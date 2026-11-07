@@ -1,0 +1,15 @@
+{
+  "name": "Dusk",
+  "author": "Eclipse",
+  "description": "Indigo and violet glass with coral highlights: an eclipse going down over the hills.",
+  "mode": "dark",
+  "accent": "#FF7A59",
+  "focus": "#FFA27F",
+  "text": "#F4EEFA",
+  "labels": "#B9AECF",
+  "glass": "#1A1230",
+  "glassStrength": 66,
+  "dim": 28,
+  "wallpaper": "wallpaper.jpg",
+  "bottomWallpaper": "bottom.jpg"
+}

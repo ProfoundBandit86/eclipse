@@ -1,0 +1,21 @@
+{
+  "id": "gentle-flow",
+  "name": "Gentle flow",
+  "screens": ["games", "recent", "systems"],
+  "step": 0,
+  "window": 6,
+  "corner": 8,
+  "card": { "width": "h*0.52*0.75", "height": "h*0.52" },
+  "transform": {
+    "x": "d*w*0.15 + sign(d)*w*0.06",
+    "y": "0",
+    "scale": "1 - min(abs(d), 3)*0.12",
+    "rotateY": "clamp(-d*38, -55, 55)",
+    "alpha": "1 - min(abs(d), 4)*0.2",
+    "z": "-abs(d)"
+  },
+  "slots": [
+    { "kind": "backdrop", "blur": 18, "dim": 0.55 },
+    { "kind": "title", "x": "w/2", "y": "h*0.86", "align": "center", "size": 18 }
+  ]
+}

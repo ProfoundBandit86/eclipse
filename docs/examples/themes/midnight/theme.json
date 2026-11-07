@@ -1,0 +1,14 @@
+{
+  "name": "Midnight",
+  "author": "You",
+  "description": "Deep blue glass with a cyan highlight. Add wallpaper.jpg next to this file to give it a picture.",
+  "mode": "dark",
+  "accent": "#4FC3F7",
+  "focus": "#B3E5FC",
+  "text": "#EAF4FB",
+  "labels": "#9DB4C4",
+  "glass": "#0A1626",
+  "glassStrength": 70,
+  "dim": 25,
+  "wallpaperMode": "fallback"
+}

@@ -1,0 +1,15 @@
+{
+  "name": "Dune",
+  "author": "Eclipse",
+  "description": "Warm sand and cream glass with terracotta highlights: a pale eclipse over the dunes at dawn.",
+  "mode": "light",
+  "accent": "#C0533A",
+  "focus": "#E07A5F",
+  "text": "#2A1F1A",
+  "labels": "#7A6457",
+  "glass": "#FBF5EE",
+  "glassStrength": 78,
+  "dim": 14,
+  "wallpaper": "wallpaper.jpg",
+  "bottomWallpaper": "bottom.jpg"
+}

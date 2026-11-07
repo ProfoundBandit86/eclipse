@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Eclipse helper: takes screenshots of the main screen when you press the Screenshot button, notices (by app
+     name only) when an app opened from the bottom-screen dock closes, and runs the app switcher (the button you pick
+     for it, and the D-pad while it's open). It reads only the Settings app's App info page, to press Force stop
+     for apps you close in the switcher. -->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/screenshot_service_desc"
+    android:summary="@string/screenshot_service_summary"
+    android:accessibilityEventTypes="typeWindowStateChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:notificationTimeout="100"
+    android:canRetrieveWindowContent="true"
+    android:accessibilityFlags="flagRetrieveInteractiveWindows"
+    android:canTakeScreenshot="true"
+    android:canRequestFilterKeyEvents="true" />

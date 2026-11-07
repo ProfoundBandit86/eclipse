@@ -1,0 +1,22 @@
+{
+  "id": "ladder",
+  "name": "Ladder",
+  "screens": ["games"],
+  "step": 1,
+  "window": 5,
+  "corner": 10,
+  "card": { "width": "w*0.46", "height": "h*0.17" },
+  "transform": {
+    "x": "-w*0.22",
+    "y": "d*h*0.2",
+    "scale": "1 + s*0.08",
+    "alpha": "1 - min(abs(d), 3)*0.25",
+    "z": "s"
+  },
+  "slots": [
+    { "kind": "backdrop", "blur": 14, "dim": 0.5 },
+    { "kind": "logo",  "x": "w*0.56", "y": "h*0.28", "size": 70 },
+    { "kind": "title", "x": "w*0.56", "y": "h*0.5",  "size": 22 },
+    { "kind": "meta",  "x": "w*0.56", "y": "h*0.64", "size": 10 }
+  ]
+}

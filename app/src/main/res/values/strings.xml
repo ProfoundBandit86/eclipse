@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="screenshot_service_summary">Screenshots, second-screen dock and app switcher</string>
+    <string name="screenshot_service_desc">Lets Eclipse take a screenshot of the main screen when you press the Screenshot button on the second screen\'s Now Playing page (saved to Pictures/Eclipse), bring the second-screen dock back when you close an app you opened from it, and open the app switcher when you hold the button you chose for it (only that button, and the D-pad while the switcher is open, are caught). When you close an app in the switcher, Eclipse opens its App info page and presses Force stop for you; that page is the only screen it reads. Only the name of the app in front is used otherwise, and nothing is collected.</string>
+</resources>

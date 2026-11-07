@@ -1,0 +1,7 @@
+# Baseline profile: tells Android to precompile Eclipse's and Compose's code at install time, so the first launch and first scrolls are smooth.
+HSPLcom/eclipse/launcher/**->**(**)**
+Lcom/eclipse/launcher/**;
+HSPLandroidx/compose/**->**(**)**
+Landroidx/compose/**;
+HSPLcoil/**->**(**)**
+Lcoil/**;

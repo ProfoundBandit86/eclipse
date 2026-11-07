@@ -1,0 +1,15 @@
+{
+  "name": "Frost",
+  "author": "Eclipse",
+  "description": "White and light blue: an icy eclipse, cool white glass and sky-blue highlights.",
+  "mode": "light",
+  "accent": "#2E86D1",
+  "focus": "#4FA9EC",
+  "text": "#13202E",
+  "labels": "#46586A",
+  "glass": "#F4F8FD",
+  "glassStrength": 74,
+  "dim": 20,
+  "wallpaper": "wallpaper.jpg",
+  "bottomWallpaper": "bottom.jpg"
+}
