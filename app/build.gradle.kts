@@ -1,8 +1,25 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+// Version: GitHub Actions passes it in from the release tag (v1.2.3 → "1.2.3", code 10203); local builds use these.
+val appVersionName = System.getenv("VERSION_NAME") ?: "0.1.0"
+val appVersionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 100
+
+// Signing key for releases. GitHub Actions: environment variables from the repository's secrets.
+// Your own machine: keystore.properties next to settings.gradle.kts (made by tools/make-signing-key.sh, never committed).
+// Neither there: release builds come out unsigned and local builds keep using the debug key.
+val keyProps = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.isFile) f.inputStream().use { load(it) }
+}
+fun signingValue(env: String, prop: String): String? = System.getenv(env)?.takeIf { it.isNotBlank() } ?: keyProps.getProperty(prop)
+val keystorePath = signingValue("SIGNING_KEYSTORE", "storeFile")
+val hasReleaseKey = keystorePath != null && file(keystorePath).isFile
 
 android {
     namespace = "com.eclipse.launcher"
@@ -12,8 +29,17 @@ android {
         applicationId = "com.eclipse.launcher"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
+    }
+
+    signingConfigs {
+        if (hasReleaseKey) create("release") {
+            storeFile = file(keystorePath!!)
+            storePassword = signingValue("SIGNING_STORE_PASSWORD", "storePassword")
+            keyAlias = signingValue("SIGNING_KEY_ALIAS", "keyAlias")
+            keyPassword = signingValue("SIGNING_KEY_PASSWORD", "keyPassword")
+        }
     }
 
     buildTypes {
@@ -24,11 +50,15 @@ android {
             isShrinkResources = true
             isDebuggable = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // with your release key on this machine, your own builds are signed like the GitHub releases, so
+            // Obtainium's updates install over them (and they over Obtainium's)
+            if (hasReleaseKey) signingConfig = signingConfigs.getByName("release")
         }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (hasReleaseKey) signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {

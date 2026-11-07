@@ -14,3 +14,9 @@ local.properties
 captures/
 .externalNativeBuild/
 .cxx/
+
+# signing key and its passwords: never commit these
+*.jks
+*.keystore
+keystore.properties
+keystore-base64.txt

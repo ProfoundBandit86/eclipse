@@ -15,7 +15,7 @@
 <p align="center">
   <a href="#features">Features</a> ·
   <a href="#supported-systems">Systems</a> ·
-  <a href="#installation">Installation</a> ·
+  <a href="#installation">Install</a> ·
   <a href="#controls">Controls</a> ·
   <a href="#documentation">Documentation</a> ·
   <a href="#faq">FAQ</a>
@@ -207,19 +207,28 @@ own.
 
 ## Installation
 
-Eclipse is installed from source with the included script, which builds the app and installs it on a device connected
-over USB:
+### With Obtainium (recommended)
+
+[Obtainium](https://github.com/ImranR98/Obtainium) installs Eclipse straight from this repository's releases and keeps it
+up to date:
+
+1. Install Obtainium on your device.
+2. Tap **Add App**, paste this repository's address, and tap **Add**.
+3. Obtainium installs the latest version and lets you know when a new one is out.
+
+### From a release
+
+Download the APK from the [latest release](../../releases/latest) and open it on your device (allow installs from your
+browser or file manager when Android asks).
+
+### From source
+
+With JDK 17+ and the Android SDK installed (`ANDROID_HOME` pointing at the SDK):
 
 ```sh
-./build-and-install.sh            # build, install and open on the connected device
-./build-and-install.sh --build    # build only; the APK is in app/build/outputs/apk/debug/
+./gradlew assembleDebug                   # the APK is in app/build/outputs/apk/debug/
+adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
-
-On Ubuntu and Debian the script installs anything missing the first time (JDK 17, and the Android SDK in
-`~/Android/Sdk`). On other systems, install JDK 17+ and the Android SDK yourself and point `ANDROID_HOME` at the SDK.
-
-**Preparing the device (once):** Settings → About → tap *Build number* seven times, then turn on Developer options →
-*USB debugging*. Allow USB debugging on the device the first time you plug it in.
 
 ## First run
 
@@ -250,6 +259,7 @@ Every screen also works with touch.
 | [Creating themes and view types](docs/CREATING.md) | Colours, wallpapers, fonts, system icons and backdrops, and your own view types |
 | [Custom views](docs/VIEWS.md) | Defining your own view types in JSON |
 | [Examples](docs/examples) | Ready-made themes and views to start from |
+| [Releasing](docs/RELEASING.md) | Publishing signed releases on GitHub for Obtainium |
 
 ## FAQ
 
