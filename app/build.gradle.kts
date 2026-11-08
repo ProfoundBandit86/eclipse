@@ -6,9 +6,14 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-// Version: GitHub Actions passes it in from the release tag (v1.2.3 → "1.2.3", code 10203); local builds use these.
-val appVersionName = System.getenv("VERSION_NAME") ?: "0.1.0"
-val appVersionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 100
+// Version: GitHub Actions passes it in (from the tag or version.properties); local builds read version.properties.
+val versionFile = Properties().apply {
+    val f = rootProject.file("version.properties")
+    if (f.isFile) f.inputStream().use { load(it) }
+}
+val appVersionName = System.getenv("VERSION_NAME") ?: versionFile.getProperty("VERSION_NAME") ?: "0.1.0"
+val appVersionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: appVersionName.substringBefore('-').split('.')
+    .let { p -> (p.getOrNull(0)?.toIntOrNull() ?: 0) * 10000 + (p.getOrNull(1)?.toIntOrNull() ?: 0) * 100 + (p.getOrNull(2)?.toIntOrNull() ?: 0) }
 
 // Signing key for releases. GitHub Actions: environment variables from the repository's secrets.
 // Your own machine: keystore.properties next to settings.gradle.kts (made by tools/make-signing-key.sh, never committed).

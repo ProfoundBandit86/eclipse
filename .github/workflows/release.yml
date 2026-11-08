@@ -1,10 +1,13 @@
-# Builds a signed APK and publishes it as a GitHub release whenever a version tag is pushed:
-#   git tag v0.2.0 && git push origin v0.2.0
+# Builds a signed APK and publishes it as a GitHub release, either
+#   - when version.properties changes on main (raise VERSION_NAME and push), or
+#   - when a version tag is pushed:  git tag v0.2.0 && git push origin v0.2.0
 # Obtainium watches the repository's releases and offers each new APK as an update.
 name: Release
 
 on:
   push:
+    branches: [main]
+    paths: [version.properties]
     tags: ["v*"]
 
 permissions:
@@ -23,11 +26,16 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Version from the tag
+      - name: Version (from the tag, else version.properties)
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"            # v1.2.3 → 1.2.3 (v1.2.3-beta1 → 1.2.3-beta1)
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"          # v1.2.3 → 1.2.3 (v1.2.3-beta1 → 1.2.3-beta1)
+          else
+            VERSION="$(grep -E '^VERSION_NAME=' version.properties | cut -d= -f2 | tr -d '[:space:]')"
+          fi
           IFS=. read -r MAJOR MINOR PATCH <<< "${VERSION%%-*}"
           echo "VERSION_NAME=$VERSION" >> "$GITHUB_ENV"
+          echo "TAG=v$VERSION" >> "$GITHUB_ENV"
           echo "VERSION_CODE=$(( 10#${MAJOR:-0} * 10000 + 10#${MINOR:-0} * 100 + 10#${PATCH:-0} ))" >> "$GITHUB_ENV"
 
       - name: Signing key
@@ -53,7 +61,9 @@ jobs:
       - name: Publish the release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.TAG }}
+          target_commitish: ${{ github.sha }}
           name: Eclipse ${{ env.VERSION_NAME }}
           files: Eclipse-${{ env.VERSION_NAME }}.apk
           generate_release_notes: true
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ contains(env.VERSION_NAME, '-') }}
