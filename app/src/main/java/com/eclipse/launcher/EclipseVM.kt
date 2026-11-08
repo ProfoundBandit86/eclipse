@@ -106,6 +106,8 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
 
     var dock by mutableStateOf(store.list("dock"))
     var homeSection by mutableStateOf(HomeSection.RECENTS)
+    /** The right panel's last highlighted row, per panel ("screen/title" → row title); forgotten when you leave the page. */
+    val drawerMemory = HashMap<String, String>()
     var dockNav = false                                     // true while Up / Down is moving focus inside the dock
     var dockFocused by mutableStateOf(false)               // the controller is in the left dock (Home previews its rows)
     var lastPlatform by mutableStateOf<String?>(null)    // platform card the controller was last on
@@ -3107,6 +3109,13 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
      */
     private fun resumeIfGame(pkg: String) {
         if (session != null) return
+        // kept on disk too: Android may have closed Eclipse in the background while you played
+        if (lastSession == null) runCatching {
+            val parts = store.str("last_session").split('\n')
+            val g = games.firstOrNull { it.id == parts.getOrNull(0) }
+            val p = parts.getOrNull(1)
+            if (g != null && !p.isNullOrBlank()) { lastSession = g to p; lastSessionEnd = parts.getOrNull(2)?.toLongOrNull() ?: 0L }
+        }
         val (g, gamePkg) = lastSession ?: return
         if (pkg != gamePkg || System.currentTimeMillis() - lastSessionEnd > 12 * 3_600_000L) return
         val s = Session(g, System.currentTimeMillis())
@@ -3211,7 +3220,10 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     fun endSession() {
         val s = session ?: return
         // remembered: if this game's app comes back to the front (app switcher, Recents), its session picks up again
-        sessionPkg()?.let { lastSession = s.game to it; lastSessionEnd = System.currentTimeMillis() }
+        sessionPkg()?.let {
+            lastSession = s.game to it; lastSessionEnd = System.currentTimeMillis()
+            store.putStr("last_session", "${s.game.id}\n$it\n$lastSessionEnd")
+        }
         rommPushSaves(s.game, s.startMs)
         val secs = ((System.currentTimeMillis() - s.startMs) / 1000).coerceIn(0L, MAX_SESSION_SECS)
         val total = (playtime[s.game.id]?.toLongOrNull() ?: 0L) + secs

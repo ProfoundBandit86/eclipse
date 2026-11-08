@@ -307,8 +307,10 @@ object AppSwitcher {
                 main.post { if (st.shots[e.pkg] == null) st.shots[e.pkg] = b.asImageBitmap() }
             }
         }.start()
-        // a fresh picture of the app on screen now (before the overlay covers it)
-        capture(svc, st.apps.first().pkg, st)
+        // a fresh picture of the app on screen now (before the overlay covers it), but only when that app has a card:
+        // opened from Eclipse (which has none), the screen shows Eclipse, not the first card's app
+        val onScreen = st.current
+        if (onScreen != null && onScreen != svc.packageName && st.apps.any { it.pkg == onScreen }) capture(svc, onScreen, st)
         addOverlay(svc, st)
     }
 

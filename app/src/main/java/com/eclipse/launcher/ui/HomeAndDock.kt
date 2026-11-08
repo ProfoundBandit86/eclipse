@@ -1587,7 +1587,12 @@ fun OptionsDrawer(
     val viewLists = lists.withIndex().filter { it.value.title !in sortTitles }
     // the drawer opens with the controller on its first option (the switch when it has none)
     val firstOpt = if (sortLists.isNotEmpty()) headers[sortLists.first().index] else if (viewLists.isNotEmpty()) headers[viewLists.first().index] else switchFr
-    LaunchedEffect(Unit) { withFrameNanos { }; runCatching { firstOpt.requestFocus() } }
+    // ...or back on the row you were on, if you've had this panel open since you came to this page
+    val memKey = "${vm.screen}/$title"
+    val remembered = vm.drawerMemory[memKey]?.let { t -> lists.indexOfFirst { it.title == t }.takeIf { it >= 0 } }
+        ?.let { headers[it] }
+    LaunchedEffect(Unit) { withFrameNanos { }; runCatching { (remembered ?: firstOpt).requestFocus() } }
+    val memo: (String) -> (Boolean) -> Unit = { t -> { f -> if (f) vm.drawerMemory[memKey] = t } }
     // light mode: off-white panel, white cards, near-black writing and darker greys (DockLightPal)
     CompositionLocalProvider(LocalPal provides if (light) DockLightPal else LocalPal.current) {
     Box(Modifier.fillMaxHeight().width(270.dp).clip(shape)) {
@@ -1628,12 +1633,12 @@ fun OptionsDrawer(
             if (!system) {
                 if (sortLists.isNotEmpty()) {
                     DockHeading("Sort")
-                    sortLists.forEach { (i, l) -> DrawerListRow(l, headers[i], open, { open = it }, scope, null) }
+                    sortLists.forEach { (i, l) -> DrawerListRow(l, headers[i], open, { open = it }, scope, memo(l.title)) }
                 }
                 if (viewLists.isNotEmpty() || size != null || extra != null) {
                     DockHeading("View")
                     viewLists.forEachIndexed { n, (i, l) ->
-                        DrawerListRow(l, headers[i], open, { open = it }, scope, null)
+                        DrawerListRow(l, headers[i], open, { open = it }, scope, memo(l.title))
                         // the size drop-down sits where the screen asked for it (after its first [sizeAt] lists)
                         if (size != null && i == sizeAt - 1) size.invoke(this)
                     }

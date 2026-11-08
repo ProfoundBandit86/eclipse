@@ -86,6 +86,8 @@ fun Root(vm: EclipseVM, pickFolder: () -> Unit, pickImage: () -> Unit) {
     val overlayOpen = vm.menuGame != null || vm.artGame != null || vm.platArtScreen != null || vm.dockMenu != null ||
         vm.setupOpen || vm.platReorder || vm.appearancePicker != null || vm.appMenu != null || vm.platformMenu != null || vm.emuMenu != null || vm.sysEdit != null || vm.viewMenu || vm.searchOpen || vm.onDeckRemove != null || vm.hiddenScreen || vm.storeDelete != null || vm.colorPicker != null || vm.themeImport != null || vm.smbBrowse != null || vm.packImport != null || vm.rommAsk != null || vm.rommDiscAsk != null || vm.toolsOpen || !vm.splashDone
     // when the last menu closes, put the controller back where it was
+    // leaving a page: its right panel opens on its first row again next time
+    LaunchedEffect(vm.screen, vm.homeSection, vm.platformSel) { vm.drawerMemory.clear() }
     LaunchedEffect(overlayOpen) {
         if (!overlayOpen) {
             withFrameNanos { }
