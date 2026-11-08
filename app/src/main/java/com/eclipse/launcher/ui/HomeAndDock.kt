@@ -353,7 +353,7 @@ fun Clock(vm: EclipseVM, modifier: Modifier = Modifier, color: Color? = null) {
 @Composable
 fun CornerClock(vm: EclipseVM, modifier: Modifier = Modifier) {
     // a right-hand drawer open: it shows the clock, battery and Wi-Fi itself (its top bar)
-    if (!vm.flag("clock_panel", false)) { if (!vm.drawerOpen()) Clock(vm, modifier.padding(28.dp)); return }
+    if (!vm.flag("clock_panel", true)) { if (!vm.drawerOpen()) Clock(vm, modifier.padding(28.dp)); return }
     val ctx = androidx.compose.ui.platform.LocalContext.current
     var net by remember { mutableStateOf(QuickSettings.network(ctx)) }
     var level by remember { mutableIntStateOf(QuickSettings.wifiLevel(ctx)) }

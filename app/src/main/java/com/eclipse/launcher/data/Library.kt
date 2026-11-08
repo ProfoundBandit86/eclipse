@@ -153,7 +153,9 @@ object AppsLoader {
         com.eclipse.launcher.media.SecondScreenHost.lastLaunchMs = System.currentTimeMillis()
         // Android brings an app that's already running back up on the screen it's on, whichever screen was asked for.
         // If it was last opened on the other screen, start it in a new window on this one.
-        val moved = lastDisplay[pkg].let { it != null && it != displayId }
+        // On the bottom screen an app with no known screen is treated as moved too: it may already be running on the
+        // top one (opened from elsewhere, or before Eclipse restarted), and Android would just bring that window back.
+        val moved = lastDisplay[pkg].let { if (displayId != com.eclipse.launcher.media.Screens.mainId) it != displayId else it != null && it != displayId }
         lastDisplay[pkg] = displayId
         @Suppress("NAME_SHADOWING")
         val opts = opts ?: android.app.ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle()
@@ -165,12 +167,15 @@ object AppsLoader {
         pm.getLaunchIntentForPackage(pkg)?.let { attempts.add(it) }
         pm.getLeanbackLaunchIntentForPackage(pkg)?.let { attempts.add(it) }
         var last: Exception? = null
+        // started through Eclipse's helper when it's on: Android can quietly block Eclipse's own launches while a
+        // game or app covers the top screen (Eclipse then counts as "in the background")
+        val starter = com.eclipse.launcher.media.ScreenshotService.starter() ?: ctx
         for (i in attempts) {
             i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
             // open as a separate window on this screen (clearing the old task would just restart it on the other screen)
             if (moved) i.addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
             try {
-                ctx.startActivity(i, opts)
+                try { starter.startActivity(i, opts) } catch (e: Exception) { if (starter === ctx) throw e; ctx.startActivity(i, opts) }
                 return null
             } catch (e: Exception) {
                 last = e

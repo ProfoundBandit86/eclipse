@@ -45,6 +45,13 @@ class ScreenshotService : AccessibilityService() {
             }
         }
 
+        /**
+         * A context to start apps from. Android lets an accessibility service start activities even while Eclipse is in
+         * the background (a game on the top screen), where its own launches from the bottom screen can be blocked
+         * without an error. Null when the helper is off.
+         */
+        fun starter(): android.content.Context? = instance
+
         /** Observable from Compose: true while the user has the service turned on. */
         val ready = mutableStateOf(false)
 

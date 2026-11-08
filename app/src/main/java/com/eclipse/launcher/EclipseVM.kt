@@ -91,6 +91,20 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     var artGame by mutableStateOf<Game?>(null)
     var pendingKind by mutableStateOf(ArtKind.BOX)
     var message by mutableStateOf<String?>(null)
+
+    /**
+     * Eclipse's own pop-up (ui/NoticeToast.kt): [kind] in gold small caps ("CONVERTED TO CHD"), the game, a detail, the
+     * game's [art] with a badge for [tone] ("ok", "down", "up", "chd", "error"; "" = a plain message).
+     */
+    data class Notice(val kind: String, val title: String, val detail: String? = null, val art: String? = null, val tone: String = "")
+    var notice by mutableStateOf<Notice?>(null)
+
+    /** Shows [n] in Eclipse's pop-up while Eclipse is on screen; otherwise as Android's toast (it shows over other apps). */
+    fun showNotice(n: Notice) {
+        if (resumed) notice = n
+        else message = listOfNotNull(n.kind.takeIf { it.isNotEmpty() }?.lowercase()?.replaceFirstChar { it.uppercase() }, n.title).joinToString(": ")
+    }
+    val isResumed: Boolean get() = resumed
     var shotStatus by mutableStateOf<String?>(null)   // feedback shown on the bottom screen
 
     // ---- data (large sets are loaded from files in the background; see init) ----
@@ -863,7 +877,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     /** The conversion itself (the Convert button, and auto-convert for new discs). */
     /**
      * [romm]: a disc just downloaded from RomM. Its game is added by `rommInstalled` and a multi-disc game's playlist
-     * is written by `gatherDiscs` once every disc is there, so no playlists and no rescan here (both used to run after
+     * is kept up to date by `updateDiscPlaylist` as each disc is ready, so no playlists and no rescan here (both used to run after
      * each disc: a playlist of only the discs done so far, which then hid them from the library).
      */
     private fun runChd(items: List<ChdItem>, del: Boolean, auto: Boolean, romm: Boolean = false, onDone: ((saved: Long, ok: Int) -> Unit)? = null) {
@@ -912,10 +926,15 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
                 if (chdCancel) log.add("Stopped. Discs already finished are kept.")
                 else log.add("Done. Saved ${fmtBytes(maxOf(0L, saved))}.")
                 chdLog = log.toList()
-                if (auto) {
+                if (auto && !romm) {
+                    // (a RomM download's conversion is told in its "ready" pop-up instead)
                     val ok = log.count { it.startsWith("\u2713") }
-                    if (ok > 0) message = "Converted ${if (ok == 1) items.first().src.nameWithoutExtension else "$ok discs"} to CHD"
-                    else if (log.any { it.startsWith("\u2717") }) message = "Couldn't convert ${items.first().src.nameWithoutExtension} to CHD (originals kept)"
+                    val first = items.first().src
+                    val g = games.firstOrNull { it.path == first.absolutePath || it.path == File(first.parentFile, first.nameWithoutExtension + ".chd").absolutePath }
+                    val pic = g?.let { artOf(it, ArtKind.BOX) }
+                    if (ok > 0) showNotice(Notice("Converted to CHD", if (ok == 1) (g?.name ?: first.nameWithoutExtension) else "$ok discs",
+                        if (saved > 0) "Saved ${fmtBytes(saved)}" else null, pic, "chd"))
+                    else if (log.any { it.startsWith("\u2717") }) showNotice(Notice("Couldn't convert", g?.name ?: first.nameWithoutExtension, "The originals were kept", pic, "error"))
                 }
             } finally {
                 runCatching { lock.release() }
@@ -2312,37 +2331,44 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
      * playlist (art, description and the RomM link move over from disc 1).
      */
     /**
-     * A disc of a multi-disc RomM game was installed ([file]). Once every disc of the game is in that folder, the
-     * playlist is (re)written with all of them and the library shows the game once, as the playlist. Works from the
-     * folder itself, so an earlier, shorter playlist (or a rescan that hid the discs) doesn't stop it.
+     * A disc of a multi-disc RomM game is ready ([file]: just downloaded, or just converted to CHD). The game is in the
+     * library as ONE entry, its playlist, from the first disc on, and the playlist is rewritten every time another
+     * disc is ready: every disc of the game in that folder, in its best form (CHD before .cue...). Any separate entry
+     * for one of its discs (a raw .cue picked up by a scan, say) is removed. Returns the game.
      */
-    private fun gatherDiscs(rom: RomM.Rom, file: File) {
-        val set = rommDiscs[rom.id] ?: return
-        val dir = file.parentFile ?: return
-        val ds = com.eclipse.launcher.data.M3u.inFolder(dir).firstOrNull { s -> s.discs.any { it.absolutePath == file.absolutePath } } ?: return
-        if (ds.discs.size < set.size) return // not every disc is here yet
-        val m3u = runCatching { com.eclipse.launcher.data.M3u.write(ds) }.getOrNull() ?: return
+    private fun updateDiscPlaylist(rom: RomM.Rom, file: File): Game? {
+        val set = rommDiscs[rom.id] ?: return null
+        val dir = file.parentFile ?: return null
+        val title = com.eclipse.launcher.data.M3u.titleOf(file.nameWithoutExtension)
+        if (title.isEmpty()) return null
+        fun sameGame(x: File) = com.eclipse.launcher.data.M3u.discNumber(x.nameWithoutExtension) != null &&
+            com.eclipse.launcher.data.M3u.titleOf(x.nameWithoutExtension).replace(TRACK_TAG, "").trim().equals(title, ignoreCase = true)
+        // each disc's best file: the order of DISC_EXTS (chd first)
+        val discs = (dir.listFiles()?.toList() ?: emptyList())
+            .filter { it.isFile && it.extension.lowercase() in DISC_EXTS && sameGame(it) }
+            .groupBy { com.eclipse.launcher.data.M3u.discNumber(it.nameWithoutExtension)!! }
+            .toSortedMap()
+            .map { (_, files) -> files.minByOrNull { DISC_EXTS.indexOf(it.extension.lowercase()) }!! }
+        if (discs.isEmpty()) return null
+        val m3u = File(dir, "$title.m3u")
+        if (runCatching { m3u.writeText(discs.joinToString("\n") { it.name } + "\n") }.isFailure) return null
         val head = set.first()
         val pg = Game("g" + Integer.toHexString(m3u.absolutePath.hashCode()), com.eclipse.launcher.data.M3u.titleOf(head.name), head.bp, m3u.absolutePath)
         val setIds = set.map { it.id.toString() }.toSet()
-        val discPaths = ds.discs.map { it.absolutePath }.toSet()
-        // the discs as separate games: linked to this RomM set, or simply one of its files
-        val discIds = (rommLink.filterValues { it in setIds }.keys + games.filter { it.path in discPaths }.map { it.id }).toSet() - pg.id
-        // artwork / description from the first disc, when it was listed on its own
-        installedRom(head.id)?.id?.takeIf { it != pg.id }?.let { first ->
-            art = HashMap(art).apply { art.filterKeys { it.startsWith("$first|") }.forEach { (k, v) -> putIfAbsent(pg.id + k.removePrefix(first), v) } }
-            desc[first]?.let { if (desc[pg.id] == null) desc = desc + (pg.id to it) }
-        }
-        if (art.keys.none { it.startsWith("${pg.id}|") }) {
-            val newArt = HashMap(art)
-            head.cover?.let { newArt.putIfAbsent("${pg.id}|${ArtKind.BOX.key}", it) }
-            head.screenshot?.let { newArt.putIfAbsent("${pg.id}|${ArtKind.BACKDROP.key}", it) }
-            art = newArt
-        }
+        // its discs as separate games (linked to this RomM set, or any file of it in this folder, gone or not)
+        val discIds = (rommLink.filterValues { it in setIds }.keys +
+            games.filter { g -> !g.path.endsWith(".m3u", true) && File(g.path).let { f -> f.parentFile?.absolutePath == dir.absolutePath && sameGame(f) } }.map { it.id }
+            ).toSet() - pg.id
+        val newArt = HashMap(art)
+        head.cover?.let { newArt.putIfAbsent("${pg.id}|${ArtKind.BOX.key}", it) }
+        head.screenshot?.let { newArt.putIfAbsent("${pg.id}|${ArtKind.BACKDROP.key}", it) }
+        art = newArt
         head.summary?.let { if (desc[pg.id] == null) desc = desc + (pg.id to it) }
         games = games.filter { it.id !in discIds }.let { l -> if (l.none { it.id == pg.id }) l + pg else l }
         rommLink = rommLink.filterKeys { it !in discIds } + (pg.id to head.id.toString())
+        if (recent.any { it in discIds }) { recent = recent.filter { it !in discIds }; store.putList("recent", recent) }
         persistGames(); persistArt(); persistDesc(); persistRomm()
+        return pg
     }
 
     /**
@@ -2363,11 +2389,11 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
             val shotOk = ok && shot != null && RomM.pictureBytes(shot)?.let { b ->
                 RomM.uploadScreenshot(c, rid, b, "eclipse-backdrop." + (shot.substringAfterLast('.', "jpg").take(4).lowercase().takeIf { it in setOf("png", "jpg", "jpeg", "webp") } ?: "jpg"))
             } == true
-            message = when {
-                !ok -> "RomM didn't accept it (it needs an editor or admin account)"
-                shotOk -> "Sent ${g.name}'s name, description, box art and backdrop to RomM"
-                else -> "Sent ${g.name}'s name, description and box art to RomM"
-            }
+            showNotice(when {
+                !ok -> Notice("Couldn't send to RomM", g.name, "It needs an editor or admin account", box, "error")
+                shotOk -> Notice("Sent to RomM", g.name, "Name, description, box art and backdrop", box, "up")
+                else -> Notice("Sent to RomM", g.name, "Name, description and box art", box, "up")
+            })
             if (ok) rommSync(quiet = true)
         }
     }
@@ -2987,13 +3013,20 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         }
         RommDownloads.onFailed = { rom ->
             addTransfer(Transfer(false, rom.name, rom.bp, System.currentTimeMillis(), false, 0L))
-            message = "Couldn't download ${rom.name}"
+            showNotice(Notice("Couldn't download", rom.name, "Check the connection to RomM and try again", rom.cover, "error"))
         }
     }
 
     /** A download finished: it's a normal local game now, with the same id a rescan will give it. */
-    private fun rommInstalled(rom: RomM.Rom, file: File, playNow: Boolean, converted: Boolean = false) {
+    private fun rommInstalled(rom: RomM.Rom, file: File, playNow: Boolean, converted: Boolean = false, savedBytes: Long = 0L) {
+        // a disc of a multi-disc game: the game (its playlist) is there from the first disc, updated with each one
+        if (rommDiscs[rom.id] != null) {
+            val pg = updateDiscPlaylist(rom, file)
+            if (!converted && convertThenInstall(rom, file, playNow)) return
+            if (pg != null) { readyNotice(rom, pg.name, converted, savedBytes); if (playNow) play(pg); return }
+        }
         if (!converted && convertThenInstall(rom, file, playNow)) return
+        readyNotice(rom, rom.name, converted, savedBytes)
         val g = Game("g" + Integer.toHexString(file.absolutePath.hashCode()), rom.name, rom.bp, file.absolutePath)
         if (games.none { it.id == g.id }) games = games + g
         rommLink = rommLink + (g.id to rom.id.toString())
@@ -3004,8 +3037,19 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         rom.summary?.let { if (desc[g.id] == null) desc = desc + (g.id to it) }
         persistGames(); persistArt(); persistDesc(); persistRomm()
         if (playNow) play(g)
-        // the last disc of a multi-disc game: one game with a playlist
-        if (rommDiscs[rom.id] != null) gatherDiscs(rom, file)
+    }
+
+    /** The "ready" pop-up of a RomM download (a disc of a multi-disc game says which disc). */
+    private fun readyNotice(rom: RomM.Rom, name: String, converted: Boolean, savedBytes: Long) {
+        val set = rommDiscs[rom.id]
+        val kind = if (set != null && set.size > 1) "Disc ${set.indexOfFirst { it.id == rom.id } + 1} of ${set.size} ready" else "Ready to play"
+        val detail = "Downloaded from RomM" + when {
+            converted && savedBytes > 0 -> " \u00b7 CHD, saved ${fmtBytes(savedBytes)}"
+            converted && savedBytes == 0L -> " \u00b7 converted to CHD"
+            converted -> " \u00b7 kept as is (CHD failed)"
+            else -> ""
+        }
+        showNotice(Notice(kind, name, detail, (set?.firstOrNull() ?: rom).cover, "ok"))
     }
 
     /**
@@ -3021,9 +3065,9 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
             while (chdJob != null) delay(1000)
             val parts = if (file.extension.equals("cue", true)) com.eclipse.launcher.data.Chd.cueFiles(file) else listOf(file)
             message = "Converting ${rom.name} to CHD\u2026"
-            runChd(listOf(ChdItem(file, parts, parts.sumOf { it.length() }, false)), chdDelete, auto = true, romm = true) { _, ok ->
+            runChd(listOf(ChdItem(file, parts, parts.sumOf { it.length() }, false)), chdDelete, auto = true, romm = true) { saved, ok ->
                 val chd = File(file.parentFile, file.nameWithoutExtension + ".chd")
-                rommInstalled(rom, if (ok > 0 && chd.isFile) chd else file, playNow, converted = true)
+                rommInstalled(rom, if (ok > 0 && chd.isFile) chd else file, playNow, converted = true, savedBytes = if (ok > 0) saved else -1L)
             }
         }
         return true

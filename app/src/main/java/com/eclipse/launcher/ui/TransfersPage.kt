@@ -8,6 +8,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.Icons
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -59,7 +65,7 @@ fun TransfersPage(vm: EclipseVM) {
             val size = d.rom.sizeBytes
             val eta = rememberEta("dl:${d.rom.id}", p)
             TxCard(
-                Color(0xFF2E7D5B), "↓", "FROM ROMM",
+                Color(0xFF2E7D5B), Icons.Filled.CloudDownload, "FROM ROMM",
                 if (downloads.size > 1) "1 of ${downloads.size}" else "",
                 d.rom.name,
                 when {
@@ -82,7 +88,7 @@ fun TransfersPage(vm: EclipseVM) {
             val elapsed = System.currentTimeMillis() - q.startedAt
             val eta = if (q.bytesDone > 0 && elapsed > 3000) (elapsed.toDouble() * (q.bytesAll - q.bytesDone) / q.bytesDone).toLong() else null
             TxCard(
-                Color(0xFFD32F2F), "↑", "TO ROMM",
+                Color(0xFF2F6FB5), Icons.Filled.CloudUpload, "TO ROMM",
                 if (q.ids.size > 1) "${q.index + 1} of ${q.ids.size}" else "",
                 q.name,
                 if (q.bytesAll > 0) "${vm.fmtBytes(q.bytesDone)} of ${vm.fmtBytes(q.bytesAll)} sent" else "Sending",
@@ -97,7 +103,7 @@ fun TransfersPage(vm: EclipseVM) {
                 val g = vm.games.firstOrNull { it.id == id }
                 val name = g?.name ?: "Game"
                 TxCard(
-                    Color(0xFFD32F2F), "↑", "TO ROMM", "", name, "Sending",
+                    Color(0xFF2F6FB5), Icons.Filled.CloudUpload, "TO ROMM", "", name, "Sending",
                     p, etaText(rememberEta("up:$id", p)),
                     cover = { m -> Cover(name, g?.let { vm.artOf(it, ArtKind.BOX) }, m) },
                     footer = null, onStop = null
@@ -109,11 +115,11 @@ fun TransfersPage(vm: EclipseVM) {
         chd?.let { j ->
             val p = j.progress
             TxCard(
-                Color(0xFF5B5FC7), "C", "CONVERT TO CHD",
+                Color(0xFF5B5BD6), Icons.Filled.Album, "CONVERT TO CHD",
                 if (j.total > 1) "${j.index} of ${j.total}" else "",
                 j.name, j.phase.replaceFirstChar { it.uppercase() },
                 p.takeIf { it >= 0f }, etaText(rememberEta("chd:${j.index}:${j.name}", p)),
-                cover = { m -> DiscTile(m) },
+                cover = { m -> DiscTile(m, remember(j.name, vm.games) { chdArt(vm, j.name) }) },
                 footer = if (vm.chdSavedTotal > 0) "Saved by CHD so far: ${vm.fmtBytes(vm.chdSavedTotal)}" else null,
                 onStop = { vm.cancelChd() }
             )
@@ -156,7 +162,7 @@ fun TransfersPage(vm: EclipseVM) {
 /** One live job: coloured glyph + kind + "n of m", then cover, name, detail, gold bar, % and time left. */
 @Composable
 private fun TxCard(
-    color: Color, glyph: String, kind: String, count: String,
+    color: Color, icon: ImageVector, kind: String, count: String,
     title: String, detail: String, progress: Float?, eta: String?,
     cover: @Composable (Modifier) -> Unit,
     footer: String?,
@@ -170,7 +176,7 @@ private fun TxCard(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(20.dp).clip(RoundedCornerShape(6.dp)).background(color), contentAlignment = Alignment.Center) {
-                Text(glyph, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
             }
             Text(kind, color = C.sub, fontSize = 9.sp, letterSpacing = 1.6.sp, modifier = Modifier.padding(start = 8.dp).weight(1f))
             if (count.isNotEmpty()) Text(count, color = C.sub, fontSize = 10.sp)
@@ -182,15 +188,16 @@ private fun TxCard(
             )
         }
         Row(Modifier.padding(top = 9.dp), verticalAlignment = Alignment.CenterVertically) {
-            cover(Modifier.size(44.dp, 58.dp).clip(RoundedCornerShape(6.dp)))
-            Column(Modifier.weight(1f).padding(start = 11.dp)) {
-                Text(title, color = C.ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(detail, color = C.sub, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 1.dp))
-                Box(Modifier.padding(top = 7.dp).fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(C.x(0x1FFFFFFFL))) {
+            // the game's art, big (about twice the old size)
+            cover(Modifier.size(92.dp, 124.dp).clip(RoundedCornerShape(10.dp)))
+            Column(Modifier.weight(1f).padding(start = 14.dp)) {
+                Text(title, color = C.ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(detail, color = C.sub, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
+                Box(Modifier.padding(top = 12.dp).fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(C.x(0x1FFFFFFFL))) {
                     if (progress != null) Box(Modifier.fillMaxHeight().fillMaxWidth(progress.coerceIn(0f, 1f)).background(C.accent))
                 }
                 Row(Modifier.padding(top = 4.dp)) {
-                    Text(if (progress != null) "${(progress * 100).toInt()}%" else "", color = C.accent, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                    Text(if (progress != null) "${(progress * 100).toInt()}%" else "", color = C.accent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                     if (eta != null) Text(eta, color = C.sub, fontSize = 10.sp)
                 }
             }
@@ -199,13 +206,22 @@ private fun TxCard(
     }
 }
 
-/** A plain disc for CHD jobs (they have no cover of their own). */
+/** The game a CHD job's disc belongs to: its disc picture, else its box art (shown inside the disc). */
+private fun chdArt(vm: EclipseVM, disc: String): String? {
+    val title = com.eclipse.launcher.data.M3u.titleOf(disc)
+    val g = vm.games.firstOrNull { java.io.File(it.path).nameWithoutExtension.let { n -> n.equals(disc, true) || n.equals(title, true) } }
+        ?: vm.games.firstOrNull { it.name.equals(title, true) }
+        ?: return null
+    return vm.artOf(g, ArtKind.MEDIA) ?: vm.artOf(g, ArtKind.BOX)
+}
+
+/** The CHD job's disc: the game's own disc art (or its box art cut round), else a plain grey disc. */
 @Composable
-private fun DiscTile(m: Modifier) {
-    Box(m.background(C.x(0x14FFFFFFL)), contentAlignment = Alignment.Center) {
-        Box(Modifier.size(36.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color(0xFF9EA3B0)), contentAlignment = Alignment.Center) {
-            Box(Modifier.size(10.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color(0xFF2A2B30)))
-        }
+private fun DiscTile(m: Modifier, art: String? = null) {
+    Box(m, contentAlignment = Alignment.Center) {
+        val disc = Modifier.size(76.dp).clip(androidx.compose.foundation.shape.CircleShape)
+        if (art != null) Cover("", art, disc) else Box(disc.background(Color(0xFF9EA3B0)))
+        Box(Modifier.size(20.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color(0xFF2A2B30)).border(3.dp, Color(0x88FFFFFF), androidx.compose.foundation.shape.CircleShape))
     }
 }
 

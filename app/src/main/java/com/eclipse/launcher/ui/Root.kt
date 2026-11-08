@@ -48,7 +48,9 @@ fun Root(vm: EclipseVM, pickFolder: () -> Unit, pickImage: () -> Unit) {
     RightStick.Driver() // right joystick scrolls the open menu's list
     LaunchedEffect(vm.message) {
         vm.message?.let {
-            Toast.makeText(ctx, it, Toast.LENGTH_SHORT).show()
+            // on screen: Eclipse's own pop-up; behind a game or app: Android's toast, which shows over it
+            if (vm.isResumed) vm.notice = com.eclipse.launcher.EclipseVM.Notice("", it)
+            else Toast.makeText(ctx, it, Toast.LENGTH_SHORT).show()
             vm.message = null
         }
     }
@@ -352,6 +354,8 @@ fun Root(vm: EclipseVM, pickFolder: () -> Unit, pickImage: () -> Unit) {
             }
         }
         if (vm.tutorialOpen) Tutorial(vm)
+        // pop-ups (downloads, conversions, messages): above everything but the opening animation
+        NoticeHost(vm)
         // the opening animation, over everything (once per start)
         if (!vm.splashDone) EclipseSplash(vm)
     }

@@ -286,7 +286,7 @@ private fun General(vm: EclipseVM) {
     TwoColumns({
         DropSection("Clock")
         ToggleRow("24-hour clock", null, vm.flag("h24", false)) { vm.setFlag("h24", it) }
-        ToggleRow("Clock panel", "The time and Wi-Fi on a black panel in the top-right corner, so they stand out over artwork.", vm.flag("clock_panel", false)) { vm.setFlag("clock_panel", it) }
+        ToggleRow("Clock panel", "The time and Wi-Fi on a black panel in the top-right corner, so they stand out over artwork.", vm.flag("clock_panel", true)) { vm.setFlag("clock_panel", it) }
         DropSection("Left dock")
         ToggleRow("Auto-hide dock", "Slides away when you move into a screen; press left at the edge to bring it back.", vm.flag("dock_autohide")) { vm.setFlag("dock_autohide", it) }
         ToggleRow("Compact dock", "Icons only, no names.", vm.flag("dock_compact", false)) { vm.setFlag("dock_compact", it) }

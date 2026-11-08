@@ -12,6 +12,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.PriorityHigh
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Pause
@@ -121,74 +126,102 @@ fun TransientArea(vm: EclipseVM, tick: Int) {
     val downloads = RommDownloads.items.value
     val allNotes by MediaListener.items.collectAsState()
     val ownPkg = ctx.packageName
-    val cards = ArrayList<@Composable () -> Unit>()
+    val items = ArrayList<NowItem>()
     downloads.filter { it.state != RommDownloads.State.FAILED }.forEach { d ->
         val p = d.progress
-        cards += {
-            NowCard(
-                Color(0xFF2E7D5B), "\u2193", if (d.state == RommDownloads.State.QUEUED) "ROMM \u00b7 QUEUED" else "ROMM \u00b7 DOWNLOAD",
-                if (p >= 0f) "${(p * 100).toInt()}%" else "", d.rom.name, if (p >= 0f) p else null
-            )
-        }
+        items += NowItem(
+            Color(0xFF2E7D5B), Icons.Filled.CloudDownload, "", if (d.state == RommDownloads.State.QUEUED) "ROMM \u00b7 QUEUED" else "ROMM \u00b7 DOWNLOAD",
+            if (p >= 0f) "${(p * 100).toInt()}%" else "", d.rom.name, if (p >= 0f) p else null
+        )
     }
     vm.uploads.entries.toList().forEach { (id, p) ->
         val name = vm.games.firstOrNull { it.id == id }?.name ?: "Game"
-        cards += { NowCard(Color(0xFFD32F2F), "\u2191", "ROMM \u00b7 UPLOAD", "${(p * 100).toInt()}%", name, p) }
+        items += NowItem(Color(0xFF2F6FB5), Icons.Filled.CloudUpload, "", "ROMM \u00b7 UPLOAD", "${(p * 100).toInt()}%", name, p)
     }
     vm.chdJob?.let { j ->
-        cards += {
-            NowCard(Color(0xFF5B5FC7), "C", "CHD \u00b7 ${j.phase.uppercase()}", if (j.total > 1) "${j.index} / ${j.total}" else "", j.name, j.progress.takeIf { it >= 0f })
-        }
+        items += NowItem(Color(0xFF5B5BD6), Icons.Filled.Album, "", "CHD \u00b7 ${j.phase.uppercase()}", if (j.total > 1) "${j.index} / ${j.total}" else "${(j.progress * 100).toInt().coerceAtLeast(0)}%", j.name, j.progress.takeIf { it >= 0f })
     }
     // finished transfers stay a few seconds
     vm.transfers.filter { now - it.time < 6_000 }.take(2).forEach { t ->
-        cards += {
-            NowCard(
-                if (t.ok) Color(0xFF2E7D5B) else Color(0xFF8C3B3B), if (t.ok) "\u2713" else "!",
-                "ROMM \u00b7 " + (if (t.up) "UPLOAD" else "DOWNLOAD") + (if (t.ok) " DONE" else " FAILED"), "", t.name, null
-            )
-        }
+        items += NowItem(
+            if (t.ok) Color(0xFF2E7D5B) else Color(0xFF8C3B3B), if (t.ok) Icons.Filled.Check else Icons.Filled.PriorityHigh, "",
+            "ROMM \u00b7 " + (if (t.up) "UPLOAD" else "DOWNLOAD") + (if (t.ok) " DONE" else " FAILED"), "", t.name, null
+        )
     }
     // system notifications that just came in
     allNotes.filter { it.pkg != ownPkg && now - it.time < 8_000 }.take(2).forEach { n ->
-        cards += {
-            NowCard(
-                appColor(n.pkg), n.app.take(1).uppercase(), n.app.uppercase(), ago(n.time).uppercase(),
-                listOf(n.title, n.text).filter { it.isNotBlank() }.joinToString(": "), null
-            )
-        }
+        items += NowItem(
+            appColor(n.pkg), null, n.app.take(1).uppercase(), n.app.uppercase(), ago(n.time).uppercase(),
+            listOf(n.title, n.text).filter { it.isNotBlank() }.joinToString(": "), null
+        )
     }
-    if (cards.isEmpty()) return
+    if (items.isEmpty()) return
+    // the header folds the section to one line (remembered: Settings flag "now_open")
+    val open = vm.flag("now_open", true)
     Column(Modifier.padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("NOW", color = DockGold, fontSize = 8.sp, letterSpacing = 2.sp)
-            Box(Modifier.padding(horizontal = 8.dp).weight(1f).height(1.dp).background(C.x(0x1AFFFFFFL)))
-            Text("${cards.size}", color = C.sub, fontSize = 8.sp)
+        FocusBox(onClick = { vm.setFlag("now_open", !open) }, shape = RoundedCornerShape(9.dp), focusKey = "dock:now") { _ ->
+            Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("NOW", color = DockGold, fontSize = 8.sp, letterSpacing = 2.sp)
+                Box(Modifier.padding(horizontal = 8.dp).weight(1f).height(1.dp).background(C.x(0x1AFFFFFFL)))
+                Text("${items.size}", color = C.sub, fontSize = 8.sp)
+                Icon(if (open) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = if (open) "Fold" else "Open",
+                    tint = C.sub, modifier = Modifier.padding(start = 4.dp).size(14.dp))
+            }
         }
-        cards.take(5).forEach { it() }
+        if (open) items.take(5).forEach { NowCard(it) }
+        else NowSummary(items.first(), items.size - 1)
     }
 }
 
-/** One live card: a coloured glyph, what it is and its percentage, the name, and a gold progress line. */
+/** One thing happening now, for the right panel's NOW section. [icon] or, without one, [glyph] (an app's first letter). */
+private class NowItem(
+    val color: Color, val icon: androidx.compose.ui.graphics.vector.ImageVector?, val glyph: String,
+    val kind: String, val right: String, val title: String, val progress: Float?
+)
+
 @Composable
-private fun NowCard(color: Color, glyph: String, kind: String, right: String, title: String, progress: Float?) {
+private fun NowBadge(it: NowItem, size: androidx.compose.ui.unit.Dp) {
+    Box(Modifier.size(size).clip(RoundedCornerShape(6.dp)).background(it.color), contentAlignment = Alignment.Center) {
+        if (it.icon != null) Icon(it.icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(size * 0.62f))
+        else Text(it.glyph, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+/** The folded NOW section: the first item on one line with its percentage, and how many more. */
+@Composable
+private fun NowSummary(it: NowItem, more: Int) {
+    val shape = RoundedCornerShape(10.dp)
+    Row(
+        Modifier.fillMaxWidth().clip(shape).background(if (LocalPal.current.light) Color.White else C.x(0x12FFFFFFL))
+            .border(1.dp, C.x(0x14FFFFFFL), shape).padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        NowBadge(it, 18.dp)
+        Text(it.title, color = C.ink, fontSize = 10.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).padding(start = 8.dp))
+        if (it.right.isNotEmpty()) Text(it.right, color = DockGold, fontSize = 9.sp, modifier = Modifier.padding(start = 6.dp))
+        if (more > 0) Text("+$more", color = C.sub, fontSize = 8.5.sp, modifier = Modifier.padding(start = 6.dp))
+    }
+}
+
+/** One live card: a coloured icon, what it is and its percentage, the name, and a gold progress line. */
+@Composable
+private fun NowCard(it: NowItem) {
     val shape = RoundedCornerShape(10.dp)
     Row(
         Modifier.fillMaxWidth().clip(shape).background(if (LocalPal.current.light) Color.White else C.x(0x12FFFFFFL))
             .border(1.dp, C.x(0x14FFFFFFL), shape).padding(horizontal = 8.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(Modifier.size(22.dp).clip(RoundedCornerShape(6.dp)).background(color), contentAlignment = Alignment.Center) {
-            Text(glyph, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-        }
+        NowBadge(it, 22.dp)
         Column(Modifier.weight(1f).padding(start = 9.dp)) {
             Row {
-                Text(kind, color = C.sub, fontSize = 7.5.sp, letterSpacing = 1.3.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                if (right.isNotEmpty()) Text(right, color = C.sub, fontSize = 8.sp, letterSpacing = 1.sp)
+                Text(it.kind, color = C.sub, fontSize = 7.5.sp, letterSpacing = 1.3.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                if (it.right.isNotEmpty()) Text(it.right, color = C.sub, fontSize = 8.sp, letterSpacing = 1.sp)
             }
-            Text(title, color = C.ink, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 1.dp))
-            if (progress != null) Box(Modifier.padding(top = 5.dp).fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)).background(C.x(0x1FFFFFFFL))) {
-                Box(Modifier.fillMaxHeight().fillMaxWidth(progress.coerceIn(0f, 1f)).background(C.accent))
+            Text(it.title, color = C.ink, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 1.dp))
+            val p = it.progress
+            if (p != null) Box(Modifier.padding(top = 5.dp).fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)).background(C.x(0x1FFFFFFFL))) {
+                Box(Modifier.fillMaxHeight().fillMaxWidth(p.coerceIn(0f, 1f)).background(C.accent))
             }
         }
     }
