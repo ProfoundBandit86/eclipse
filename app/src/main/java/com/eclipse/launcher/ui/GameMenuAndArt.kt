@@ -437,7 +437,11 @@ fun GameMenu(vm: EclipseVM, g: Game) = Glass {
                         }
                         run { val f = first(); fOpts += { OptRow("Rescrape", "\u203A", fr = f) { vm.rescrapeGame(g) } } }
                         fOpts += { OptRow("Match by hand", "\u203A") { matching = true } }
-                        if (rom != null && vm.installedRom(rom.id)?.id == g.id) fOpts += { OptRow("Delete install", "\u203A", danger = true) { close(); vm.storeDelete = rom.id } }
+                        when (vm.uninstallKind(g)) {
+                            "romm" -> vm.rommIdFor(g)?.toIntOrNull()?.let { rid -> fOpts += { OptRow("Uninstall", "\u203A", danger = true) { close(); vm.storeDelete = rid } } }
+                            null -> {}
+                            else -> fOpts += { OptRow("Uninstall", "\u203A", danger = true) { close(); vm.gameDelete = g } }
+                        }
                         OptGrid(fOpts)
                         Spacer(Modifier.height(8.dp))
                     }
@@ -1145,5 +1149,22 @@ fun DeleteDownload(vm: EclipseVM, romId: Int) {
     ) {
         MenuRow("Keep it", value = "B", fr = keep) { vm.storeDelete = null }
         MenuRow("Delete from this device", danger = true) { vm.storeDelete = null; vm.rommDeleteDownload(romId) }
+    }
+}
+
+/** "Uninstall …?" for any game: Android's own prompt for an Android game, otherwise its files are deleted. */
+@Composable
+fun UninstallGame(vm: EclipseVM, g: Game) {
+    val keep = remember { FocusRequester() }
+    FocusOnShow(keep) // Keep first: a stray A press deletes nothing
+    val app = vm.uninstallKind(g) == "app"
+    MenuSheet(
+        "Uninstall", g.name,
+        if (app) "Android will ask you to confirm. The app and its data are removed from this device."
+        else "Deletes the game's files from this device. Your play time and artwork are kept in case you add it again.",
+        onDismiss = { vm.gameDelete = null }
+    ) {
+        MenuRow("Keep it", value = "B", fr = keep) { vm.gameDelete = null }
+        MenuRow(if (app) "Uninstall app" else "Delete from this device", danger = true) { vm.gameDelete = null; vm.uninstallGame(g) }
     }
 }

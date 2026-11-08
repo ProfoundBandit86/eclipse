@@ -322,6 +322,7 @@ fun AppMenu(vm: EclipseVM, pkg: String) {
                 MenuRow(if (app.pkg in vm.dock2) "Remove from second-screen dock" else "Add to second-screen dock") { vm.toggleDock2(app.pkg); close() }
                 MenuRow("Rename") { mode = "rename" }
                 MenuRow("Change category") { mode = "cat" }
+                MenuRow("Uninstall", danger = true) { close(); vm.uninstallApp(app.pkg, app.label) }
             }
         }
     }

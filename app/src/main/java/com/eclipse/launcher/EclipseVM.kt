@@ -493,6 +493,12 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
                 apps = list
                 lastAppsLoad = System.currentTimeMillis()
                 if (flag("auto_scan", true)) scanInstalledApps()
+                else if (list.isNotEmpty() && loaded) {
+                    // an Android game you uninstalled leaves the library even with auto-scan off
+                    val have = list.map { it.pkg }.toSet()
+                    val kept = games.filter { it.platform != "android" || it.path in have }
+                    if (kept.size != games.size) { games = kept; persistGames() }
+                }
             }
         }
     }
@@ -2250,6 +2256,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     var rommCatalog by mutableStateOf<List<RomM.Rom>>(emptyList())
 
     var storeDelete by mutableStateOf<Int?>(null)     // RomM id waiting for "delete download?" (the game page)
+    var gameDelete by mutableStateOf<Game?>(null)     // a game waiting for "uninstall?" (the game page, the app menu)
 
     private fun persistRomm() {
         val a = rommRoms
@@ -3004,30 +3011,88 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     /** Deletes your downloaded copy (RomM keeps its own). Your play time and artwork are kept for next time. */
     fun rommDeleteDownload(romId: Int) {
         val g = installedRom(romId) ?: return
-        val rom = rommCatalog.firstOrNull { it.id == romId }
+        deleteLocalGame(g, rommCatalog.firstOrNull { it.id == romId })
+    }
+
+    /** What "Uninstall" does to this game, or null when there's nothing on this device to remove (a RomM entry). */
+    fun uninstallKind(g: Game): String? = when {
+        g.id.startsWith("rm:") || g.path.startsWith("romm:") -> null
+        g.platform == "android" -> "app"
+        rommIdFor(g)?.toIntOrNull()?.let { installedRom(it)?.id == g.id } == true -> "romm"
+        else -> "files"
+    }
+
+    /**
+     * Uninstalls any game: an Android game through Android's own uninstall prompt, a game downloaded from RomM by
+     * deleting the download, anything else by deleting its files from your ROM folders.
+     */
+    fun uninstallGame(g: Game) {
+        when (uninstallKind(g)) {
+            "app" -> {
+                // Android asks you to confirm; the app list refreshes itself once the package is gone
+                val ok = runCatching {
+                    ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_DELETE, android.net.Uri.parse("package:${g.path}"))
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                }.isSuccess
+                if (!ok) message = "Couldn't uninstall ${g.name}"
+            }
+            "romm" -> rommIdFor(g)?.toIntOrNull()?.let { rommDeleteDownload(it) }
+            "files" -> deleteLocalGame(g, null)
+            else -> message = "${g.name} isn't installed on this device"
+        }
+    }
+
+    /** Android's uninstall prompt for an app (the app menu). */
+    fun uninstallApp(pkg: String, name: String) {
+        if (pkg == ctx.packageName) { message = "Eclipse can't uninstall itself from here"; return }
+        uninstallGame(Game("a_$pkg", name, "android", pkg))
+    }
+
+    /** Every folder games are kept in: your ROM folders and each system's own folders. */
+    private fun gameRoots(): List<File> =
+        (romFolders() + sysFolders.values.flatMap { it.split('\n') }).map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+            .mapNotNull { runCatching { File(it).canonicalFile }.getOrNull() }
+
+    /** Deletes a game's files (only ever inside your game folders) and takes it out of the library. */
+    private fun deleteLocalGame(g: Game, rom: RomM.Rom?) {
         viewModelScope.launch {
             val ok = withContext(Dispatchers.IO) {
-                val f = File(g.path)
-                val root = File(romPath).canonicalPath
-                if (!f.canonicalPath.startsWith(root)) return@withContext false // only ever inside your ROM folder
-                // a multi-file game lives in its own folder named after it: remove the whole folder
+                val f = File(g.path).canonicalFile
+                val roots = gameRoots()
+                val root = roots.firstOrNull { f.path.startsWith(it.path + File.separator) } ?: return@withContext false
+                fun inside(x: File) = runCatching { x.canonicalPath.startsWith(root.path + File.separator) }.getOrDefault(false)
+                // a folder that holds only this game (never a ROM folder or a system folder itself)
+                fun gameFolder(d: File?) = d != null && d.canonicalFile != root && d.canonicalFile.parentFile != root &&
+                    roots.none { it == d.canonicalFile } && inside(d)
                 val folder = f.parentFile
-                if (rom != null && rom.multi && folder != null && folder.canonicalPath != root &&
-                    RomM.safeName(rom.fsName).let { n -> folder.name.equals(n.substringBeforeLast('.').ifEmpty { n }, ignoreCase = true) }
-                ) folder.deleteRecursively()
-                else if (f.extension.equals("cue", true)) {
-                    // a multi-file game unpacked into the system folder: its .cue, the files it names, any CHD made from it
-                    runCatching { com.eclipse.launcher.data.Chd.cueFiles(f) }.getOrDefault(emptyList())
-                        .filter { it.canonicalPath.startsWith(root) }.forEach { it.delete() }
-                    File(f.parentFile, f.nameWithoutExtension + ".chd").delete()
-                    f.delete() || !f.exists()
-                } else if (f.extension.equals("m3u", true)) {
-                    // a multi-disc game from RomM: the playlist and the discs it lists
-                    val dir = f.parentFile
-                    runCatching { com.eclipse.launcher.data.M3u.entries(f) }.getOrDefault(emptyList())
-                        .map { File(dir, it) }.filter { it.canonicalPath.startsWith(root) }.forEach { it.delete() }
-                    f.delete() || !f.exists()
-                } else f.delete() || !f.exists()
+                when {
+                    f.isDirectory -> gameFolder(f) && f.deleteRecursively()
+                    // a multi-file game from RomM lives in its own folder named after it: remove the whole folder
+                    rom != null && rom.multi && folder != null && gameFolder(folder) &&
+                        RomM.safeName(rom.fsName).let { n -> folder.name.equals(n.substringBeforeLast('.').ifEmpty { n }, ignoreCase = true) } ->
+                        folder.deleteRecursively()
+                    f.extension.equals("cue", true) || f.extension.equals("gdi", true) -> {
+                        // the sheet, the files it names, any CHD made from it
+                        runCatching { com.eclipse.launcher.data.Chd.cueFiles(f) }.getOrDefault(emptyList())
+                            .filter { inside(it) && it.canonicalFile != f }.forEach { it.delete() }
+                        File(f.parentFile, f.nameWithoutExtension + ".chd").delete()
+                        f.delete() || !f.exists()
+                    }
+                    f.extension.equals("m3u", true) -> {
+                        // a multi-disc game: the playlist and the discs it lists
+                        val dir = f.parentFile
+                        runCatching { com.eclipse.launcher.data.M3u.entries(f) }.getOrDefault(emptyList())
+                            .map { File(dir, it) }.filter { inside(it) }.forEach { d ->
+                                if (d.extension.equals("cue", true)) runCatching { com.eclipse.launcher.data.Chd.cueFiles(d) }.getOrDefault(emptyList()).filter { inside(it) }.forEach { it.delete() }
+                                d.delete()
+                            }
+                        f.delete() || !f.exists()
+                    }
+                    else -> f.delete() || !f.exists()
+                }.also { done ->
+                    // a game folder left empty goes too
+                    if (done && folder != null && gameFolder(folder) && folder.listFiles()?.isEmpty() == true) folder.delete()
+                }
             }
             if (!ok) { message = "Couldn't delete ${g.name}"; return@launch }
             games = games.filter { it.id != g.id }
@@ -3035,6 +3100,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
             recent = recent.filter { it != g.id }
             store.putList("recent", recent)
             if (focused?.id == g.id) focused = null
+            if (menuGame?.id == g.id) menuGame = null
             persistGames(); persistRomm()
             message = "Deleted ${g.name}"
         }
