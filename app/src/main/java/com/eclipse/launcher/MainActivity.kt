@@ -408,6 +408,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        // Eclipse closed for real (not just turned or restarted by Android): the app switcher's card pictures go
+        if (isFinishing && !isChangingConfigurations) com.eclipse.launcher.media.AppSwitcher.clearShots(this)
         SecondScreenHost.hideForApp = null
         SecondScreenHost.close = null
         SecondScreenHost.restart = null

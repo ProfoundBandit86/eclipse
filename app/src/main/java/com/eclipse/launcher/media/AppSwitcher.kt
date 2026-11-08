@@ -298,13 +298,17 @@ object AppSwitcher {
             st.apps.add(Entry(p, label, icon, seenAt[p] ?: 0L))
         }
         state = st
-        // the pictures saved last time (the one on screen gets a fresh one below, if Android allows it this soon)
+        // the pictures taken earlier: from memory, else from the copies saved in Eclipse's private cache (kept until
+        // Eclipse is closed, see [clearShots]). The one on screen gets a fresh one below, if Android allows it this soon.
+        for (e in st.apps) memShots[e.pkg]?.let { if (st.shots[e.pkg] == null) st.shots[e.pkg] = it }
+        memShots.keys.retainAll(st.apps.map { it.pkg }.toSet())
+        val need = st.apps.map { it.pkg }.filter { !memShots.containsKey(it) }
         Thread {
-            for (e in st.apps) {
-                val f = shotFile(svc, e.pkg)
+            for (pkg in need) {
+                val f = shotFile(svc, pkg)
                 if (!f.isFile) continue
                 val b = runCatching { BitmapFactory.decodeFile(f.absolutePath) }.getOrNull() ?: continue
-                main.post { if (st.shots[e.pkg] == null) st.shots[e.pkg] = b.asImageBitmap() }
+                main.post { val img = b.asImageBitmap(); if (!memShots.containsKey(pkg)) memShots[pkg] = img; if (st.shots[pkg] == null) st.shots[pkg] = img }
             }
         }.start()
         // a fresh picture of the app on screen now (before the overlay covers it), but only when that app has a card:
@@ -325,7 +329,9 @@ object AppSwitcher {
                     val w = 720
                     val small = runCatching { Bitmap.createScaledBitmap(full, w, (full.height * w / full.width.toFloat()).toInt().coerceAtLeast(1), true) }.getOrNull() ?: full
                     if (small !== full) runCatching { full.recycle() }
-                    st?.shots?.set(pkg, small.asImageBitmap())
+                    val img = small.asImageBitmap()
+                    memShots[pkg] = img
+                    st?.shots?.set(pkg, img)
                     Thread { runCatching { shotFile(svc, pkg).apply { parentFile?.mkdirs() }.outputStream().use { small.compress(Bitmap.CompressFormat.JPEG, 82, it) } } }.start()
                 }
                 override fun onFailure(errorCode: Int) {}
@@ -333,7 +339,16 @@ object AppSwitcher {
         }
     }
 
+    /** The cards' pictures in memory; each is also saved in Eclipse's private cache until Eclipse is closed. */
+    private val memShots = HashMap<String, androidx.compose.ui.graphics.ImageBitmap>()
+
     private fun shotFile(ctx: Context, pkg: String) = File(File(ctx.cacheDir, "switcher"), "$pkg.jpg")
+
+    /** Eclipse was closed: forget every card picture, in memory and on storage. */
+    fun clearShots(ctx: Context) {
+        Handler(Looper.getMainLooper()).post { memShots.clear() }
+        Thread { runCatching { File(ctx.cacheDir, "switcher").deleteRecursively() } }.start()
+    }
 
     private fun iconBitmap(d: android.graphics.drawable.Drawable): Bitmap? = runCatching {
         val size = 144
@@ -361,6 +376,7 @@ object AppSwitcher {
         val e = s.apps[s.sel]
         s.apps.removeAt(s.sel)
         forget(svc, e.pkg)
+        memShots.remove(e.pkg)
         runCatching { shotFile(svc, e.pkg).delete() }
         // stopped for real straight away, underneath the switcher (ForceStop: App info → Force stop)
         if (e.pkg !in closed) closed.add(e.pkg)

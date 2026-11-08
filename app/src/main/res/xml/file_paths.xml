@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- ROM files shared with emulators. Only shared storage: internal storage (/storage/emulated/0) and SD cards /
+     USB drives (/storage/XXXX-XXXX). Eclipse's own private folders (/data/...) can never be shared. -->
 <paths>
-    <root-path name="root" path="" />
+    <root-path name="storage" path="storage/" />
 </paths>

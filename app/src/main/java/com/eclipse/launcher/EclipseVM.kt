@@ -335,7 +335,8 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
 
     fun finishSetup() { setFlag("setup_done", true); setupOpen = false; setupStep = 0 }
     fun runSetupAgain() { setupStep = 0; setupOpen = true }
-    val keys = mutableStateMapOf<String, String>().apply { putAll(store.map("keys")) }
+    // passwords and API keys: encrypted with a key held in Android's Keystore (see Secrets)
+    val keys = mutableStateMapOf<String, String>().apply { putAll(com.eclipse.launcher.data.Secrets.load(store)) }
 
     private val raCache = HashMap<String, RaProgress?>()
 
@@ -412,7 +413,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     fun flag(k: String, d: Boolean = true): Boolean = flags[k] ?: d
     fun setFlag(k: String, v: Boolean) { flags[k] = v; store.putBool(k, v) }
     fun key(k: String): String = keys[k] ?: ""
-    fun setKey(k: String, v: String) { keys[k] = v; store.putMap("keys", keys.toMap()) }
+    fun setKey(k: String, v: String) { keys[k] = v; com.eclipse.launcher.data.Secrets.save(store, keys.toMap()) }
 
     /** The dock's Settings button has focus on Home: Settings slides up into view as a preview (A, or Right, opens it). */
     var settingsPeek by mutableStateOf(false)
@@ -3548,11 +3549,33 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
                 "sgdb" -> if (Scrapers.sgdbCheck(key("sgdb"))) true to "Connected" else false to "Key not accepted, or no connection"
                 "igdb" -> if (Scrapers.igdbCheck(key("igdb_id"), key("igdb_secret"))) true to "Connected" else false to "Client ID or secret not accepted, or no connection"
                 "ra" -> if (RetroAch.check(key("ra_user"), key("ra_key"))) true to "Connected as ${key("ra_user")}" else false to "Username or key not accepted, or no connection"
-                "romm" -> RomM.test(rommConn()!!).let { (ok, msg) -> ok to msg }
+                "romm" -> rommCheckSecure()
                 else -> return@launch
             }
             connCheck = connCheck + (id to r)
         }
+    }
+
+    /** RomM on http:// sends your password unencrypted (Basic auth): the server settings warn about it. */
+    fun rommInsecure(): Boolean = rommConn()?.base?.startsWith("http://") == true
+
+    /**
+     * Tests the RomM connection. On an http:// address, the same server is tried over https:// first: when it
+     * answers there, the address is switched to https so the password is encrypted on the way.
+     */
+    private suspend fun rommCheckSecure(): Pair<Boolean, String> {
+        val c = rommConn() ?: return false to "Not set up"
+        if (c.base.startsWith("http://")) {
+            val secure = RomM.Conn("https://" + c.base.removePrefix("http://"), key("romm_user"), key("romm_pass"))
+            val (ok, _) = runCatching { RomM.test(secure) }.getOrDefault(false to "")
+            if (ok) {
+                setKey("romm_url", secure.base)
+                return true to "Connected over https (switched from http, so your password is encrypted)"
+            }
+        }
+        val (ok, msg) = RomM.test(c)
+        return if (ok && c.base.startsWith("http://")) true to "$msg \u2014 over http, so your password isn't encrypted. Turn on https for your RomM server to protect it."
+        else ok to msg
     }
 
     fun checkConnections() = listOf("sgdb", "igdb", "ra", "romm").forEach { if (isConfigured(it) && it !in connCheck) checkConnection(it) }

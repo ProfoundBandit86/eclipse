@@ -452,8 +452,9 @@ private fun DualScreen(vm: EclipseVM) {
         DropSection("Bottom screen")
         ToggleRow("Media controls page", "Swipe to playback controls.", vm.flag("media")) { vm.setFlag("media", it) }
         ToggleRow("Recently played page", "A grid of your recent games; tap one to play.", vm.flag("recent_page", false)) { vm.setFlag("recent_page", it) }
-        ToggleRow("Screen mirror page", "The top screen, or a zoomed-in part of it.", vm.flag("mirror_page", true)) { vm.setFlag("mirror_page", it) }
+        ToggleRow("Screen mirror page", "The top screen, or a zoomed-in part of it. Only there while the mirror is on: start it with Mirror on Now Playing.", vm.flag("mirror_page", true)) { vm.setFlag("mirror_page", it) }
         ToggleRow("Transfers page", "RomM downloads, uploads and CHD conversion; only there while one is running.", vm.flag("tx_page", true)) { vm.setFlag("tx_page", it) }
+        if (vm.flag("tx_page", true)) ToggleRow("Go to Transfers when a download starts", "The bottom screen switches to it when a RomM download begins.", vm.flag("tx_follow", true)) { vm.setFlag("tx_follow", it) }
         if (vm.flag("tx_page", true)) ToggleRow("Show finished transfers", "The last few results under the live ones.", vm.flag("tx_done", true)) { vm.setFlag("tx_done", it) }
         ToggleRow("Dock on second screen", "Long-press an app in its drawer to pin it.", vm.flag("dock2")) { vm.setFlag("dock2", it) }
         if (vm.flag("dock2")) {
@@ -628,6 +629,10 @@ private fun RommPanel(vm: EclipseVM, openR: String?, toggleR: (String) -> Unit) 
                     FieldRow("Username", vm.key("romm_user")) { vm.setKey("romm_user", it.trim()); vm.checkConnection("romm") }
                     FieldRow("Password", vm.key("romm_pass"), secret = true) { vm.setKey("romm_pass", it); vm.checkConnection("romm") }
                 }
+                if (vm.rommInsecure()) Text(
+                    "This address uses http, so your RomM password is sent unencrypted. Use an https address if your server has one.",
+                    color = androidx.compose.ui.graphics.Color(0xFFE59A6A), fontSize = 10.sp, lineHeight = 13.sp, modifier = Modifier.padding(top = 6.dp, start = 2.dp)
+                )
                 if (ready) {
                     var launchOpen by remember { mutableStateOf(false) }
                     val launches = listOf("ask" to "Ask each time", "play" to "Install and play", "download" to "Install")
@@ -2319,6 +2324,12 @@ private fun SetupTwoColumns(vm: EclipseVM, page: SetupPage) {
                             FieldRow("Username", vm.key("romm_user")) { vm.setKey("romm_user", it.trim()); vm.checkConnection("romm") }
                             FieldRow("Password", vm.key("romm_pass"), secret = true) { vm.setKey("romm_pass", it); vm.checkConnection("romm") }
                         }
+                    }
+                    if (vm.rommInsecure()) Reveal(n++) {
+                        Text(
+                            "This address uses http, so your RomM password is sent unencrypted. Use an https address if your server has one.",
+                            color = androidx.compose.ui.graphics.Color(0xFFE59A6A), fontSize = 10.sp, lineHeight = 13.sp, modifier = Modifier.padding(top = 2.dp, start = 2.dp)
+                        )
                     }
                     if (vm.isConfigured("romm")) Reveal(n++) {
                         ActionRow("Sync library", vm.rommStatus?.takeIf { !vm.rommBusy } ?: "Reads all your RomM games.") { vm.rommSync() }

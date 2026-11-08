@@ -21,6 +21,7 @@ class Store(ctx: Context) {
     // ---------- SharedPreferences (small values) ----------
     fun str(k: String, d: String = ""): String = sp.getString(k, d) ?: d
     fun putStr(k: String, v: String) = sp.edit().putString(k, v).apply()
+    fun remove(k: String) = sp.edit().remove(k).apply()
 
     fun putBool(k: String, v: Boolean) = sp.edit().putBoolean("f_$k", v).apply()
 

@@ -56,7 +56,9 @@ android {
             isDebuggable = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // with your release key on this machine, your own builds are signed like the GitHub releases, so
-            // Obtainium's updates install over them (and they over Obtainium's)
+            // Obtainium's updates install over them (and they over Obtainium's). That's only safe because they are
+            // NOT debuggable: a debuggable build with the release signature would install over the real app and let
+            // `adb run-as` read its data. The check at the end of this file stops the build if that ever changes.
             if (hasReleaseKey) signingConfig = signingConfigs.getByName("release")
         }
         release {
@@ -109,4 +111,13 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("eu.agno3.jcifs:jcifs-ng:2.1.10") // copies games to your RomM library over a network share (SMB)
     implementation("androidx.profileinstaller:profileinstaller:1.4.1") // installs the baseline profile (precompiled hot code)
+}
+
+// Safety check: no build signed with the release key may be debuggable (see the debug build type above).
+afterEvaluate {
+    val releaseKey = android.signingConfigs.findByName("release")
+    android.buildTypes.forEach { bt ->
+        if (releaseKey != null && bt.isDebuggable && bt.signingConfig == releaseKey)
+            throw GradleException("The ${bt.name} build is debuggable and signed with the release key. Make it not debuggable, or sign it with the debug key.")
+    }
 }

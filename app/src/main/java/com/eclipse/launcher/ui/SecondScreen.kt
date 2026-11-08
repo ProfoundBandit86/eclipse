@@ -71,6 +71,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
 import com.eclipse.launcher.EclipseVM
+import com.eclipse.launcher.RommDownloads
 import com.eclipse.launcher.data.AppEntry
 import com.eclipse.launcher.data.ArtKind
 import com.eclipse.launcher.data.Platforms
@@ -91,10 +92,26 @@ fun SecondaryContent(vm: EclipseVM, displayId: Int) {
         val recentPage = vm.flag("recent_page", false) && vm.recent.isNotEmpty()
         // Transfers (RomM downloads / uploads, CHD): only while one is running; last, so it never shifts the other pages
         val txPage = vm.flag("tx_page", true) && transfersRunning(vm)
-        val pageIds = listOfNotNull("home", if (recentPage) "recent" else null, if (mediaPage) "media" else null, if (vm.flag("mirror_page", true)) "mirror" else null, if (txPage) "transfers" else null)
+        // the mirror page, like Transfers, is only there while the mirror is on (the Mirror button on Now Playing starts it)
+        val mirrorOn = vm.flag("mirror_page", true)
+        val mirroring by com.eclipse.launcher.media.Mirror.running.collectAsState()
+        val pageIds = listOfNotNull("home", if (recentPage) "recent" else null, if (mediaPage) "media" else null, if (mirrorOn && mirroring) "mirror" else null, if (txPage) "transfers" else null)
         val pages = pageIds.size
         val pager = rememberPagerState(pageCount = { pages })
         LaunchedEffect(pages) { if (pager.currentPage > pages - 1) pager.scrollToPage(pages - 1) }
+        // Mirror pressed: go to its page once the mirror has started
+        var wantMirror by remember { mutableStateOf(false) }
+        LaunchedEffect(wantMirror, mirroring, pages) {
+            if (wantMirror && mirroring) { pageIds.indexOf("mirror").takeIf { it >= 0 }?.let { pager.animateScrollToPage(it) }; wantMirror = false }
+        }
+        // a RomM download starting brings the Transfers page up
+        val downloadingNow = RommDownloads.items.value.any { it.state != RommDownloads.State.FAILED }
+        var wasDownloading by remember { mutableStateOf(downloadingNow) }
+        LaunchedEffect(downloadingNow, pages) {
+            if (downloadingNow && !wasDownloading && vm.flag("tx_follow", true)) {
+                pageIds.indexOf("transfers").takeIf { it >= 0 }?.let { pager.animateScrollToPage(it); wasDownloading = true }
+            } else wasDownloading = downloadingNow
+        }
         var mirrorPicking by remember { mutableStateOf(false) }
         val ctxMain = LocalContext.current
         val pagerScope = rememberCoroutineScope()
@@ -120,9 +137,9 @@ fun SecondaryContent(vm: EclipseVM, displayId: Int) {
                     "transfers" -> TransfersPage(vm)
                     else -> NowPlayingPage(
                         vm, dockOn,
-                        openMirror = if ("mirror" in pageIds) ({
-                            if (!com.eclipse.launcher.media.Mirror.running.value) com.eclipse.launcher.media.Mirror.request(ctxMain)
-                            pagerScope.launch { pager.animateScrollToPage(pageIds.indexOf("mirror")) }
+                        openMirror = if (mirrorOn) ({
+                            if (!mirroring) com.eclipse.launcher.media.Mirror.request(ctxMain)
+                            wantMirror = true
                             Unit
                         }) else null,
                         editWalk = { walkGame = it }
