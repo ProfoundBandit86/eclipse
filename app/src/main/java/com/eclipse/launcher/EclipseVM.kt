@@ -3054,6 +3054,16 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         (romFolders() + sysFolders.values.flatMap { it.split('\n') }).map { it.trim() }.filter { it.isNotEmpty() }.distinct()
             .mapNotNull { runCatching { File(it).canonicalFile }.getOrNull() }
 
+    private val DISC_EXTS = listOf("chd", "cue", "gdi", "ccd", "mds", "iso", "cso", "pbp", "rvz", "gcz")
+    private val TRACK_EXTS = listOf("bin", "img", "sub", "raw", "mdf")
+    private val TRACK_TAG = Regex("""\s*\(\s*track\s*\d+\s*\)""", RegexOption.IGNORE_CASE)
+    private fun addDiscOnce(d: File, into: MutableSet<File>, inside: (File) -> Boolean) {
+        if (d in into || !inside(d)) return
+        into += d
+        if (d.extension.equals("cue", true) || d.extension.equals("gdi", true))
+            runCatching { com.eclipse.launcher.data.Chd.cueFiles(d) }.getOrDefault(emptyList()).filter(inside).forEach { into += it }
+    }
+
     /** Deletes a game's files (only ever inside your game folders) and takes it out of the library. */
     private fun deleteLocalGame(g: Game, rom: RomM.Rom?) {
         viewModelScope.launch {
@@ -3080,13 +3090,28 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
                         f.delete() || !f.exists()
                     }
                     f.extension.equals("m3u", true) -> {
-                        // a multi-disc game: the playlist and the discs it lists
+                        // a multi-disc game: every disc of it in this folder, in every form (the playlist can be out
+                        // of date: a disc converted to CHD after it was written is still listed as its .cue)
                         val dir = f.parentFile
-                        runCatching { com.eclipse.launcher.data.M3u.entries(f) }.getOrDefault(emptyList())
-                            .map { File(dir, it) }.filter { inside(it) }.forEach { d ->
-                                if (d.extension.equals("cue", true)) runCatching { com.eclipse.launcher.data.Chd.cueFiles(d) }.getOrDefault(emptyList()).filter { inside(it) }.forEach { it.delete() }
-                                d.delete()
-                            }
+                        val doomed = LinkedHashSet<File>()
+                        fun addDisc(d: File) {
+                            if (!inside(d)) return
+                            doomed += d
+                            if (d.extension.equals("cue", true) || d.extension.equals("gdi", true))
+                                runCatching { com.eclipse.launcher.data.Chd.cueFiles(d) }.getOrDefault(emptyList()).filter { inside(it) }.forEach { doomed += it }
+                            // the same disc in its other forms: "Game (Disc 1).cue" ↔ "Game (Disc 1).chd"
+                            for (ext in DISC_EXTS) File(d.parentFile, d.nameWithoutExtension + "." + ext).takeIf { it.isFile }?.let { addDiscOnce(it, doomed, ::inside) }
+                        }
+                        runCatching { com.eclipse.launcher.data.M3u.entries(f) }.getOrDefault(emptyList()).forEach { addDisc(File(dir, it)) }
+                        // and any file in the folder named after this game with a disc tag ("Title (Disc 3).chd",
+                        // "Title (Disc 3) (Track 2).bin"), listed or not
+                        val title = f.nameWithoutExtension
+                        dir?.listFiles()?.filter { x ->
+                            x.isFile && x.extension.lowercase() in DISC_EXTS + TRACK_EXTS &&
+                                com.eclipse.launcher.data.M3u.discNumber(x.nameWithoutExtension) != null &&
+                                com.eclipse.launcher.data.M3u.titleOf(x.nameWithoutExtension).replace(TRACK_TAG, "").trim().equals(title, ignoreCase = true)
+                        }?.forEach { addDisc(it) }
+                        doomed.forEach { it.delete() }
                         f.delete() || !f.exists()
                     }
                     else -> f.delete() || !f.exists()
