@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -1578,6 +1579,12 @@ fun OptionsDrawer(
     // Page (this screen's options) or System (Wi-Fi, Bluetooth, notifications); the drawer opens on Page
     var system by remember { mutableStateOf(false) }
     val switchFr = remember { FocusRequester() }
+    // where focus waits while the panel swaps between its buttons and a setting's list: invisible and outside the
+    // scrolling column, so nothing lights up and the panel doesn't scroll to it
+    val park = remember { FocusRequester() }
+    // (only takes focus during the swap: the D-pad can never land on it)
+    var parking by remember { mutableStateOf(false) }
+    LaunchedEffect(parking) { if (parking) { delay(400); parking = false } }
     val wifiFr = remember { FocusRequester() }
     var open by remember { mutableStateOf<String?>(null) }
     val headers = remember(lists.size) { List(lists.size) { FocusRequester() } }
@@ -1615,7 +1622,7 @@ fun OptionsDrawer(
                             if (t != null && !system) {
                                 // on a setting's list page: back to the buttons
                                 val i = lists.indexOfFirst { it.title == t }
-                                runCatching { switchFr.requestFocus() }; open = null
+                                parking = true; runCatching { park.requestFocus() }; open = null
                                 if (i >= 0) scope.launch { refocus(headers[i]) }
                             } else close()
                         }
@@ -1633,6 +1640,7 @@ fun OptionsDrawer(
     ) {
         // no focus trap here: it would also block handing focus back to the screen on close, and the drawer's
         // focused item vanishing would then drop focus onto the left dock (opening it). Keys are handled above.
+        Box(Modifier.size(1.dp).focusProperties { canFocus = parking }.focusRequester(park).focusable())
         Column(
             Modifier.fillMaxSize().menuScroll().padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(9.dp)
@@ -1643,14 +1651,14 @@ fun OptionsDrawer(
             val page = if (system) null else open?.let { t -> lists.withIndex().firstOrNull { it.value.title == t } }
             if (page != null) {
                 val (pi, pl) = page
-                // focus waits on the switch (there in both views) while the rows change, then lands on the button
-                // again: a focused row vanishing would otherwise drop focus out of the panel
-                val back: () -> Unit = { runCatching { switchFr.requestFocus() }; open = null; scope.launch { refocus(headers[pi]) } }
+                // focus waits on an invisible spot (park) while the rows change, then lands on the button again: a
+                // focused row vanishing would otherwise drop focus out of the panel
+                val back: () -> Unit = { parking = true; runCatching { park.requestFocus() }; open = null; scope.launch { refocus(headers[pi]) } }
                 DrawerListPage(pl, back) { action -> action(); back() }
             } else {
             // what's happening right now: transfers, conversions, and notifications that just came in (they leave by themselves)
             TransientArea(vm, tick)
-            val openPage: (String) -> Unit = { t -> runCatching { switchFr.requestFocus() }; open = t }
+            val openPage: (String) -> Unit = { t -> parking = true; runCatching { park.requestFocus() }; open = t }
             if (!system) {
                 if (sortLists.isNotEmpty()) {
                     DockHeading("Sort")
