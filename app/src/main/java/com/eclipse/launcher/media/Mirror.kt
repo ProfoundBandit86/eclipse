@@ -34,6 +34,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
  */
 object Mirror {
     val running = MutableStateFlow(false)
+    /** Mirror was pressed: its page is shown (and scrolled to) before capture starts, see SecondScreen. */
+    val starting = MutableStateFlow(false)
     /** Size of the top screen in pixels: the size of each mirrored frame. */
     val size = MutableStateFlow(1920 to 1080)
 
@@ -44,6 +46,7 @@ object Mirror {
 
     /** Asks Android for permission (its consent dialog shows on the top screen), then starts mirroring. */
     fun request(ctx: Context) {
+        starting.value = true
         val i = Intent(ctx, MirrorPermissionActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val opts = android.app.ActivityOptions.makeBasic().setLaunchDisplayId(Screens.mainId).toBundle()
         try { ctx.startActivity(i, opts) } catch (e: Exception) { ctx.startActivity(i) }
@@ -54,9 +57,35 @@ object Mirror {
         if (p != null) p.stop() else release(ctx)
     }
 
-    /** The bottom screen's view is ready to show frames (or has gone away: [detach]). */
-    fun attach(s: Surface) { surface = s; display?.surface = s }
-    fun detach(s: Surface) { if (surface === s) { surface = null; display?.surface = null } }
+    /**
+     * The bottom screen's view is ready to show frames (or has gone away: [detach]). The capture's virtual display is
+     * only made once there is a surface to draw into, and a moment after it appears (the page may still be settling):
+     * making it with no surface, or swapping surfaces while the page scrolls, could stall both screens.
+     */
+    fun attach(s: Surface) {
+        surface = s
+        main.removeCallbacks(makeDisplay)
+        main.postDelayed(makeDisplay, 350)
+    }
+    fun detach(s: Surface) {
+        if (surface === s) { surface = null; main.removeCallbacks(makeDisplay); display?.surface = null }
+    }
+
+    private var metrics: DisplayMetrics? = null
+    private val makeDisplay = Runnable {
+        val p = projection ?: return@Runnable
+        val s = surface ?: return@Runnable
+        val d = display
+        if (d != null) { d.surface = s; return@Runnable }
+        val m = metrics ?: return@Runnable
+        display = try {
+            p.createVirtualDisplay(
+                "EclipseMirror", m.widthPixels, m.heightPixels, m.densityDpi,
+                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, s, null, null
+            )
+        } catch (e: Exception) { null }
+        if (display == null) p.stop()
+    }
 
     internal fun start(ctx: Context, resultCode: Int, data: Intent) {
         val mpm = ctx.getSystemService(MediaProjectionManager::class.java)
@@ -71,21 +100,23 @@ object Mirror {
         val m = DisplayMetrics()
         @Suppress("DEPRECATION") d.getRealMetrics(m)
         size.value = m.widthPixels to m.heightPixels
-        display = try {
-            p.createVirtualDisplay(
-                "EclipseMirror", m.widthPixels, m.heightPixels, m.densityDpi,
-                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, surface, null, null
-            )
-        } catch (e: Exception) { null }
-        if (display == null) { p.stop(); return }
+        metrics = m
+        // the live page now shows; its surface arriving makes the virtual display (attach → makeDisplay)
         running.value = true
+        starting.value = false
+        surface?.let { main.removeCallbacks(makeDisplay); main.postDelayed(makeDisplay, 350) }
+        // safety: no surface within a few seconds → stop capturing rather than leave it half started
+        main.postDelayed({ if (projection === p && display == null) p.stop() }, 6000)
     }
 
     private fun release(ctx: Context) {
+        main.removeCallbacks(makeDisplay)
         display?.release()
         display = null
         projection = null
+        metrics = null
         running.value = false
+        starting.value = false
         ctx.stopService(Intent(ctx, MirrorService::class.java))
     }
 }
@@ -149,7 +180,7 @@ class MirrorPermissionActivity : Activity() {
                 .putExtra(MirrorService.EXTRA_CODE, resultCode)
                 .putExtra(MirrorService.EXTRA_DATA, data)
             if (Build.VERSION.SDK_INT >= 26) startForegroundService(i) else startService(i)
-        }
+        } else Mirror.starting.value = false // refused: the page goes away again
         finish()
     }
 }

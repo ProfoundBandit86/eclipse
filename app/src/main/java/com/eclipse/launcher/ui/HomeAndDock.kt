@@ -1609,7 +1609,18 @@ fun OptionsDrawer(
             .focusGroup()
             .onKeyEvent { e ->
                 when (e.key) {
-                    Key.DirectionLeft -> { if (e.type == KeyEventType.KeyDown) close(); true }
+                    Key.DirectionLeft -> {
+                        if (e.type == KeyEventType.KeyDown) {
+                            val t = open
+                            if (t != null && !system) {
+                                // on a setting's list page: back to the buttons
+                                val i = lists.indexOfFirst { it.title == t }
+                                runCatching { switchFr.requestFocus() }; open = null
+                                if (i >= 0) scope.launch { refocus(headers[i]) }
+                            } else close()
+                        }
+                        true
+                    }
                     // keep Up / Down inside the drawer (the rows around it would otherwise take them)
                     Key.DirectionUp, Key.DirectionDown -> {
                         if (e.type == KeyEventType.KeyDown) fm.moveFocus(if (e.key == Key.DirectionUp) FocusDirection.Up else FocusDirection.Down)
@@ -1628,17 +1639,27 @@ fun OptionsDrawer(
         ) {
             // the switch sits at the very top; its left half is named after this screen ("SNES", "Recently Played"…)
             DockSwitch(system, { system = it; open = null }, switchFr, page = title)
+            // a setting's button was pressed: the whole panel is that setting's list (B / Left / ‹ comes back)
+            val page = if (system) null else open?.let { t -> lists.withIndex().firstOrNull { it.value.title == t } }
+            if (page != null) {
+                val (pi, pl) = page
+                // focus waits on the switch (there in both views) while the rows change, then lands on the button
+                // again: a focused row vanishing would otherwise drop focus out of the panel
+                val back: () -> Unit = { runCatching { switchFr.requestFocus() }; open = null; scope.launch { refocus(headers[pi]) } }
+                DrawerListPage(pl, back) { action -> action(); back() }
+            } else {
             // what's happening right now: transfers, conversions, and notifications that just came in (they leave by themselves)
             TransientArea(vm, tick)
+            val openPage: (String) -> Unit = { t -> runCatching { switchFr.requestFocus() }; open = t }
             if (!system) {
                 if (sortLists.isNotEmpty()) {
                     DockHeading("Sort")
-                    sortLists.forEach { (i, l) -> DrawerListRow(l, headers[i], open, { open = it }, scope, memo(l.title)) }
+                    sortLists.forEach { (i, l) -> DrawerListButton(l, headers[i], openPage, memo(l.title)) }
                 }
                 if (viewLists.isNotEmpty() || size != null || extra != null) {
                     DockHeading("View")
                     viewLists.forEachIndexed { n, (i, l) ->
-                        DrawerListRow(l, headers[i], open, { open = it }, scope, memo(l.title))
+                        DrawerListButton(l, headers[i], openPage, memo(l.title))
                         // the size drop-down sits where the screen asked for it (after its first [sizeAt] lists)
                         if (size != null && i == sizeAt - 1) size.invoke(this)
                     }
@@ -1650,56 +1671,51 @@ fun OptionsDrawer(
                 QuickTiles(tick, wifiFr)
                 NotificationsSection(vm)
             }
+            }
         }
     }
     }
     }
 }
 
-/** One drop-down row of the drawer (Sort, Source, Style …) with its choices under it when open. */
+/** One setting of the drawer (Sort, Source, Style …) as a button: its name, the current choice in gold, and ›. */
 @Composable
-private fun DrawerListRow(
-    l: DrawerList, header: FocusRequester, open: String?, setOpen: (String?) -> Unit,
-    scope: kotlinx.coroutines.CoroutineScope, onFocus: ((Boolean) -> Unit)?
-) {
+private fun DrawerListButton(l: DrawerList, header: FocusRequester, openPage: (String) -> Unit, onFocus: ((Boolean) -> Unit)?) {
     val shown = (l.options.firstOrNull { it.first == l.current }?.second ?: "") + if (l.makeDefault != null && l.isDefault) " (default)" else ""
-    DrawerSection(l.title, shown, open == l.title, header, onFocus = onFocus) {
-        setOpen(if (open == l.title) null else l.title)
+    DrawerSection(l.title, shown, false, header, onFocus = onFocus, arrow = "\u203A") { openPage(l.title) }
+}
+
+/**
+ * A setting's choices filling the whole panel: "‹ TITLE" (B / Left / pressing it goes back), each choice as a full
+ * row with the current one marked and highlighted, then Make default / Use default here. [pick] runs a choice and
+ * returns to the buttons.
+ */
+@Composable
+private fun DrawerListPage(l: DrawerList, back: () -> Unit, pick: (() -> Unit) -> Unit) {
+    val cur = remember { FocusRequester() }
+    val backFr = remember { FocusRequester() }
+    BackHandler { back() }
+    LaunchedEffect(l.title) {
+        repeat(3) { withFrameNanos { } }
+        if (runCatching { cur.requestFocus() }.isFailure) runCatching { backFr.requestFocus() }
     }
-    androidx.compose.animation.AnimatedVisibility(visible = open == l.title) {
-        // B while a choice is highlighted: back up to the list's own row (the top of the list), not out of the drawer
-        var inside by remember { mutableStateOf(false) }
-        BackHandler(enabled = inside) { runCatching { header.requestFocus() } }
-        Box(Modifier.onFocusChanged { inside = it.hasFocus }) {
-        DrawerMenu {
-            l.options.forEach { (id, label) ->
-                DrawerChoice(label, l.current == id) {
-                    // the choice we're on folds away: put focus back on its section's header first, so it
-                    // stays in the drawer (otherwise it drops out and lands on the left dock)
-                    runCatching { header.requestFocus() }
-                    l.onPick(id)
-                    setOpen(null)
-                    scope.launch { refocus(header) }
-                }
-            }
-            // at the bottom: make this system's choice the default everywhere, or go back to the default here
-            l.makeDefault?.let { make ->
-                if (!l.isDefault) DrawerChoice("Make default", false) {
-                    runCatching { header.requestFocus() }
-                    make(); setOpen(null)
-                    scope.launch { refocus(header) }
-                }
-            }
-            l.useDefault?.let { use ->
-                DrawerChoice("Use default here", false) {
-                    runCatching { header.requestFocus() }
-                    use(); setOpen(null)
-                    scope.launch { refocus(header) }
-                }
-            }
-        }
+    FocusBox(Modifier.fillMaxWidth().height(32.dp), shape = RoundedCornerShape(8.dp), onClick = back, focusRequester = backFr) {
+        Row(Modifier.fillMaxSize().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("\u2039", color = DockGold, fontSize = 16.sp)
+            Text(l.title.uppercase(), color = DockGold, fontSize = 10.sp, letterSpacing = 2.4.sp, maxLines = 1, modifier = Modifier.padding(start = 8.dp).weight(1f))
+            Text("B \u00b7 BACK", color = C.sub, fontSize = 8.sp, letterSpacing = 1.sp)
         }
     }
+    val hasCurrent = l.options.any { it.first == l.current }
+    l.options.forEachIndexed { i, (id, label) ->
+        val sel = l.current == id
+        DrawerChoice(label, sel, fr = if (sel || (!hasCurrent && i == 0)) cur else null, tall = true) { pick { l.onPick(id) } }
+    }
+    val make = l.makeDefault?.takeIf { !l.isDefault }
+    val use = l.useDefault
+    if (make != null || use != null) Box(Modifier.padding(vertical = 3.dp, horizontal = 2.dp).fillMaxWidth().height(1.dp).background(C.x(0x14FFFFFFL)))
+    if (make != null) DrawerChoice("Make default", false, tall = true, radio = false) { pick(make) }
+    if (use != null) DrawerChoice("Use default here", false, tall = true, radio = false) { pick(use) }
 }
 
 /** The choices of an open drop-down: a darker box hanging under its header. */
@@ -1716,7 +1732,7 @@ private fun DrawerMenu(content: @Composable ColumnScope.() -> Unit) {
 
 /** A drop-down's header: its name on the left, the current choice in gold on the right, and an arrow. */
 @Composable
-private fun DrawerSection(title: String, value: String, expanded: Boolean, fr: FocusRequester? = null, onFocus: ((Boolean) -> Unit)? = null, onClick: () -> Unit) {
+private fun DrawerSection(title: String, value: String, expanded: Boolean, fr: FocusRequester? = null, onFocus: ((Boolean) -> Unit)? = null, arrow: String? = null, onClick: () -> Unit) {
     val shape = if (expanded) RoundedCornerShape(topStart = 9.dp, topEnd = 9.dp) else RoundedCornerShape(9.dp)
     FocusBox(Modifier.fillMaxWidth().height(38.dp), shape = shape, onClick = onClick, focusRequester = fr, onFocusChange = { f -> onFocus?.invoke(f) }) {
         Row(
@@ -1728,21 +1744,29 @@ private fun DrawerSection(title: String, value: String, expanded: Boolean, fr: F
         ) {
             Text(title.uppercase(), color = C.x(0xB3FFFFFFL), fontSize = 10.sp, letterSpacing = 1.6.sp, maxLines = 1, modifier = Modifier.weight(1f))
             Text(value.uppercase(), color = DockGold, fontSize = 10.sp, letterSpacing = 1.4.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 130.dp))
-            Text(if (expanded) "\u2303" else "\u2304", color = C.sub, fontSize = 10.sp, modifier = Modifier.padding(start = 6.dp))
+            Text(arrow ?: if (expanded) "\u2303" else "\u2304", color = C.sub, fontSize = if (arrow != null) 14.sp else 10.sp, modifier = Modifier.padding(start = 6.dp))
         }
     }
 }
 
 /** One choice in an open drop-down: a radio dot and its name. */
 @Composable
-private fun DrawerChoice(label: String, selected: Boolean, fr: FocusRequester? = null, onClick: () -> Unit) {
-    FocusBox(Modifier.fillMaxWidth().height(32.dp), shape = RoundedCornerShape(7.dp), onClick = onClick, focusRequester = fr) {
-        Row(Modifier.fillMaxSize().padding(horizontal = 9.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(10.dp).clip(CircleShape).border(1.3.dp, if (selected) C.accent else C.sub, CircleShape),
-                contentAlignment = Alignment.Center
-            ) { if (selected) Box(Modifier.size(5.dp).clip(CircleShape).background(C.accent)) }
-            Spacer(Modifier.width(9.dp))
+private fun DrawerChoice(label: String, selected: Boolean, fr: FocusRequester? = null, tall: Boolean = false, radio: Boolean = true, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(if (tall) 9.dp else 7.dp)
+    FocusBox(Modifier.fillMaxWidth().height(if (tall) 38.dp else 32.dp), shape = shape, onClick = onClick, focusRequester = fr) {
+        Row(
+            Modifier.fillMaxSize()
+                .then(if (tall) Modifier.background(if (LocalPal.current.light) Color.White else C.x(0x0AFFFFFFL)).border(1.dp, C.x(0x10FFFFFFL), shape) else Modifier)
+                .padding(horizontal = if (tall) 12.dp else 9.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (radio) {
+                Box(
+                    Modifier.size(10.dp).clip(CircleShape).border(1.3.dp, if (selected) C.accent else C.sub, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) { if (selected) Box(Modifier.size(5.dp).clip(CircleShape).background(C.accent)) }
+                Spacer(Modifier.width(9.dp))
+            }
             Text(label.uppercase(), color = if (selected) C.ink else C.x(0xB3FFFFFFL), fontSize = 10.sp, letterSpacing = 1.6.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         }
     }

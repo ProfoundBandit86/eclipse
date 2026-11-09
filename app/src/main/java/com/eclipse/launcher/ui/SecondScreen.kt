@@ -95,25 +95,38 @@ fun SecondaryContent(vm: EclipseVM, displayId: Int) {
         // the mirror page, like Transfers, is only there while the mirror is on (the Mirror button on Now Playing starts it)
         val mirrorOn = vm.flag("mirror_page", true)
         val mirroring by com.eclipse.launcher.media.Mirror.running.collectAsState()
-        val pageIds = listOfNotNull("home", if (recentPage) "recent" else null, if (mediaPage) "media" else null, if (mirrorOn && mirroring) "mirror" else null, if (txPage) "transfers" else null)
+        val mirrorStarting by com.eclipse.launcher.media.Mirror.starting.collectAsState()
+        // (a start that never got an answer from Android's dialog doesn't keep the page forever)
+        LaunchedEffect(mirrorStarting) {
+            if (mirrorStarting) { kotlinx.coroutines.delay(45_000); if (!com.eclipse.launcher.media.Mirror.running.value) com.eclipse.launcher.media.Mirror.starting.value = false }
+        }
+        val pageIds = listOfNotNull("home", if (recentPage) "recent" else null, if (mediaPage) "media" else null, if (mirrorOn && (mirroring || mirrorStarting)) "mirror" else null, if (txPage) "transfers" else null)
         val pages = pageIds.size
         val pager = rememberPagerState(pageCount = { pages })
         LaunchedEffect(pages) { if (pager.currentPage > pages - 1) pager.scrollToPage(pages - 1) }
-        // Mirror pressed: go to its page once the mirror has started
+        // Mirror pressed: its page is added and scrolled to FIRST, then (once the page has settled) capture is asked
+        // for, so the live picture starts on a page that's standing still (the old order: starting capture while the
+        // page was being added and scrolled could stall both screens)
+        val ctxMain = LocalContext.current
         var wantMirror by remember { mutableStateOf(false) }
-        LaunchedEffect(wantMirror, mirroring, pages) {
-            if (wantMirror && mirroring) { pageIds.indexOf("mirror").takeIf { it >= 0 }?.let { pager.animateScrollToPage(it) }; wantMirror = false }
+        LaunchedEffect(wantMirror, pages) {
+            if (!wantMirror) return@LaunchedEffect
+            val i = pageIds.indexOf("mirror")
+            if (i < 0) return@LaunchedEffect
+            pager.animateScrollToPage(i)
+            kotlinx.coroutines.delay(450)
+            if (!com.eclipse.launcher.media.Mirror.running.value) com.eclipse.launcher.media.Mirror.request(ctxMain)
+            wantMirror = false
         }
         // a RomM download starting brings the Transfers page up
         val downloadingNow = RommDownloads.items.value.any { it.state != RommDownloads.State.FAILED }
         var wasDownloading by remember { mutableStateOf(downloadingNow) }
         LaunchedEffect(downloadingNow, pages) {
-            if (downloadingNow && !wasDownloading && vm.flag("tx_follow", true)) {
+            if (downloadingNow && !wasDownloading && vm.flag("tx_follow", true) && !mirroring) {
                 pageIds.indexOf("transfers").takeIf { it >= 0 }?.let { pager.animateScrollToPage(it); wasDownloading = true }
             } else wasDownloading = downloadingNow
         }
         var mirrorPicking by remember { mutableStateOf(false) }
-        val ctxMain = LocalContext.current
         val pagerScope = rememberCoroutineScope()
         var browser by remember { mutableStateOf<String?>(null) }
         var walkGame by remember { mutableStateOf<Game?>(null) }
@@ -138,7 +151,7 @@ fun SecondaryContent(vm: EclipseVM, displayId: Int) {
                     else -> NowPlayingPage(
                         vm, dockOn,
                         openMirror = if (mirrorOn) ({
-                            if (!mirroring) com.eclipse.launcher.media.Mirror.request(ctxMain)
+                            if (!mirroring) com.eclipse.launcher.media.Mirror.starting.value = true // shows the page
                             wantMirror = true
                             Unit
                         }) else null,
