@@ -334,6 +334,65 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     }
 
     /** Eclipse's version, from the installed package. */
+    // ---- Eclipse's own updates (data/Updater.kt): checked at start, offered in a popup (UpdateSheet) ----
+    /** A newer release waiting for an answer: the update popup shows while this is set. */
+    var update by mutableStateOf<com.eclipse.launcher.data.Updater.Release?>(null)
+    /** Download progress of the update (0..1, -1 = size unknown), null when not downloading. */
+    var updateProgress by mutableStateOf<Float?>(null)
+    /** What the last check found, for Settings ("Up to date", "Couldn't reach GitHub"…). */
+    var updateStatus by mutableStateOf<String?>(null)
+    private var updateFile: File? = null
+
+    /** Looks for a newer Eclipse. At start ([manual] false) a version you skipped isn't offered again. */
+    fun checkForUpdate(manual: Boolean) {
+        if (manual) updateStatus = "Checking\u2026"
+        viewModelScope.launch {
+            val r = com.eclipse.launcher.data.Updater.latest()
+            val cur = appVersion()
+            when {
+                r == null -> updateStatus = if (manual) "Couldn't reach GitHub" else updateStatus
+                !com.eclipse.launcher.data.Updater.isNewer(r.version, cur) -> updateStatus = "Up to date (${cur})"
+                !manual && store.str("update_skip") == r.version -> updateStatus = "Version ${r.version} skipped"
+                else -> { updateStatus = "Version ${r.version} available"; update = r }
+            }
+        }
+    }
+
+    /** "Update now": download, then Android's installer (after allowing Eclipse to install apps, if needed). */
+    fun startUpdate() {
+        val r = update ?: return
+        if (updateProgress != null) return
+        updateFile?.takeIf { it.isFile }?.let { installUpdate(it); return }
+        updateProgress = 0f
+        viewModelScope.launch {
+            var shown = -2f
+            val f = com.eclipse.launcher.data.Updater.download(ctx, r) { p ->
+                // (every 1 %, not every chunk)
+                if (p < 0f || p - shown >= 0.01f || p >= 1f) { shown = p; viewModelScope.launch(Dispatchers.Main) { updateProgress = p } }
+            }
+            updateProgress = null
+            if (f == null) { message = "Couldn't download the update. Try again later."; return@launch }
+            updateFile = f
+            installUpdate(f)
+        }
+    }
+
+    private fun installUpdate(f: File) {
+        if (!com.eclipse.launcher.data.Updater.canInstall(ctx)) {
+            // Android asks once: allow Eclipse to install apps, then press Update again
+            message = "Allow Eclipse to install apps, then press Update again"
+            com.eclipse.launcher.data.Updater.askInstallPermission(ctx)
+            return
+        }
+        if (!com.eclipse.launcher.data.Updater.install(ctx, f)) message = "Couldn't open Android's installer"
+    }
+
+    /** The update popup is up (not over the opening animation, the setup wizard or the tour). */
+    val updateShowing: Boolean get() = update != null && splashDone && !setupOpen && !tutorialOpen
+
+    fun updateLater() { if (updateProgress == null) update = null }
+    fun skipUpdate() { update?.let { store.putStr("update_skip", it.version) }; if (updateProgress == null) update = null }
+
     fun appVersion(): String = try { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "" } catch (e: Exception) { "" }
 
     /** Setup's Artwork page was passed: fetch artwork for the whole library (once the scan is done), in the background. */
@@ -410,6 +469,9 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
             restoreSession()
             loaded = true
             noteAdded()
+            // a newer Eclipse on GitHub? (Settings → General → Updates; off: only "Check for updates" asks)
+            com.eclipse.launcher.data.Updater.cleanUp(ctx)
+            if (flag("update_check", true)) checkForUpdate(manual = false)
             if (resumed) endStaleSession()
             refreshApps()
             loadThemes()

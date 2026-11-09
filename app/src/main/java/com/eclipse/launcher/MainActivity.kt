@@ -443,7 +443,7 @@ class MainActivity : ComponentActivity() {
         val menuOverWizard = vm.colorPicker != null || vm.appearancePicker != null || vm.searchOpen ||
             vm.menuGame != null || vm.artGame != null || vm.platArtScreen != null || vm.dockMenu != null || vm.platReorder ||
             vm.appMenu != null || vm.platformMenu != null || vm.emuMenu != null || vm.sysEdit != null || vm.viewMenu || vm.onDeckRemove != null ||
-            vm.storeDelete != null || vm.gameDelete != null || vm.smbBrowse != null || vm.packImport != null || vm.rommAsk != null || vm.themeImport != null
+            vm.storeDelete != null || vm.gameDelete != null || vm.updateShowing || vm.smbBrowse != null || vm.packImport != null || vm.rommAsk != null || vm.themeImport != null
         if (modal != null && !menuOverWizard && !GamepadFocus.modalHasFocus && e.keyCode in MODAL_KEYS) {
             if (e.action == KeyEvent.ACTION_DOWN) runCatching { modal.requestFocus() }
             return true

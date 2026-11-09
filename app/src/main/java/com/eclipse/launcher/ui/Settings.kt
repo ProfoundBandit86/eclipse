@@ -297,6 +297,9 @@ private fun General(vm: EclipseVM) {
         ActionRow("Run setup again", "Permissions, ROM folder and connections.") { vm.runSetupAgain() }
         ToggleRow("Opening animation", "The eclipse rising when Eclipse starts. Any button skips it.", vm.flag("splash", true)) { vm.setFlag("splash", it) }
         ActionRow("Show the tutorial again", "The short tour of Home, the dock and the settings panel.") { vm.restartTutorial() }
+        DropSection("Updates")
+        ToggleRow("Check for updates at start", "Looks for a newer Eclipse on GitHub when Eclipse opens, and asks before installing it.", vm.flag("update_check", true)) { vm.setFlag("update_check", it) }
+        ActionRow("Check for updates", vm.updateStatus ?: "You have ${vm.appVersion()}") { vm.checkForUpdate(manual = true) }
         DropSection("Crash reports")
         val ctxNow = androidx.compose.ui.platform.LocalContext.current
         val crashes = remember { CrashReports.list(ctxNow) }
@@ -1372,10 +1375,7 @@ private fun ScrapeSection(vm: EclipseVM) {
     ) { vm.setFlag("fill_art", it) }
     ToggleRow("Save artwork as WebP", "New PNG pictures are re-saved as lossless WebP when that's smaller. Pixel for pixel the same. Needs Android 10+.", vm.flag("webp_new", false)) { vm.setFlag("webp_new", it) }
     // what to scrape: one drop-down row; its list ticks each kind on or off
-    val kinds = listOf(
-        "box" to "Box art", "poster" to "Poster", "bg" to "Backdrop", "logo" to "Logo", "desc" to "Description",
-        "media" to "Disc / cartridge", "box3d" to "3D box", "hero" to "Hero banner", "video" to "Trailer (video link)"
-    )
+    val kinds = SCRAPE_KINDS
     var kindsOpen by remember { mutableStateOf(false) }
     val on = kinds.count { it.first in vm.scrapeKinds }
     DropRow("What to scrape", if (on == kinds.size) "Everything" else "$on of ${kinds.size}", "lib:scrapekinds", kindsOpen) { kindsOpen = !kindsOpen }
@@ -1387,6 +1387,22 @@ private fun ScrapeSection(vm: EclipseVM) {
         }
     }
     Note("Your own uploaded art is always kept.")
+}
+
+/** What scraping can fetch (store key → name): Settings → Scrape → What to scrape, and the setup wizard's Artwork page. */
+val SCRAPE_KINDS = listOf(
+    "box" to "Box art", "poster" to "Poster", "bg" to "Backdrop", "logo" to "Logo", "desc" to "Description",
+    "media" to "Disc / cartridge", "box3d" to "3D box", "hero" to "Hero banner", "video" to "Trailer (video link)"
+)
+
+/** A tick box: gold with a check when on, an empty outline when off. */
+@Composable
+private fun KindCheck(on: Boolean) {
+    val shape = RoundedCornerShape(4.dp)
+    Box(
+        Modifier.size(16.dp).clip(shape).background(if (on) C.accent else Color.Transparent).border(1.4.dp, if (on) C.accent else C.sub, shape),
+        contentAlignment = Alignment.Center
+    ) { if (on) Text("\u2713", color = C.onAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
 }
 
 @Composable
@@ -2248,6 +2264,23 @@ private fun SetupPageBody(vm: EclipseVM, page: SetupPage, first: Boolean, isLast
                         ServiceCard("LaunchBox", t, d, open == "lb", { toggle("lb") }) {
                             if (lb != null) { Bar(vm.lbProgress); ActionRow("Cancel", null) { vm.cancelLaunchBox() } }
                             else ActionRow(if (LaunchBox.loaded) "Check for newer LaunchBox data" else "Download LaunchBox data", "Downloaded once and kept (use Wi-Fi).") { vm.updateLaunchBox() }
+                        }
+                    }
+                    // which kinds of art to download (the same setting as Settings → Scrape → What to scrape; no trailers here)
+                    Reveal(n++) { Box(Modifier.padding(top = 8.dp)) { DropSection("What to download") } }
+                    SCRAPE_KINDS.filter { it.first != "video" }.chunked(2).forEach { pair ->
+                        Reveal(n++) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                pair.forEach { (k, label) ->
+                                    Box(Modifier.weight(1f)) {
+                                        SetRow("setup:kind:$k", onClick = { vm.chooseScrapeKind(k, k !in vm.scrapeKinds) }) {
+                                            KindCheck(k in vm.scrapeKinds)
+                                            Text(label, color = C.ink, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 10.dp).weight(1f))
+                                        }
+                                    }
+                                }
+                                if (pair.size == 1) Spacer(Modifier.weight(1f))
+                            }
                         }
                     }
                 }

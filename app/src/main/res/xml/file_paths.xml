@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- ROM files shared with emulators. Only shared storage: internal storage (/storage/emulated/0) and SD cards /
-     USB drives (/storage/XXXX-XXXX). Eclipse's own private folders (/data/...) can never be shared. -->
+     USB drives (/storage/XXXX-XXXX), plus a downloaded Eclipse update for the installer. Nothing else of Eclipse's. -->
 <paths>
     <root-path name="storage" path="storage/" />
+    <!-- an Eclipse update being handed to Android's installer (cache/updates only) -->
+    <cache-path name="updates" path="updates/" />
 </paths>
