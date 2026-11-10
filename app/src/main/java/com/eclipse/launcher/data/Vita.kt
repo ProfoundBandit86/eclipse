@@ -12,7 +12,7 @@ import java.nio.ByteOrder
  * installed in Vita3K, so nobody has to make them by hand.
  */
 object Vita {
-    /** First line of every shortcut Eclipse makes: lets it tell its own files from yours (Library.shortcutId skips it). */
+    /** First line of every shortcut Eclipse makes: lets it tell its own files from yours (Launch.shortcutId skips it). */
     const val MARK = "# Made by Eclipse from Vita3K"
 
     data class Installed(val titleId: String, val title: String)
@@ -94,12 +94,12 @@ object Vita {
         val existing = (lookIn + dest).distinct().flatMap { dir ->
             dir.walkTopDown().maxDepth(2).filter { it.isFile && it.extension.equals("psvita", true) }.toList()
         }.distinct()
-        val have = existing.map { Library.shortcutId(it).uppercase() }.toSet()
+        val have = existing.map { Launch.shortcutId(it).uppercase() }.toSet()
         val installedIds = games.map { it.titleId }.toSet()
         var removed = 0
         for (f in existing) {
             val mine = runCatching { f.useLines { it.firstOrNull()?.trim() == MARK } }.getOrDefault(false)
-            if (mine && Library.shortcutId(f).uppercase() !in installedIds && f.delete()) removed++
+            if (mine && Launch.shortcutId(f).uppercase() !in installedIds && f.delete()) removed++
         }
         var made = 0
         for (g in games) {
