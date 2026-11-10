@@ -57,7 +57,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
-private val TOOL_TABS = listOf("CHD / RVZ", "Playlists", "Send to RomM")
+private val TOOL_TABS = listOf("Compress", "Playlists", "Send to RomM")
 
 /**
  * Tools, full screen: three tabs (L1 / R1, or touch) with a list on the left and what will happen on the right.
@@ -191,12 +191,12 @@ private fun RowScope.ChdTab(
     yAct.value = { if (vm.chdJob == null) vm.startChd() }
 
     ToolList(
-        "Disc images not converted yet", systems.keys.toList(), filter, { filter = it },
+        "Not compressed yet", systems.keys.toList(), filter, { filter = it },
         Modifier.weight(1.62f)
     ) {
         when {
-            items == null || vm.chdScanning -> ListMessage("Looking for disc images…")
-            todo.isEmpty() -> ListMessage("Every disc image is already a CHD or RVZ.", "Look again", first) { vm.scanForChd() }
+            items == null || vm.chdScanning -> ListMessage("Looking for games to compress…")
+            todo.isEmpty() -> ListMessage("Everything is already compressed.", "Look again", first) { vm.scanForChd() }
             else -> LazyColumn(Modifier.fillMaxSize().stayInside(), state = stickListState(), verticalArrangement = Arrangement.spacedBy(4.dp), contentPadding = PaddingValues(bottom = 12.dp)) {
                 var n = 0
                 shown.forEach { (sys, list) ->
@@ -207,7 +207,7 @@ private fun RowScope.ChdTab(
                             val g = byPath[ci.src.absolutePath]
                             val running = job != null && job.name == ci.src.nameWithoutExtension
                             val kind = (if (ci.src.extension.equals("cue", true)) "BIN / CUE · ${ci.parts.size} FILES" else ci.src.extension.uppercase()) +
-                                if (ci.rvz) " → RVZ" else " → CHD"
+                                " → " + ci.ext.uppercase()
                             ToolRow(
                                 ci.src.absolutePath in vm.chdPicked, g?.name ?: ci.src.nameWithoutExtension, kind,
                                 g?.let { gg -> vm.artOf(gg, ArtKind.BOX) }, "chd:${ci.src.absolutePath}", if (idx == 0) first else null,
@@ -225,8 +225,8 @@ private fun RowScope.ChdTab(
     }
     SidePanel(Modifier.weight(1f)) {
         if (job != null) {
-            Label("Converting")
-            BigCount("${job.index + 1}", "of ${job.total} discs")
+            Label("Compressing")
+            BigCount("${job.index + 1}", "of ${job.total} games")
             Text(job.name, color = C.ink, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text("${job.phase} · ${(job.progress * 100).toInt()} %", color = C.accent, fontSize = 10.sp)
             Meter(listOf((job.index + job.progress) / job.total.coerceAtLeast(1) to C.accent))
@@ -235,17 +235,17 @@ private fun RowScope.ChdTab(
             SideNote("Discs already finished are kept. It goes on in the background if you close this.")
         } else {
             Label("Selected")
-            BigCount("${picked.size}", "of ${todo.size} discs")
+            BigCount("${picked.size}", "of ${todo.size} games")
             Text("${vm.fmtBytes(picked.sumOf { it.bytes })} to convert", color = C.x(0xFFCFCAC0L), fontSize = 10.sp)
             if (vm.chdDiscsTotal > 0) Text("Saved so far: ${vm.fmtBytes(vm.chdSavedTotal)} on ${vm.chdDiscsTotal} discs", color = C.accent, fontSize = 10.sp)
             Spacer(Modifier.height(2.dp))
             ToggleRow("Delete originals when done", null, vm.chdDelete) { vm.chooseChdDelete(it) }
             Spacer(Modifier.weight(1f))
             Pill(
-                if (picked.isEmpty()) "Nothing ticked" else "Convert ${picked.size} disc${if (picked.size == 1) "" else "s"}",
+                if (picked.isEmpty()) "Nothing ticked" else "Compress ${picked.size} game${if (picked.size == 1) "" else "s"}",
                 Modifier.fillMaxWidth(), primary = true
             ) { vm.startChd() }
-            SideNote(vm.chdLog.lastOrNull() ?: "One at a time, each checked before the originals go. GameCube / Wii discs become RVZ (Dolphin's format), the rest CHD. Playlists are pointed at the new files.")
+            SideNote(vm.chdLog.lastOrNull() ?: "One at a time, each checked before the originals go. Discs become CHD (GameCube / Wii: RVZ), cartridge ROMs ZIP. Games keep their artwork and play time. Playlists are pointed at the new files.")
         }
     }
 }

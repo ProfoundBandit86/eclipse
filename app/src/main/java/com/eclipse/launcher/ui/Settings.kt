@@ -66,7 +66,7 @@ private val TABS = listOf(
     SettingsTab("Theme", androidx.compose.material.icons.Icons.Filled.Palette, "Theme, colours, icons, font and wallpapers."),
     SettingsTab("Views", androidx.compose.material.icons.Icons.Filled.ViewCarousel, "Which ways of showing a games list are offered, and new ones to install."),
     SettingsTab("Library", androidx.compose.material.icons.Icons.Filled.VideoLibrary, "Your game folders, the systems found in them and their emulators."),
-    SettingsTab("Tools", androidx.compose.material.icons.Icons.Filled.Handyman, "Convert to CHD / RVZ, make playlists, send games to RomM, shrink artwork."),
+    SettingsTab("Tools", androidx.compose.material.icons.Icons.Filled.Handyman, "Compress games (CHD / RVZ / ZIP), make playlists, send games to RomM, shrink artwork."),
     SettingsTab("Scrape", androidx.compose.material.icons.Icons.Filled.ImageSearch, "Artwork, descriptions and details, and where they come from."),
     SettingsTab("General", androidx.compose.material.icons.Icons.Filled.Tune, "Clock, dock, home screen and crash reports."),
     SettingsTab("Connections", androidx.compose.material.icons.Icons.Filled.Cloud, "RomM, artwork scrapers and RetroAchievements."),
@@ -257,7 +257,7 @@ private val SETTINGS_INDEX: List<Triple<String, Int, String>> = listOf(
     Triple("LaunchBox", 4, "artwork database scraper"), Triple("Save artwork as WebP", 4, "webp lossless png space compress images"), Triple("Fill missing disc, cartridge and 3D box art", 4, "generate draw media physical cart 3d box missing"),
     Triple("SteamGridDB", 4, "api key art scraper"), Triple("IGDB", 4, "twitch client scraper"), Triple("RetroAchievements", 6, "achievements cheevos"),
     Triple("RomM server", 6, "server sync saves romm"), Triple("RomM library share", 6, "upload smb folder"), Triple("Transfers", 6, "uploads downloads history romm"),
-    Triple("Convert to CHD", 3, "iso bin cue compress disc rvz gamecube wii dolphin"), Triple("Shrink artwork", 3, "webp lossless png space compress images"), Triple("Playlists for multi-disc games", 3, "m3u discs"),
+    Triple("Compress games", 3, "iso bin cue compress disc rvz gamecube wii dolphin zip rom cartridge chd"), Triple("Shrink artwork", 3, "webp lossless png space compress images"), Triple("Playlists for multi-disc games", 3, "m3u discs"),
     Triple("Credits", 8, "licences about version"),
     Triple("Permissions", 5, "access allow"), Triple("All-files access", 5, "storage permission"), Triple("Notification access", 5, "permission"),
     Triple("Eclipse helper", 5, "accessibility screenshot permission"), Triple("No battery limits", 5, "battery optimisation permission")
@@ -946,15 +946,15 @@ private fun ToolsTab(vm: EclipseVM) {
     }
     fun open(tab: Int) { vm.toolsTab = tab; vm.toolsOpen = true }
     TwoColumns({
-        DropSection("Disc images")
+        DropSection("Compress games")
         val chd = vm.chdItems?.count { !it.done }
         ActionRow(
-            "Convert to CHD",
+            "Compress games",
             when {
                 vm.chdJob != null -> "Converting ${vm.chdJob!!.index + 1} of ${vm.chdJob!!.total}\u2026"
-                chd == null -> "Looking for disc images\u2026"
-                chd == 0 -> "Every disc image is already a CHD or RVZ."
-                else -> "$chd disc image${if (chd == 1) "" else "s"} not converted yet. Smaller files, same games (GameCube / Wii become RVZ, for Dolphin)."
+                chd == null -> "Looking for games to compress\u2026"
+                chd == 0 -> "Everything is already compressed."
+                else -> "$chd game${if (chd == 1) "" else "s"} not compressed yet. Smaller files, same games: discs to CHD (GameCube / Wii to RVZ), cartridges to ZIP."
             }
         ) { open(0) }
         DropSection("Multi-disc games")
@@ -1217,6 +1217,15 @@ fun SystemEditor(vm: EclipseVM, platformId: String, pickFolder: () -> Unit) {
                 "Everything in a folder added here counts as ${p.name}, whatever it's called.",
                 color = C.sub, fontSize = 12.sp, modifier = Modifier.padding(start = 4.dp)
             )
+
+            // Vita: Eclipse makes the .psvita shortcuts from the games installed in Vita3K
+            if (platformId == "psvita") {
+                LibBox("Vita3K") {
+                    DropRow("Vita3K's folder", vm.vita3kDir.ifBlank { "Found by itself" }, "sys:vita3k", opens = true) { vm.folderTarget = "@vita3k"; pickFolder() }
+                    if (vm.vita3kDir.isNotBlank()) DropRow("Back to automatic", "Look in the usual places", "sys:vita3k:auto", opens = true) { vm.chooseVita3kDir(null) }
+                    Note(vm.vitaNote ?: "Games installed in Vita3K show up here by themselves on the next scan.")
+                }
+            }
 
             // RomM: which of the library's platform folders this system's games are uploaded to (picked on the share)
             if (vm.isConfigured("romm")) {

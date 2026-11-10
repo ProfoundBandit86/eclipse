@@ -744,12 +744,49 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         }.distinct().sorted().toList()
     }
 
+    // ---- PlayStation Vita: shortcuts for the games installed in Vita3K (data/Vita.kt) ----
+
+    /** Vita3K's storage folder, picked in the Vita system editor; "" = look in the usual places. */
+    var vita3kDir by mutableStateOf(store.str("vita3k_dir"))
+        private set
+    /** What the last look at Vita3K found (shown in the Vita system editor). null = not looked yet. */
+    var vitaNote by mutableStateOf<String?>(null)
+        private set
+
+    fun chooseVita3kDir(path: String?) {
+        vita3kDir = path.orEmpty()
+        store.putStr("vita3k_dir", vita3kDir)
+        rescanSystem("psvita", scrapeAfter = true)
+    }
+
+    /**
+     * Runs before every scan: each game installed in Vita3K gets a "<Title>.psvita" in your Vita folder (the one set
+     * for the system, else one found in your ROM folders, else "psvita" in the main ROM folder, made only when there are
+     * games). Shortcuts Eclipse made for games since removed from Vita3K go; yours are left alone.
+     */
+    private fun syncVita() {
+        val root = com.eclipse.launcher.data.Vita.findRoot(vita3kDir)
+        if (root == null) {
+            vitaNote = if (vita3kDir.isNotBlank()) "No installed games found in that folder (it needs ux0/app inside)."
+                else "Vita3K's folder wasn't found. In Vita3K, set its storage folder to a normal folder (like Vita3K at the root of your storage), or choose it below."
+            return
+        }
+        val installed = com.eclipse.launcher.data.Vita.installed(root)
+        val folders = (foldersFor("psvita") + detectedFoldersFor("psvita")).distinct().map { File(it) }
+        val dest = folders.firstOrNull() ?: romPath.takeIf { it.isNotBlank() }?.let { File(it, "psvita") }
+        if (dest == null) { vitaNote = "Choose a ROM folder first."; return }
+        val r = com.eclipse.launcher.data.Vita.sync(installed, dest, folders)
+        vitaNote = "${installed.size} ${if (installed.size == 1) "game" else "games"} installed in Vita3K (${root.absolutePath})" +
+            (if (r.made > 0) " \u00b7 ${r.made} added" else "") + (if (r.removed > 0) " \u00b7 ${r.removed} removed" else "")
+    }
+
     /** The folder picker came back. The first folder becomes the main ROM folder; later ones are added to a list. */
     fun onFolderPicked(path: String, tree: String?) {
         val target = folderTarget
         folderTarget = null
         when {
             target == "@main" -> setRomFolder(path, tree) // setup: choose / replace the main folder
+            target == "@vita3k" -> chooseVita3kDir(path) // the Vita system editor: where Vita3K keeps its games
             target != null -> {
                 val cur = foldersFor(target)
                 if (path in cur) { message = "That folder is already added"; return }
@@ -788,13 +825,15 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
 
     /** Everything in all the folders, as one list (no duplicates when folders overlap). */
     private fun scanAll(): List<Game> {
+        runCatching { syncVita() }
         val out = LinkedHashMap<String, Game>()
         romFolders().forEach { f -> Scanner.scan(f).forEach { out.putIfAbsent(it.path, it) } }
         // a folder added for one system: the system is known, so only its file types count
         sysFolders.keys.forEach { id -> foldersFor(id).forEach { f -> Scanner.scan(f, id).forEach { out[it.path] = it } } }
         // arcade ROMs named like "simpsons2p" get their real titles if the LaunchBox data knows them
         // a title you set on the game's page wins over everything
-        return out.values.map { g -> metaTitle(g.id)?.let { g.copy(name = it) } ?: LaunchBox.titleFor(g)?.let { g.copy(name = it) } ?: g }
+        val aliased = out.values.map { g -> idAlias[g.path]?.let { g.copy(id = it) } ?: g }.distinctBy { it.id }
+        return aliased.map { g -> metaTitle(g.id)?.let { g.copy(name = it) } ?: LaunchBox.titleFor(g)?.let { g.copy(name = it) } ?: g }
     }
 
     /**
@@ -811,7 +850,29 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     data class ChdItem(
         val src: java.io.File, val parts: List<java.io.File>, val bytes: Long, val done: Boolean,
         val rvz: Boolean = false, val psp: Boolean = false,
-    )
+        /** a cartridge ROM, compressed into a .zip (data/RomZip.kt) */
+        val zip: Boolean = false,
+    ) {
+        val ext: String get() = if (zip) "zip" else if (rvz) "rvz" else "chd"
+    }
+
+    /** [g]'s ROM as something to zip, or null (not a zip system, compressed already, zipped beside it …). */
+    private fun zipItem(g: Game): ChdItem? {
+        val f = java.io.File(g.path)
+        if (!com.eclipse.launcher.data.RomZip.canZip(f, g.platform)) return null
+        return ChdItem(f, listOf(f), f.length(), false, zip = true)
+    }
+
+    /**
+     * A converted file that replaced its original (originals deleted) keeps the original's game id, so its artwork,
+     * play time, favourite, notes … stay with it. new path → id. Applied by `scanAll`.
+     */
+    private var idAlias: Map<String, String> = store.map("id_alias")
+    private fun keepId(old: java.io.File, new: java.io.File) {
+        val id = idAlias[old.absolutePath] ?: ("g" + Integer.toHexString(old.absolutePath.hashCode()))
+        idAlias = (idAlias - old.absolutePath) + (new.absolutePath to id)
+        store.putMap("id_alias", idAlias)
+    }
 
     /**
      * The system a disc belongs to: its game in the library, a system folder it's in, or a folder (up to 4 levels up)
@@ -874,7 +935,10 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     var chdDelete by mutableStateOf(store.str("chd_delete") == "1")
     fun chooseChdDelete(on: Boolean) { chdDelete = on; store.putStr("chd_delete", if (on) "1" else "") }
     /** while converting: what's happening now */
-    data class ChdJob(val index: Int, val total: Int, val name: String, val phase: String, val progress: Float, val rvz: Boolean = false)
+    data class ChdJob(val index: Int, val total: Int, val name: String, val phase: String, val progress: Float, val rvz: Boolean = false, val zip: Boolean = false) {
+        /** what it's turning into: "CHD", "RVZ" or "ZIP" */
+        val format: String get() = if (zip) "ZIP" else if (rvz) "RVZ" else "CHD"
+    }
     var chdJob by mutableStateOf<ChdJob?>(null)
     /** one line per disc when a run finishes */
     var chdLog by mutableStateOf<List<String>>(emptyList())
@@ -976,6 +1040,8 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
                         if (!seen.add(f.absolutePath)) return@forEach
                         discItem(f, alreadyConverted(f))?.let { list.add(it) }
                     }
+                // cartridge ROMs that can be zipped (from the library: the system is known there)
+                games.forEach { g -> zipItem(g)?.takeIf { seen.add(it.src.absolutePath) }?.let { list.add(it) } }
                 list.sortedWith(compareBy({ it.done }, { it.src.name.lowercase() }))
             }
             chdItems = found
@@ -1017,17 +1083,19 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
                     if (chdCancel) break
                     val name = item.src.nameWithoutExtension
                     val rvz = item.rvz
-                    val ext = if (rvz) "rvz" else "chd"
+                    val ext = item.ext
                     val out = java.io.File(item.src.parentFile, "$name.$ext")
                     val part = java.io.File(item.src.parentFile, "$name.$ext.part")
-                    chdJob = ChdJob(i, items.size, name, "Converting", 0f, rvz)
+                    chdJob = ChdJob(i, items.size, name, if (item.zip) "Compressing" else "Converting", 0f, rvz, item.zip)
                     val result = withContext(Dispatchers.IO) {
                         try {
-                            if (rvz) com.eclipse.launcher.data.Rvz.convert(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
+                            if (item.zip) com.eclipse.launcher.data.RomZip.zip(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
+                            else if (rvz) com.eclipse.launcher.data.Rvz.convert(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
                             else com.eclipse.launcher.data.Chd.convert(item.src, part, threads, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel }, psp = item.psp)
                             chdJob = chdJob?.copy(phase = "Checking", progress = 0f)
                             // RVZ: read it all back through Dolphin and compare with the original, byte for byte
-                            val good = if (rvz) com.eclipse.launcher.data.Rvz.same(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
+                            val good = if (item.zip) com.eclipse.launcher.data.RomZip.same(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
+                                else if (rvz) com.eclipse.launcher.data.Rvz.same(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
                                 else com.eclipse.launcher.data.Chd.verify(part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
                             if (!good) {
                                 part.delete()
@@ -1036,7 +1104,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
                                 out.delete()
                                 if (!part.renameTo(out)) throw java.io.IOException("couldn't rename the finished file")
                                 saved += item.bytes - out.length()
-                                if (del) item.parts.forEach { it.delete() }
+                                if (del) { item.parts.forEach { it.delete() }; keepId(item.src, out) }
                                 "\u2713 $name: ${fmtBytes(item.bytes)} \u2192 ${fmtBytes(out.length())}" + if (del) ", originals deleted" else ""
                             }
                         } catch (e: InterruptedException) { part.delete(); null
@@ -1058,9 +1126,10 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
                     // (a RomM download's conversion is told in its "ready" pop-up instead)
                     val ok = log.count { it.startsWith("\u2713") }
                     val first = items.first().src
-                    val g = games.firstOrNull { it.path == first.absolutePath || it.path == convertedOf(first).absolutePath }
+                    val g = games.firstOrNull { it.path == first.absolutePath || it.path == convertedOf(first).absolutePath ||
+                        it.path == java.io.File(first.parentFile, first.nameWithoutExtension + "." + items.first().ext).absolutePath }
                     val pic = g?.let { artOf(it, ArtKind.BOX) }
-                    if (ok > 0) showNotice(Notice(if (items.all { it.rvz }) "Converted to RVZ" else if (items.any { it.rvz }) "Converted" else "Converted to CHD", if (ok == 1) (g?.name ?: first.nameWithoutExtension) else "$ok discs",
+                    if (ok > 0) showNotice(Notice(if (items.all { it.zip }) "Compressed to ZIP" else if (items.all { it.rvz }) "Converted to RVZ" else if (items.all { !it.rvz && !it.zip }) "Converted to CHD" else "Converted", if (ok == 1) (g?.name ?: first.nameWithoutExtension) else "$ok discs",
                         if (saved > 0) "Saved ${fmtBytes(saved)}" else null, pic, "chd"))
                     else if (log.any { it.startsWith("\u2717") }) showNotice(Notice("Couldn't convert", g?.name ?: first.nameWithoutExtension, "The originals were kept", pic, "error"))
                 }
@@ -1081,7 +1150,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     /** A game's page: can this one game be turned into a CHD? (an .iso or .cue with no .chd beside it yet) */
     fun canConvertToChd(g: Game): Boolean {
         if (g.platform == "android" || g.id.startsWith("rm:")) return false
-        return chdDiscsOf(g).isNotEmpty()
+        return zipItem(g) != null || chdDiscsOf(g).isNotEmpty()
     }
 
     /**
@@ -1114,6 +1183,9 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
 
     /** What a game's discs are converted to, by its system: "RVZ" for GameCube / Wii (Dolphin's format), else "CHD". */
     fun convertFormat(g: Game): String? {
+        // a cartridge ROM of a zip system (a PC Engine CD's .cue in the same system still goes to CHD)
+        if (g.platform in com.eclipse.launcher.data.RomZip.SYSTEMS && java.io.File(g.path).extension.lowercase() !in setOf("cue", "iso", "gcm", "chd", "rvz", "m3u", "gdi", "ccd", "pbp", "cso"))
+            return "ZIP"
         val exts = com.eclipse.launcher.data.Platforms.byId(g.platform)?.exts ?: return null
         return when { "rvz" in exts -> "RVZ"; "chd" in exts -> "CHD"; else -> null }
     }
@@ -1121,6 +1193,11 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     /** A game's page → Convert to CHD: just this disc (originals deleted only if Settings → Tools says so). */
     fun convertGameToChd(g: Game) {
         if (chdJob != null) { message = "Already converting a disc: wait for it to finish (Settings \u2192 Tools)"; return }
+        zipItem(g)?.let { z ->
+            message = "Compressing ${g.name} to ZIP\u2026"
+            runChd(listOf(z), chdDelete, auto = true) { saved, ok -> if (ok > 0) chdSavedFor[g.id] = saved }
+            return
+        }
         val discs = chdDiscsOf(g)
         if (discs.isEmpty()) { message = "Nothing to convert: no .cue or .iso for ${g.name}"; return }
         message = "Converting ${g.name} to ${convertFormat(g) ?: "CHD"}\u2026"

@@ -286,8 +286,16 @@ survive a reinstall. Artwork and settings are kept in Eclipse's private app stor
 <details>
 <summary><b>How do I add PlayStation Vita games?</b></summary>
 
-Install the game in Vita3K first. Then, in your `psvita` folder, create a text file named after the game with the
-`.psvita` extension (for example `Persona 4 Golden.psvita`) containing the game's title ID, such as `PCSE00120`.
+Install the game in Vita3K. Eclipse finds it on the next scan and adds it with its real name: it makes the
+`.psvita` shortcut in your `psvita` folder itself.
+
+Eclipse looks for Vita3K's storage folder in the usual places (a `Vita3K` or `Vita` folder at the root of your
+storage or SD card). If yours is elsewhere, choose it under Settings → Library → PlayStation Vita → Vita3K's folder.
+Vita3K's default folder inside `Android/data` can't be read by other apps, so set Vita3K's storage folder to a normal
+folder (Vita3K → Settings → Emulator → Emulated System Storage folder).
+
+You can still make a shortcut by hand: a text file named after the game with the `.psvita` extension (for example
+`Persona 4 Golden.psvita`) containing the game's title ID, such as `PCSE00120`.
 </details>
 
 <details>
