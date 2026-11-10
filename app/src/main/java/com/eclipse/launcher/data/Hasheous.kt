@@ -104,7 +104,7 @@ object Hasheous {
                 null
             }
         }
-        if (f.length() > MAX_HASH_BYTES || f.extension.lowercase() in setOf("7z", "chd", "m3u", "cue")) return null
+        if (f.length() > MAX_HASH_BYTES || f.extension.lowercase() in setOf("7z", "chd", "rvz", "m3u", "cue")) return null
         return try {
             val crc = CRC32()
             val md5 = MessageDigest.getInstance("MD5")

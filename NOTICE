@@ -1,7 +1,31 @@
 Eclipse
 Copyright 2026 TJL
 
-This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+Eclipse is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+It is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See LICENSE for the full text.
+
+Versions up to and including 0.1.11 were released under the Apache License, Version 2.0, and stay available under it.
+
+Third-party code built into Eclipse
+-----------------------------------
+
+The GameCube / Wii → RVZ converter (app/src/main/cpp) is Dolphin's disc code (Source/Core/DiscIO and the parts of
+Source/Core/Common and Source/Core/Core/IOS it needs), from https://github.com/dolphin-emu/dolphin.
+  Copyright 2003-2026 Dolphin Emulator Project. GPL-2.0-or-later (app/src/main/cpp/dolphin/COPYING).
+  Files changed for Eclipse are marked "Eclipse" where they were changed.
+With it, from Dolphin's Externals:
+  - Zstandard: Copyright (c) Meta Platforms, Inc. and affiliates. BSD licence (externals/zstd/LICENSE).
+  - {fmt}: Copyright (c) 2012 - present, Victor Zverovich. MIT licence (externals/fmt/LICENSE).
+  - liblzma (XZ Utils): public domain / 0BSD (externals/liblzma/COPYING).
+  - Mbed TLS (AES, SHA-1, MD5 only): Copyright The Mbed TLS Contributors. Apache License 2.0
+    (externals/mbedtls/LICENSE).
+
+Other material
+--------------
+
+The ColorGrade system icons are by grvceless and included with permission. They are not covered by the GPL.
 
 The emulator catalog (app/src/main/assets/systems.json) was compiled with reference to the public system definitions
 of NeoStation (https://neostation.dev). The RomM and RetroAchievements logos belong to their respective projects.

@@ -66,7 +66,7 @@ private val TABS = listOf(
     SettingsTab("Theme", androidx.compose.material.icons.Icons.Filled.Palette, "Theme, colours, icons, font and wallpapers."),
     SettingsTab("Views", androidx.compose.material.icons.Icons.Filled.ViewCarousel, "Which ways of showing a games list are offered, and new ones to install."),
     SettingsTab("Library", androidx.compose.material.icons.Icons.Filled.VideoLibrary, "Your game folders, the systems found in them and their emulators."),
-    SettingsTab("Tools", androidx.compose.material.icons.Icons.Filled.Handyman, "Convert to CHD, make playlists, send games to RomM, shrink artwork."),
+    SettingsTab("Tools", androidx.compose.material.icons.Icons.Filled.Handyman, "Convert to CHD / RVZ, make playlists, send games to RomM, shrink artwork."),
     SettingsTab("Scrape", androidx.compose.material.icons.Icons.Filled.ImageSearch, "Artwork, descriptions and details, and where they come from."),
     SettingsTab("General", androidx.compose.material.icons.Icons.Filled.Tune, "Clock, dock, home screen and crash reports."),
     SettingsTab("Connections", androidx.compose.material.icons.Icons.Filled.Cloud, "RomM, artwork scrapers and RetroAchievements."),
@@ -257,7 +257,7 @@ private val SETTINGS_INDEX: List<Triple<String, Int, String>> = listOf(
     Triple("LaunchBox", 4, "artwork database scraper"), Triple("Save artwork as WebP", 4, "webp lossless png space compress images"), Triple("Fill missing disc, cartridge and 3D box art", 4, "generate draw media physical cart 3d box missing"),
     Triple("SteamGridDB", 4, "api key art scraper"), Triple("IGDB", 4, "twitch client scraper"), Triple("RetroAchievements", 6, "achievements cheevos"),
     Triple("RomM server", 6, "server sync saves romm"), Triple("RomM library share", 6, "upload smb folder"), Triple("Transfers", 6, "uploads downloads history romm"),
-    Triple("Convert to CHD", 3, "iso bin cue compress disc"), Triple("Shrink artwork", 3, "webp lossless png space compress images"), Triple("Playlists for multi-disc games", 3, "m3u discs"),
+    Triple("Convert to CHD", 3, "iso bin cue compress disc rvz gamecube wii dolphin"), Triple("Shrink artwork", 3, "webp lossless png space compress images"), Triple("Playlists for multi-disc games", 3, "m3u discs"),
     Triple("Credits", 8, "licences about version"),
     Triple("Permissions", 5, "access allow"), Triple("All-files access", 5, "storage permission"), Triple("Notification access", 5, "permission"),
     Triple("Eclipse helper", 5, "accessibility screenshot permission"), Triple("No battery limits", 5, "battery optimisation permission")
@@ -652,7 +652,7 @@ private fun RommPanel(vm: EclipseVM, openR: String?, toggleR: (String) -> Unit) 
                 ColumnLabel("Library share \u00b7 uploads")
                 RommShareRow(vm)
                 if (ready) {
-                    ToggleRow("Convert installs to CHD", "A disc game (.cue / .iso) from RomM is converted to a CHD before it shows up or starts. Multi-disc games start after disc 1. Originals are deleted if Settings \u2192 Tools says so.", vm.flag("romm_chd", false)) { vm.setFlag("romm_chd", it) }
+                    ToggleRow("Convert installs to CHD", "A disc game (.cue / .iso) from RomM is converted to a CHD (RVZ for GameCube / Wii) before it shows up or starts. Multi-disc games start after disc 1. Originals are deleted if Settings \u2192 Tools says so.", vm.flag("romm_chd", false)) { vm.setFlag("romm_chd", it) }
                     ToggleRow("Sync saves", "Newer saves come down from RomM before a game starts; changed saves go up after it closes.", vm.flag("romm_saves", false)) { vm.setFlag("romm_saves", it) }
                     if (vm.flag("romm_saves", false)) {
                         FieldRow("Save folders", vm.key("romm_savedirs").ifBlank { "/storage/emulated/0/RetroArch/saves" }) { vm.setKey("romm_savedirs", it) }
@@ -953,8 +953,8 @@ private fun ToolsTab(vm: EclipseVM) {
             when {
                 vm.chdJob != null -> "Converting ${vm.chdJob!!.index + 1} of ${vm.chdJob!!.total}\u2026"
                 chd == null -> "Looking for disc images\u2026"
-                chd == 0 -> "Every disc image is already a CHD."
-                else -> "$chd disc image${if (chd == 1) "" else "s"} not in CHD yet. Smaller files, same games."
+                chd == 0 -> "Every disc image is already a CHD or RVZ."
+                else -> "$chd disc image${if (chd == 1) "" else "s"} not converted yet. Smaller files, same games (GameCube / Wii become RVZ, for Dolphin)."
             }
         ) { open(0) }
         DropSection("Multi-disc games")
@@ -2383,7 +2383,7 @@ private fun SetupTwoColumns(vm: EclipseVM, page: SetupPage) {
                             }
                         }
                     }
-                    Reveal(n++) { ToggleRow("Convert installs to CHD", "Disc games become CHDs before they start.", vm.flag("romm_chd", false)) { vm.setFlag("romm_chd", it) } }
+                    Reveal(n++) { ToggleRow("Convert installs to CHD", "Disc games become CHDs (GameCube / Wii: RVZ) before they start.", vm.flag("romm_chd", false)) { vm.setFlag("romm_chd", it) } }
                     Reveal(n++) {
                         Text("ROMM'S LIBRARY SHARE · FOR SENDING GAMES", color = Color(0xFF8E897F), fontSize = 7.5.sp, letterSpacing = 1.6.sp, modifier = Modifier.padding(start = 4.dp, top = 6.dp))
                     }
@@ -2442,8 +2442,13 @@ private fun Credits(vm: EclipseVM) {
         "A launcher and emulator frontend for handhelds and TV boxes. Eclipse doesn't include any games, BIOS files " +
             "or emulators: it finds and opens the ones you already have."
     )
+    CreditRow(vm, "Licence", "Free software under the GNU General Public License, version 3 or later.", "https://www.gnu.org/licenses/gpl-3.0.html")
+    CreditRow(vm, "Source code", "github.com/ProfoundBandit86/eclipse", "https://github.com/ProfoundBandit86/eclipse")
 
     CreditHeader("Open-source libraries")
+    CreditRow(vm, "Dolphin (disc code: RVZ converter)", "Dolphin Emulator Project \u00b7 GPL-2.0-or-later", "https://github.com/dolphin-emu/dolphin")
+    CreditRow(vm, "Zstandard, liblzma, {fmt}, Mbed TLS", "Used by Dolphin's converter \u00b7 BSD, public domain, MIT, Apache 2.0", "https://github.com/dolphin-emu/dolphin/tree/master/Externals")
+    CreditRow(vm, "jcifs-ng (network shares)", "AgNO3 & contributors \u00b7 LGPL 2.1", "https://github.com/AgNO3/jcifs-ng")
     CreditRow(vm, "Jetpack Compose, AndroidX & Material icons", "Google \u00b7 Apache License 2.0", "https://developer.android.com/jetpack/androidx")
     CreditRow(vm, "Kotlin & kotlinx.coroutines", "JetBrains \u00b7 Apache License 2.0", "https://github.com/Kotlin/kotlinx.coroutines")
     CreditRow(vm, "OkHttp", "Square \u00b7 Apache License 2.0", "https://square.github.io/okhttp/")

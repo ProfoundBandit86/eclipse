@@ -25,3 +25,6 @@
 -dontwarn org.conscrypt.**
 -dontwarn org.openjsse.**
 -dontwarn okhttp3.internal.platform.**
+
+# The RVZ converter's native methods are found by name from libeclipse_rvz.so (app/src/main/cpp/rvz_jni.cpp)
+-keepclasseswithmembernames class com.eclipse.launcher.data.Rvz { native <methods>; }

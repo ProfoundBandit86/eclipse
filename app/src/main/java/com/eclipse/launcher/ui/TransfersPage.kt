@@ -111,16 +111,16 @@ fun TransfersPage(vm: EclipseVM) {
             }
         }
 
-        // Convert to CHD
+        // Convert to CHD (or RVZ, for a GameCube / Wii disc)
         chd?.let { j ->
             val p = j.progress
             TxCard(
-                Color(0xFF5B5BD6), Icons.Filled.Album, "CONVERT TO CHD",
+                Color(0xFF5B5BD6), Icons.Filled.Album, if (j.rvz) "CONVERT TO RVZ" else "CONVERT TO CHD",
                 if (j.total > 1) "${j.index} of ${j.total}" else "",
                 j.name, j.phase.replaceFirstChar { it.uppercase() },
                 p.takeIf { it >= 0f }, etaText(rememberEta("chd:${j.index}:${j.name}", p)),
                 cover = { m -> DiscTile(m, remember(j.name, vm.games) { chdArt(vm, j.name) }) },
-                footer = if (vm.chdSavedTotal > 0) "Saved by CHD so far: ${vm.fmtBytes(vm.chdSavedTotal)}" else null,
+                footer = if (vm.chdSavedTotal > 0) "Saved by converting so far: ${vm.fmtBytes(vm.chdSavedTotal)}" else null,
                 onStop = { vm.cancelChd() }
             )
         }

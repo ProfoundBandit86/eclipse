@@ -19,7 +19,7 @@ object M3u {
     private val TAG = Regex("""\s*[\(\[]\s*(?:disc|disk|cd)\s*([0-9]{1,2}|[a-d])\s*(?:of\s*[0-9]{1,2})?\s*[\)\]]""", RegexOption.IGNORE_CASE)
 
     /** Disc image formats, best first: when a disc is there in two formats (say .cue and .chd), the playlist uses the first. */
-    private val FORMATS = listOf("chd", "cue", "gdi", "ccd", "mds", "iso", "cso", "pbp", "rvz", "gcz")
+    private val FORMATS = listOf("chd", "rvz", "cue", "gdi", "ccd", "mds", "gcz", "iso", "gcm", "cso", "pbp")
 
     fun discNumber(name: String): Int? = TAG.find(name)?.groupValues?.get(1)?.let { v ->
         v.toIntOrNull() ?: (v.lowercase()[0] - 'a' + 1)

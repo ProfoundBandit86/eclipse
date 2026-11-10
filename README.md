@@ -9,7 +9,7 @@
   <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin and Jetpack Compose" src="https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF?logo=kotlin&logoColor=white">
   <img alt="Dual screen" src="https://img.shields.io/badge/dual%20screen-AYN%20Thor-1F1F1F">
-  <img alt="Licence: Apache 2.0" src="https://img.shields.io/badge/licence-Apache%202.0-blue">
+  <img alt="Licence: GPL 3.0 or later" src="https://img.shields.io/badge/licence-GPL--3.0--or--later-blue">
 </p>
 
 <p align="center">
@@ -298,7 +298,12 @@ No. RomM is optional. Without it, Eclipse works entirely with the games on your 
 
 ## Licence
 
-Eclipse is released under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for attribution notices.
+Eclipse is free software, released under the [GNU General Public License, version 3 or later](LICENSE). See
+[NOTICE](NOTICE) for the third-party code it includes and their licences. Versions up to 0.1.11 were released under
+the Apache License 2.0 and stay available under it.
+
+The GameCube / Wii → RVZ converter is the [Dolphin](https://github.com/dolphin-emu/dolphin) emulator's own disc
+code (GPL-2.0-or-later), built into Eclipse in `app/src/main/cpp`.
 
 ## Acknowledgements
 
@@ -307,6 +312,7 @@ Eclipse is released under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE
   belong to their projects.
 - Artwork and game data from **libretro thumbnails**, **ArcadeDB**, **GameTDB**, **LaunchBox Games Database**,
   **SteamGridDB**, **IGDB** and **Hasheous**.
+- **[Dolphin](https://dolphin-emu.org)**, whose disc code converts GameCube and Wii games to RVZ.
 - The open-source libraries Eclipse is built on are listed, with their licences, in the app under Settings → Credits.
 
 Game artwork shown in the screenshots belongs to its respective publishers. All trademarks are the property of their

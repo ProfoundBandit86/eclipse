@@ -425,14 +425,16 @@ fun GameMenu(vm: EclipseVM, g: Game) = Glass {
                         }
                         TabSection("Files")
                         val fOpts = ArrayList<@Composable () -> Unit>()
-                        fOpts += {
+                        // no row at all for systems whose emulators can't use CHD / RVZ (Xbox, Xbox 360, PS3 …)
+                        val fmt = vm.convertFormat(g)
+                        if (fmt != null) fOpts += {
                             val j = vm.chdJobFor(g)
                             val saved = vm.chdSavedFor[g.id]
                             when {
-                                j != null -> OptRow("Convert to CHD", "${j.phase} ${(j.progress * 100).toInt()}%") { }
-                                saved != null -> OptRow("Convert to CHD", "Saved ${vm.fmtBytes(saved)}") { }
-                                vm.canConvertToChd(g) -> OptRow("Convert to CHD", "\u203A") { vm.convertGameToChd(g) }
-                                else -> OptRow("Convert to CHD", "Not a disc game", muted = true) { }
+                                j != null -> OptRow("Convert to $fmt", "${j.phase} ${(j.progress * 100).toInt()}%") { }
+                                saved != null -> OptRow("Convert to $fmt", "Saved ${vm.fmtBytes(saved)}") { }
+                                vm.canConvertToChd(g) -> OptRow("Convert to $fmt", "\u203A") { vm.convertGameToChd(g) }
+                                else -> OptRow("Convert to $fmt", "Not a disc game", muted = true) { }
                             }
                         }
                         run { val f = first(); fOpts += { OptRow("Rescrape", "\u203A", fr = f) { vm.rescrapeGame(g) } } }

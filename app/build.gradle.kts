@@ -29,6 +29,8 @@ val hasReleaseKey = keystorePath != null && file(keystorePath).isFile
 android {
     namespace = "com.eclipse.launcher"
     compileSdk = 35
+    // the NDK Dolphin builds with (for the RVZ converter, app/src/main/cpp); Gradle downloads it if it's missing
+    ndkVersion = "30.0.15729638"
 
     defaultConfig {
         applicationId = "com.eclipse.launcher"
@@ -36,6 +38,19 @@ android {
         targetSdk = 35
         versionCode = appVersionCode
         versionName = appVersionName
+        // Eclipse runs on ARM64 handhelds; x86_64 for the Android emulator
+        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+        externalNativeBuild {
+            cmake { arguments += listOf("-DANDROID_STL=c++_static", "-DCMAKE_BUILD_TYPE=Release") }
+        }
+    }
+
+    // GameCube / Wii → RVZ: Dolphin's converter (GPL-2.0-or-later), see app/src/main/cpp/CMakeLists.txt
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1+"
+        }
     }
 
     signingConfigs {

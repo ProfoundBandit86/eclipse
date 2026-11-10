@@ -57,7 +57,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
-private val TOOL_TABS = listOf("CHD", "Playlists", "Send to RomM")
+private val TOOL_TABS = listOf("CHD / RVZ", "Playlists", "Send to RomM")
 
 /**
  * Tools, full screen: three tabs (L1 / R1, or touch) with a list on the left and what will happen on the right.
@@ -191,12 +191,12 @@ private fun RowScope.ChdTab(
     yAct.value = { if (vm.chdJob == null) vm.startChd() }
 
     ToolList(
-        "Disc images not in CHD", systems.keys.toList(), filter, { filter = it },
+        "Disc images not converted yet", systems.keys.toList(), filter, { filter = it },
         Modifier.weight(1.62f)
     ) {
         when {
             items == null || vm.chdScanning -> ListMessage("Looking for disc images…")
-            todo.isEmpty() -> ListMessage("Every disc image is already a CHD.", "Look again", first) { vm.scanForChd() }
+            todo.isEmpty() -> ListMessage("Every disc image is already a CHD or RVZ.", "Look again", first) { vm.scanForChd() }
             else -> LazyColumn(Modifier.fillMaxSize().stayInside(), state = stickListState(), verticalArrangement = Arrangement.spacedBy(4.dp), contentPadding = PaddingValues(bottom = 12.dp)) {
                 var n = 0
                 shown.forEach { (sys, list) ->
@@ -206,7 +206,8 @@ private fun RowScope.ChdTab(
                         item(key = ci.src.absolutePath) {
                             val g = byPath[ci.src.absolutePath]
                             val running = job != null && job.name == ci.src.nameWithoutExtension
-                            val kind = if (ci.src.extension.equals("cue", true)) "BIN / CUE · ${ci.parts.size} FILES" else ci.src.extension.uppercase()
+                            val kind = (if (ci.src.extension.equals("cue", true)) "BIN / CUE · ${ci.parts.size} FILES" else ci.src.extension.uppercase()) +
+                                if (ci.rvz) " → RVZ" else " → CHD"
                             ToolRow(
                                 ci.src.absolutePath in vm.chdPicked, g?.name ?: ci.src.nameWithoutExtension, kind,
                                 g?.let { gg -> vm.artOf(gg, ArtKind.BOX) }, "chd:${ci.src.absolutePath}", if (idx == 0) first else null,
@@ -244,7 +245,7 @@ private fun RowScope.ChdTab(
                 if (picked.isEmpty()) "Nothing ticked" else "Convert ${picked.size} disc${if (picked.size == 1) "" else "s"}",
                 Modifier.fillMaxWidth(), primary = true
             ) { vm.startChd() }
-            SideNote(vm.chdLog.lastOrNull() ?: "One at a time, each checked before the originals go. Playlists are pointed at the .chd.")
+            SideNote(vm.chdLog.lastOrNull() ?: "One at a time, each checked before the originals go. GameCube / Wii discs become RVZ (Dolphin's format), the rest CHD. Playlists are pointed at the new files.")
         }
     }
 }

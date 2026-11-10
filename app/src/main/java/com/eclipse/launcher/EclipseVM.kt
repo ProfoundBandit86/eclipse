@@ -804,7 +804,69 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     // ---- Settings → Tools (CHD) ----
 
     /** A disc image that can become a CHD. [parts] = every file it's made of (the .cue and its .bins, or the .iso). */
-    data class ChdItem(val src: java.io.File, val parts: List<java.io.File>, val bytes: Long, val done: Boolean)
+    /**
+     * [rvz]: a GameCube / Wii disc, which becomes RVZ (Dolphin's format: Dolphin can't play CHD); the rest become CHD.
+     * [psp]: a PSP disc (its CHD must be DVD-style with 2048-byte hunks for PPSSPP).
+     */
+    data class ChdItem(
+        val src: java.io.File, val parts: List<java.io.File>, val bytes: Long, val done: Boolean,
+        val rvz: Boolean = false, val psp: Boolean = false,
+    )
+
+    /**
+     * The system a disc belongs to: its game in the library, a system folder it's in, or a folder (up to 4 levels up)
+     * named after a system. null = can't tell.
+     */
+    private fun discSystem(f: java.io.File, platformId: String? = null): com.eclipse.launcher.data.PlatformDef? {
+        platformId?.let { id -> com.eclipse.launcher.data.Platforms.byId(id)?.let { return it } }
+        val path = f.absolutePath
+        games.firstOrNull { it.path == path }?.let { g -> com.eclipse.launcher.data.Platforms.byId(g.platform)?.let { return it } }
+        for ((id, paths) in sysFolders) {
+            if (paths.split('\n').map { it.trim() }.any { it.isNotEmpty() && inDir(f, it) })
+                com.eclipse.launcher.data.Platforms.byId(id)?.let { return it }
+        }
+        var d = f.parentFile
+        repeat(4) {
+            if (d == null) return null
+            com.eclipse.launcher.data.Platforms.matchFolder(d!!.name)?.let { return it }
+            d = d!!.parentFile
+        }
+        return null
+    }
+
+    /**
+     * What [f] can be converted to, or null when its system's emulators can't use the result. Goes by the system's own
+     * file types in the catalog (systems.json): systems that list .chd get CHD, GameCube / Wii (listing .rvz) get RVZ.
+     * Xbox, Xbox 360, PS3, Wii U, DOS and the like list neither, so their discs are left alone. A disc of an unknown
+     * system: GameCube / Wii by its header → RVZ, a .cue → CHD (every system that uses .cue sheets reads CHD), an .iso → no.
+     */
+    private fun discItem(f: java.io.File, done: Boolean, platformId: String? = null): ChdItem? {
+        if (!isConvertible(f)) return null
+        val parts = if (f.extension.equals("cue", true)) com.eclipse.launcher.data.Chd.cueFiles(f) else listOf(f)
+        val bytes = parts.sumOf { it.length() }
+        val sys = discSystem(f, platformId)
+        val nintendo = !f.extension.equals("cue", true) && com.eclipse.launcher.data.Rvz.isNintendoDisc(f)
+        return when {
+            sys == null -> when {
+                nintendo -> ChdItem(f, parts, bytes, done, rvz = true)
+                f.extension.equals("cue", true) -> ChdItem(f, parts, bytes, done)
+                else -> null
+            }
+            "rvz" in sys.exts && nintendo -> ChdItem(f, parts, bytes, done, rvz = true)
+            "chd" in sys.exts && !f.extension.equals("gcm", true) ->
+                ChdItem(f, parts, bytes, done, psp = sys.id == "psp" || sys.id == "pspminis")
+            else -> null
+        }
+    }
+
+    /** What a disc becomes: "Game.rvz" for a GameCube / Wii disc, "Game.chd" for the rest. */
+    private fun convertedOf(disc: java.io.File): java.io.File =
+        java.io.File(disc.parentFile, disc.nameWithoutExtension + if (com.eclipse.launcher.data.Rvz.isNintendoDisc(disc)) ".rvz" else ".chd")
+    /** A .chd or .rvz of this disc is already there. */
+    private fun alreadyConverted(disc: java.io.File): Boolean =
+        java.io.File(disc.parentFile, disc.nameWithoutExtension + ".chd").exists() || java.io.File(disc.parentFile, disc.nameWithoutExtension + ".rvz").exists()
+    /** Disc images the converter takes: .cue sheets, .iso (and .gcm, GameCube's own). */
+    private fun isConvertible(f: java.io.File) = f.extension.lowercase().let { it == "cue" || it == "iso" || it == "gcm" }
     /** null = not scanned yet */
     var chdItems by mutableStateOf<List<ChdItem>?>(null)
     var chdPicked by mutableStateOf<Set<String>>(emptySet())
@@ -812,7 +874,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     var chdDelete by mutableStateOf(store.str("chd_delete") == "1")
     fun chooseChdDelete(on: Boolean) { chdDelete = on; store.putStr("chd_delete", if (on) "1" else "") }
     /** while converting: what's happening now */
-    data class ChdJob(val index: Int, val total: Int, val name: String, val phase: String, val progress: Float)
+    data class ChdJob(val index: Int, val total: Int, val name: String, val phase: String, val progress: Float, val rvz: Boolean = false)
     var chdJob by mutableStateOf<ChdJob?>(null)
     /** one line per disc when a run finishes */
     var chdLog by mutableStateOf<List<String>>(emptyList())
@@ -909,12 +971,10 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
                 // .bins a .cue uses aren't listed on their own
                 for (root in roots) java.io.File(root).walkTopDown().maxDepth(4)
                     .onEnter { !it.name.startsWith(".") && it.name != "Android" }
-                    .filter { it.isFile && (it.extension.equals("cue", true) || it.extension.equals("iso", true)) }
+                    .filter { it.isFile && isConvertible(it) }
                     .forEach { f ->
                         if (!seen.add(f.absolutePath)) return@forEach
-                        val parts = if (f.extension.equals("cue", true)) com.eclipse.launcher.data.Chd.cueFiles(f) else listOf(f)
-                        val chd = java.io.File(f.parentFile, f.nameWithoutExtension + ".chd")
-                        list.add(ChdItem(f, parts, parts.sumOf { it.length() }, chd.exists()))
+                        discItem(f, alreadyConverted(f))?.let { list.add(it) }
                     }
                 list.sortedWith(compareBy({ it.done }, { it.src.name.lowercase() }))
             }
@@ -956,14 +1016,20 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
                 for ((i, item) in items.withIndex()) {
                     if (chdCancel) break
                     val name = item.src.nameWithoutExtension
-                    val out = java.io.File(item.src.parentFile, "$name.chd")
-                    val part = java.io.File(item.src.parentFile, "$name.chd.part")
-                    chdJob = ChdJob(i, items.size, name, "Converting", 0f)
+                    val rvz = item.rvz
+                    val ext = if (rvz) "rvz" else "chd"
+                    val out = java.io.File(item.src.parentFile, "$name.$ext")
+                    val part = java.io.File(item.src.parentFile, "$name.$ext.part")
+                    chdJob = ChdJob(i, items.size, name, "Converting", 0f, rvz)
                     val result = withContext(Dispatchers.IO) {
                         try {
-                            com.eclipse.launcher.data.Chd.convert(item.src, part, threads, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
+                            if (rvz) com.eclipse.launcher.data.Rvz.convert(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
+                            else com.eclipse.launcher.data.Chd.convert(item.src, part, threads, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel }, psp = item.psp)
                             chdJob = chdJob?.copy(phase = "Checking", progress = 0f)
-                            if (!com.eclipse.launcher.data.Chd.verify(part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })) {
+                            // RVZ: read it all back through Dolphin and compare with the original, byte for byte
+                            val good = if (rvz) com.eclipse.launcher.data.Rvz.same(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
+                                else com.eclipse.launcher.data.Chd.verify(part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
+                            if (!good) {
                                 part.delete()
                                 if (chdCancel) null else "\u2717 $name: the check after converting failed, originals kept"
                             } else {
@@ -992,9 +1058,9 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
                     // (a RomM download's conversion is told in its "ready" pop-up instead)
                     val ok = log.count { it.startsWith("\u2713") }
                     val first = items.first().src
-                    val g = games.firstOrNull { it.path == first.absolutePath || it.path == File(first.parentFile, first.nameWithoutExtension + ".chd").absolutePath }
+                    val g = games.firstOrNull { it.path == first.absolutePath || it.path == convertedOf(first).absolutePath }
                     val pic = g?.let { artOf(it, ArtKind.BOX) }
-                    if (ok > 0) showNotice(Notice("Converted to CHD", if (ok == 1) (g?.name ?: first.nameWithoutExtension) else "$ok discs",
+                    if (ok > 0) showNotice(Notice(if (items.all { it.rvz }) "Converted to RVZ" else if (items.any { it.rvz }) "Converted" else "Converted to CHD", if (ok == 1) (g?.name ?: first.nameWithoutExtension) else "$ok discs",
                         if (saved > 0) "Saved ${fmtBytes(saved)}" else null, pic, "chd"))
                     else if (log.any { it.startsWith("\u2717") }) showNotice(Notice("Couldn't convert", g?.name ?: first.nameWithoutExtension, "The originals were kept", pic, "error"))
                 }
@@ -1030,8 +1096,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
                 .map { line -> java.io.File(line).let { if (it.isAbsolute) it else java.io.File(f.parentFile, line) } }
         } else listOf(f)
         return discs.filter { d ->
-            d.isFile && (d.extension.equals("iso", true) || d.extension.equals("cue", true)) &&
-                !java.io.File(d.parentFile, d.nameWithoutExtension + ".chd").exists()
+            d.isFile && isConvertible(d) && !alreadyConverted(d) && discItem(d, false, g.platform) != null
         }
     }
 
@@ -1047,16 +1112,19 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
      */
     val chdSavedFor = mutableStateMapOf<String, Long>()
 
+    /** What a game's discs are converted to, by its system: "RVZ" for GameCube / Wii (Dolphin's format), else "CHD". */
+    fun convertFormat(g: Game): String? {
+        val exts = com.eclipse.launcher.data.Platforms.byId(g.platform)?.exts ?: return null
+        return when { "rvz" in exts -> "RVZ"; "chd" in exts -> "CHD"; else -> null }
+    }
+
     /** A game's page → Convert to CHD: just this disc (originals deleted only if Settings → Tools says so). */
     fun convertGameToChd(g: Game) {
         if (chdJob != null) { message = "Already converting a disc: wait for it to finish (Settings \u2192 Tools)"; return }
         val discs = chdDiscsOf(g)
         if (discs.isEmpty()) { message = "Nothing to convert: no .cue or .iso for ${g.name}"; return }
-        message = "Converting ${g.name} to CHD\u2026"
-        runChd(discs.map { d ->
-            val parts = if (d.extension.equals("cue", true)) com.eclipse.launcher.data.Chd.cueFiles(d) else listOf(d)
-            ChdItem(d, parts, parts.sumOf { it.length() }, false)
-        }, chdDelete, auto = true) { saved, ok -> if (ok > 0) chdSavedFor[g.id] = saved }
+        message = "Converting ${g.name} to ${convertFormat(g) ?: "CHD"}\u2026"
+        runChd(discs.mapNotNull { d -> discItem(d, false, g.platform) }, chdDelete, auto = true) { saved, ok -> if (ok > 0) chdSavedFor[g.id] = saved }
     }
 
     // ---- auto-convert: new .cue/.bin or .iso discs dropped into a ROM folder become a CHD by themselves ----
@@ -1084,7 +1152,8 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     fun loadChdFolders() {
         viewModelScope.launch {
             chdFolders = withContext(Dispatchers.IO) {
-                val disc = setOf("cue", "iso", "chd")
+                // only systems whose emulators read CHD or RVZ (not Xbox, PS3 …)
+                val disc = setOf("chd", "rvz")
                 val out = LinkedHashMap<String, String>() // path -> system name
                 for (root in romFolders()) (java.io.File(root).listFiles() ?: emptyArray()).filter { it.isDirectory }.forEach { d ->
                     val p = com.eclipse.launcher.data.Platforms.matchFolder(d.name)
@@ -1134,11 +1203,10 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         val list = ArrayList<ChdItem>()
         for (root in roots) java.io.File(root).walkTopDown().maxDepth(4)
             .onEnter { !it.name.startsWith(".") && it.name != "Android" }
-            .filter { it.isFile && (it.extension.equals("cue", true) || it.extension.equals("iso", true)) }
+            .filter { it.isFile && isConvertible(it) }
             .forEach { f ->
                 if (!seen.add(f.absolutePath)) return@forEach
-                val parts = if (f.extension.equals("cue", true)) com.eclipse.launcher.data.Chd.cueFiles(f) else listOf(f)
-                list.add(ChdItem(f, parts, parts.sumOf { it.length() }, java.io.File(f.parentFile, f.nameWithoutExtension + ".chd").exists()))
+                discItem(f, alreadyConverted(f))?.let { list.add(it) }
             }
         return list
     }
@@ -1155,7 +1223,8 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
             findChdCandidates().filter { !it.done && it.src.absolutePath !in chdKnown && dirs.any { d -> inDir(it.src, d) } }.filter { item ->
                 val key = item.src.absolutePath
                 // every .bin the .cue names is there, nothing half-written beside it
-                val complete = item.parts.all { it.isFile } && !java.io.File(item.src.parentFile, item.src.nameWithoutExtension + ".chd.part").exists()
+                val complete = item.parts.all { it.isFile } && !java.io.File(item.src.parentFile, item.src.nameWithoutExtension + ".chd.part").exists() &&
+                    !java.io.File(item.src.parentFile, item.src.nameWithoutExtension + ".rvz.part").exists()
                 val size = item.parts.sumOf { it.length() }
                 val newest = item.parts.maxOf { it.lastModified() }
                 val before = chdWatch.put(key, size to newest)
@@ -1190,8 +1259,13 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
                     val t = line.trim()
                     val disc = java.io.File(t).let { if (it.isAbsolute) it else java.io.File(dir, t) }
                     val chd = java.io.File(disc.parentFile, disc.nameWithoutExtension + ".chd")
-                    if ((disc.extension.equals("cue", true) || disc.extension.equals("iso", true)) && chd.isFile)
-                        t.substringBeforeLast('.') + ".chd" else line
+                    val rvz = java.io.File(disc.parentFile, disc.nameWithoutExtension + ".rvz")
+                    when {
+                        !isConvertible(disc) -> line
+                        chd.isFile -> t.substringBeforeLast('.') + ".chd"
+                        rvz.isFile -> t.substringBeforeLast('.') + ".rvz"
+                        else -> line
+                    }
                 }
                 if (fixed != lines) m.writeText(fixed.joinToString("\n") + "\n")
             }
@@ -3085,10 +3159,10 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         if (rommDiscs[rom.id] != null) {
             val pg = updateDiscPlaylist(rom, file)
             if (!converted && convertThenInstall(rom, file, playNow)) return
-            if (pg != null) { readyNotice(rom, pg.name, converted, savedBytes); if (playNow) play(pg); return }
+            if (pg != null) { readyNotice(rom, pg.name, converted, savedBytes, file); if (playNow) play(pg); return }
         }
         if (!converted && convertThenInstall(rom, file, playNow)) return
-        readyNotice(rom, rom.name, converted, savedBytes)
+        readyNotice(rom, rom.name, converted, savedBytes, file)
         val g = Game("g" + Integer.toHexString(file.absolutePath.hashCode()), rom.name, rom.bp, file.absolutePath)
         if (games.none { it.id == g.id }) games = games + g
         rommLink = rommLink + (g.id to rom.id.toString())
@@ -3102,34 +3176,39 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     }
 
     /** The "ready" pop-up of a RomM download (a disc of a multi-disc game says which disc). */
-    private fun readyNotice(rom: RomM.Rom, name: String, converted: Boolean, savedBytes: Long) {
+    private fun readyNotice(rom: RomM.Rom, name: String, converted: Boolean, savedBytes: Long, file: File) {
         val set = rommDiscs[rom.id]
+        // GameCube / Wii discs become RVZ, the rest CHD
+        val fmt = if (file.extension.equals("rvz", true) || (converted && com.eclipse.launcher.data.Rvz.isNintendoDisc(file))) "RVZ" else "CHD"
         val kind = if (set != null && set.size > 1) "Disc ${set.indexOfFirst { it.id == rom.id } + 1} of ${set.size} ready" else "Ready to play"
         val detail = "Downloaded from RomM" + when {
-            converted && savedBytes > 0 -> " \u00b7 CHD, saved ${fmtBytes(savedBytes)}"
-            converted && savedBytes == 0L -> " \u00b7 converted to CHD"
-            converted -> " \u00b7 kept as is (CHD failed)"
+            converted && savedBytes > 0 -> " \u00b7 $fmt, saved ${fmtBytes(savedBytes)}"
+            converted && savedBytes == 0L -> " \u00b7 converted to $fmt"
+            converted -> " \u00b7 kept as is ($fmt failed)"
             else -> ""
         }
         showNotice(Notice(kind, name, detail, (set?.firstOrNull() ?: rom).cover, "ok"))
     }
 
     /**
-     * Settings → Connections → RomM → "Convert installs to CHD": a finished .cue / .iso install is converted first and
+     * Settings → Connections → RomM → "Convert installs to CHD": a finished .cue / .iso install is converted first (to RVZ
+     * for a GameCube / Wii disc, which Dolphin plays; CHD for the rest) and
      * only then shown (and played, for "Install & play"). A multi-disc game plays once disc 1 is converted; the other
      * discs convert after it. If a conversion fails the original is used. Returns true when it took over.
      */
     private fun convertThenInstall(rom: RomM.Rom, file: File, playNow: Boolean): Boolean {
         if (!flag("romm_chd", false)) return false
-        if (!file.extension.equals("cue", true) && !file.extension.equals("iso", true)) return false
-        if (File(file.parentFile, file.nameWithoutExtension + ".chd").exists()) return false
+        if (!isConvertible(file)) return false
+        if (alreadyConverted(file)) return false
+        // a system whose emulators can't use CHD / RVZ (Xbox, PS3 …): installed as it came
+        val item = discItem(file, false, rom.bp) ?: return false
         viewModelScope.launch {
             while (chdJob != null) delay(1000)
-            val parts = if (file.extension.equals("cue", true)) com.eclipse.launcher.data.Chd.cueFiles(file) else listOf(file)
-            message = "Converting ${rom.name} to CHD\u2026"
-            runChd(listOf(ChdItem(file, parts, parts.sumOf { it.length() }, false)), chdDelete, auto = true, romm = true) { saved, ok ->
-                val chd = File(file.parentFile, file.nameWithoutExtension + ".chd")
-                rommInstalled(rom, if (ok > 0 && chd.isFile) chd else file, playNow, converted = true, savedBytes = if (ok > 0) saved else -1L)
+            val rvz = item.rvz
+            message = "Converting ${rom.name} to ${if (rvz) "RVZ" else "CHD"}\u2026"
+            runChd(listOf(item), chdDelete, auto = true, romm = true) { saved, ok ->
+                val done = File(file.parentFile, file.nameWithoutExtension + if (rvz) ".rvz" else ".chd")
+                rommInstalled(rom, if (ok > 0 && done.isFile) done else file, playNow, converted = true, savedBytes = if (ok > 0) saved else -1L)
             }
         }
         return true
@@ -3180,7 +3259,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         (romFolders() + sysFolders.values.flatMap { it.split('\n') }).map { it.trim() }.filter { it.isNotEmpty() }.distinct()
             .mapNotNull { runCatching { File(it).canonicalFile }.getOrNull() }
 
-    private val DISC_EXTS = listOf("chd", "cue", "gdi", "ccd", "mds", "iso", "cso", "pbp", "rvz", "gcz")
+    private val DISC_EXTS = listOf("chd", "rvz", "cue", "gdi", "ccd", "mds", "gcz", "iso", "gcm", "cso", "pbp")
     private val TRACK_EXTS = listOf("bin", "img", "sub", "raw", "mdf")
     private val TRACK_TAG = Regex("""\s*\(\s*track\s*\d+\s*\)""", RegexOption.IGNORE_CASE)
     private fun addDiscOnce(d: File, into: MutableSet<File>, inside: (File) -> Boolean) {

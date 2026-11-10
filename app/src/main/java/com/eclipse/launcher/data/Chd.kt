@@ -244,11 +244,12 @@ object Chd {
         }
     }
 
-    fun convertDvd(iso: File, out: File, threads: Int, progress: (Float) -> Unit, cancelled: () -> Boolean) {
+    /** [hunkBytes]: 4096 like chdman's old default; PPSSPP only reads PSP CHDs made with 2048 (`createdvd -hs 2048`). */
+    fun convertDvd(iso: File, out: File, threads: Int, progress: (Float) -> Unit, cancelled: () -> Boolean, hunkBytes: Int = 4096) {
         val size = iso.length()
         if (size % 2048 != 0L) throw ChdException("${iso.name} isn't a whole number of 2048-byte sectors")
         RandomAccessFile(iso, "r").use { raf ->
-            write(out, size, 4096, 2048, tag("zlib"), listOf(tag("DVD ") to byteArrayOf(0)), threads, progress, cancelled) { hunk, buf ->
+            write(out, size, hunkBytes, 2048, tag("zlib"), listOf(tag("DVD ") to byteArrayOf(0)), threads, progress, cancelled) { hunk, buf ->
                 java.util.Arrays.fill(buf, 0)
                 val pos = hunk.toLong() * buf.size
                 raf.seek(pos)
@@ -257,11 +258,15 @@ object Chd {
         }
     }
 
-    /** Converts one .cue or .iso, choosing CD or DVD. */
-    fun convert(src: File, out: File, threads: Int, progress: (Float) -> Unit, cancelled: () -> Boolean) {
+    /**
+     * Converts one .cue or .iso, choosing CD or DVD. [psp]: a PSP disc, always DVD with 2048-byte hunks (the only CHD
+     * PPSSPP reads), however small.
+     */
+    fun convert(src: File, out: File, threads: Int, progress: (Float) -> Unit, cancelled: () -> Boolean, psp: Boolean = false) {
         when (src.extension.lowercase()) {
             "cue" -> convertCd(parseCue(src), out, threads, progress, cancelled)
-            "iso" -> if (src.length() > CD_MAX_BYTES) convertDvd(src, out, threads, progress, cancelled)
+            "iso" -> if (psp) convertDvd(src, out, threads, progress, cancelled, hunkBytes = 2048)
+                     else if (src.length() > CD_MAX_BYTES) convertDvd(src, out, threads, progress, cancelled)
                      else convertCd(isoAsCd(src), out, threads, progress, cancelled)
             else -> throw ChdException("Not a .cue or .iso file")
         }

@@ -26,6 +26,10 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # the RVZ converter (Dolphin's, app/src/main/cpp) is C++: the NDK and CMake versions it builds with
+      - name: Android NDK and CMake
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;30.0.15729638" "cmake;3.22.1" > /dev/null
+
       - name: Version (from the tag, else version.properties)
         run: |
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then

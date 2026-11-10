@@ -103,7 +103,7 @@ object SmbUpload {
                     dir.listFiles()?.filter { f ->
                         f.isFile && f.nameWithoutExtension.lowercase().startsWith(base) &&
                             Regex("""\((Disc|CD|Disk)\s*\d+""", RegexOption.IGNORE_CASE).containsMatchIn(f.name) &&
-                            f.extension.lowercase() in setOf("cue", "chd", "iso", "cso", "pbp", "img", "bin", ext)
+                            f.extension.lowercase() in setOf("cue", "chd", "rvz", "iso", "gcm", "cso", "pbp", "img", "bin", ext)
                     }?.sortedBy { it.name.lowercase() }?.forEach { addDisc(it) }
                     File(dir, m.groupValues[1].trim() + ".m3u").takeIf { it.isFile }?.let { out.add(it) }
                 }
