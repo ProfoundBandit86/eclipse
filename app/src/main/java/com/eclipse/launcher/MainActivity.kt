@@ -167,6 +167,7 @@ class MainActivity : ComponentActivity() {
             snapshotFlow { vm.flag("dual") }.collect { syncSecondScreen() }
         }
         (getSystemService(DISPLAY_SERVICE) as DisplayManager).registerDisplayListener(displayListener, null)
+        SecondScreenHost.owner = this
         SecondScreenHost.hideForApp = { pkg, displayId -> hideForApp(pkg, displayId) }
         SecondScreenHost.close = { handler.post { closeSecondScreen() } }
         SecondScreenHost.restart = { handler.post { restartEclipse() } }
@@ -408,13 +409,20 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        // Eclipse closed for real (not just turned or restarted by Android): the app switcher's card pictures go
-        if (isFinishing && !isChangingConfigurations) com.eclipse.launcher.media.AppSwitcher.clearShots(this)
-        SecondScreenHost.hideForApp = null
-        SecondScreenHost.close = null
-        SecondScreenHost.restart = null
-        SecondScreenHost.show = null
-        SecondScreenHost.resync = null
+        // only while this is the Eclipse screen the hooks belong to: one reopened on the other display (placeMain)
+        // has set its own by the time this old one finishes closing, and they must stay
+        val current = SecondScreenHost.owner === this
+        // Eclipse closed for real (not just turned, restarted by Android or moved to the other display): the app
+        // switcher's card pictures go
+        if (current && isFinishing && !isChangingConfigurations) com.eclipse.launcher.media.AppSwitcher.clearShots(this)
+        if (current) {
+            SecondScreenHost.owner = null
+            SecondScreenHost.hideForApp = null
+            SecondScreenHost.close = null
+            SecondScreenHost.restart = null
+            SecondScreenHost.show = null
+            SecondScreenHost.resync = null
+        }
         presentation?.dismiss()
         presentation = null
         (getSystemService(DISPLAY_SERVICE) as DisplayManager).unregisterDisplayListener(displayListener)

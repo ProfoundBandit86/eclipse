@@ -297,6 +297,13 @@ class SecondaryPresentation(
 
 /** Lets the second-screen UI ask MainActivity to step aside for an app opened on that screen. */
 object SecondScreenHost {
+    /**
+     * The MainActivity that set the hooks below. When Eclipse reopens itself on the other display, the old activity
+     * finishes closing after the new one has set them: it may only clear them while it's still the owner (it used to
+     * clear the new one's, which stopped bottom-screen launches and Reload until Eclipse was killed).
+     */
+    var owner: Any? = null
+
     var hideForApp: ((pkg: String, displayId: Int) -> Unit)? = null
 
     /** Closes the bottom-screen overlay until Eclipse is opened again (the button on the bottom screen). */
