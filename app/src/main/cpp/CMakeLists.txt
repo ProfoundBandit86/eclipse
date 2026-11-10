@@ -66,6 +66,16 @@ else()
   set(DOLPHIN_ARCH)
 endif()
 
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+  # as Dolphin: only these two use the ARMv8 crypto instructions, and only after checking the CPU has them
+  # (CRC32 everywhere, as Dolphin's own build does)
+  set_source_files_properties(${DOL}/Common/Crypto/AES.cpp ${DOL}/Common/Crypto/SHA1.cpp
+    PROPERTIES COMPILE_OPTIONS "-march=armv8-a+crc+crypto")
+endif()
+# Android's zlib has no crc32_z / adler32_z (see stubs/eclipse_zlib_compat.h)
+set_source_files_properties(${DOL}/Common/Hash.cpp
+  PROPERTIES COMPILE_OPTIONS "-include;${CMAKE_CURRENT_SOURCE_DIR}/stubs/eclipse_zlib_compat.h")
+
 if(ANDROID)
   add_library(eclipse_rvz SHARED ${DOLPHIN_SRC} ${CMAKE_CURRENT_SOURCE_DIR}/rvz_jni.cpp)
 else()
@@ -75,6 +85,9 @@ endif()
 target_include_directories(eclipse_rvz PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/stubs ${DOL} ${EXT}/fmt/include)
 target_compile_definitions(eclipse_rvz PRIVATE FMT_HEADER_ONLY ${DOLPHIN_ARCH})
 target_compile_options(eclipse_rvz PRIVATE -w -fvisibility=hidden)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+  target_compile_options(eclipse_rvz PRIVATE -march=armv8-a+crc)
+endif()
 target_link_libraries(eclipse_rvz PRIVATE ezstd elzma embedtls z)
 if(ANDROID)
   find_library(log-lib log)
