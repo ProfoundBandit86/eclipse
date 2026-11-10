@@ -3824,6 +3824,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         val l = ArrayList<Pair<String, String>>()
         if (flag("p_lb") && LaunchBox.loaded) l.add("lb" to "LaunchBox") // local + offline: checked first
         l.add("has" to "Hasheous") // always on: it identifies the game for everything else
+        if (ssReady()) l.add("ss" to "ScreenScraper") // by the ROM's checksum: exact matches, scans of the real box
         // free, no account: GameTDB (Nintendo discs and cartridges by ID), ArcadeDB (arcade), libretro (everything else)
         if (flag("p_gtdb")) l.add("gtdb" to "GameTDB")
         if (flag("p_adb")) l.add("adb" to "ArcadeDB")
@@ -3835,6 +3836,17 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
 
     private fun igdbReady(): Boolean = flag("p_igdb") && key("igdb_id").isNotBlank() && key("igdb_secret").isNotBlank()
 
+    // ---- ScreenScraper (data/ScreenScraper.kt): this build's developer login + your own account ----
+    /** This build can use ScreenScraper at all (its developer login was built in). */
+    val ssBuilt: Boolean get() = com.eclipse.launcher.data.ScreenScraper.built
+    /** Signed in and switched on: ScreenScraper is used for artwork, descriptions, details and manuals. */
+    fun ssReady(): Boolean = ssBuilt && flag("p_ss") && key("ss_user").isNotBlank() && key("ss_pass").isNotBlank()
+    private suspend fun ssEntry(g: Game): com.eclipse.launcher.data.ScreenScraper.Entry? =
+        if (!ssReady() || g.platform == "android") null
+        else com.eclipse.launcher.data.ScreenScraper.lookup(key("ss_user"), key("ss_pass"), g.platform, g.path, queryGame(g).name)
+    /** The Companion's Manual tab: the address of [g]'s manual on ScreenScraper, or null. */
+    suspend fun ssManual(g: Game): String? = ssEntry(g)?.let { com.eclipse.launcher.data.ScreenScraper.manual(it) }
+
     // ---- connection status (the coloured dots in Settings → Connections) ----
     /** service -> (works?, what to say). A service that isn't in here hasn't been checked yet. */
     var connCheck by mutableStateOf<Map<String, Pair<Boolean, String>>>(emptyMap())
@@ -3844,6 +3856,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         "igdb" -> key("igdb_id").isNotBlank() && key("igdb_secret").isNotBlank()
         "ra" -> key("ra_user").isNotBlank() && key("ra_key").isNotBlank()
         "romm" -> rommConn() != null
+        "ss" -> ssBuilt && key("ss_user").isNotBlank() && key("ss_pass").isNotBlank()
         else -> false
     }
 
@@ -3857,6 +3870,9 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
                 "igdb" -> if (Scrapers.igdbCheck(key("igdb_id"), key("igdb_secret"))) true to "Connected" else false to "Client ID or secret not accepted, or no connection"
                 "ra" -> if (RetroAch.check(key("ra_user"), key("ra_key"))) true to "Connected as ${key("ra_user")}" else false to "Username or key not accepted, or no connection"
                 "romm" -> rommCheckSecure()
+                "ss" -> com.eclipse.launcher.data.ScreenScraper.account(key("ss_user"), key("ss_pass"))?.let { a ->
+                    true to ("Signed in as ${a.name}" + if (a.maxPerDay > 0) " \u00b7 ${a.today} of ${a.maxPerDay} lookups today" else "")
+                } ?: (false to "Username or password not accepted, or no connection")
                 else -> return@launch
             }
             connCheck = connCheck + (id to r)
@@ -3885,7 +3901,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         else ok to msg
     }
 
-    fun checkConnections() = listOf("sgdb", "igdb", "ra", "romm").forEach { if (isConfigured(it) && it !in connCheck) checkConnection(it) }
+    fun checkConnections() = listOf("sgdb", "igdb", "ra", "romm", "ss").forEach { if (isConfigured(it) && it !in connCheck) checkConnection(it) }
 
     // ---- Hasheous: identify games from the ROM file itself ----
     /** The Hasheous match for this game (hashing the file the first time), or null. Cached per game. */
@@ -3956,6 +3972,10 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
             LaunchBox.art(e, k)
         } ?: emptyList()
         "sgdb" -> Scrapers.sgdb(key("sgdb"), queryGame(g), k)
+        "ss" -> ssEntry(g)?.let { e ->
+            e.synopsis?.let { saveDesc(g, it) }
+            com.eclipse.launcher.data.ScreenScraper.art(e, k)
+        } ?: emptyList()
         "igdb" -> {
             val r = Scrapers.igdb(key("igdb_id"), key("igdb_secret"), queryGame(g), k, hashFor(g)?.igdbId)
             r.summary?.let { saveDesc(g, it) }
@@ -3992,6 +4012,8 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     suspend fun ensureDesc(g: Game): String? {
         desc[g.id]?.let { return it }
         if (flag("p_lb") && LaunchBox.loaded) LaunchBox.lookup(queryGame(g))?.overview?.let { saveDesc(g, it) }
+        desc[g.id]?.let { return it }
+        ssEntry(g)?.synopsis?.let { saveDesc(g, it) }
         desc[g.id]?.let { return it }
         // arcade games: ArcadeDB's history of the game
         if (flag("p_adb") && com.eclipse.launcher.data.ArcadeDb.covers(g.platform)) com.eclipse.launcher.data.ArcadeDb.lookup(g)?.history?.let { saveDesc(g, it) }
@@ -4308,13 +4330,17 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     var gameInfo by mutableStateOf(store.map("game_info"))
         private set
 
-    private fun infoSourcesReady(): Boolean = (flag("p_lb") && LaunchBox.loaded) || igdbReady()
+    private fun infoSourcesReady(): Boolean = (flag("p_lb") && LaunchBox.loaded) || igdbReady() || ssReady()
 
     /** Looks the game's details up (LaunchBox first, IGDB for what is still missing) and keeps them. */
     suspend fun ensureInfo(g: Game) {
         if (gameInfo[g.id] != null || !infoSourcesReady()) return
         var info: com.eclipse.launcher.data.GameInfo? = null
         if (flag("p_lb") && LaunchBox.loaded) info = LaunchBox.lookup(queryGame(g))?.info
+        if (info == null || info.year == null || info.developer == null || info.genres == null) {
+            val ss = ssEntry(g)?.info
+            if (ss != null) info = (info ?: com.eclipse.launcher.data.GameInfo()).orElse(ss)
+        }
         if ((info == null || info.year == null || info.developer == null || info.genres == null) && igdbReady()) {
             val ig = Scrapers.igdbInfo(key("igdb_id"), key("igdb_secret"), queryGame(g).name, hashFor(g)?.igdbId)
             info = (info ?: com.eclipse.launcher.data.GameInfo()).orElse(ig)

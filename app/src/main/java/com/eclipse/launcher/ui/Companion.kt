@@ -109,10 +109,13 @@ import kotlin.math.abs
  * ScreenScraper shown but not ready yet).
  */
 
-private val INK = Color(0xFFF2EEE6)
-private val SUB = Color(0xFF9C978E)
-private val LINE = Color(0x1AFFFFFF)
-private val CARD = Color(0x0EFFFFFF)
+// The theme's colours (the bottom screen keeps its dark look; your text / label colours and accent apply)
+private val INK: Color @Composable @androidx.compose.runtime.ReadOnlyComposable get() = C.ink
+private val SUB: Color @Composable @androidx.compose.runtime.ReadOnlyComposable get() = C.sub
+private val LINE: Color @Composable @androidx.compose.runtime.ReadOnlyComposable get() = C.x(0x1AFFFFFFL)
+private val CARD: Color @Composable @androidx.compose.runtime.ReadOnlyComposable get() = C.x(0x0EFFFFFFL)
+/** Pop-ups and panels over the hub. */
+private val PANEL: Color @Composable @androidx.compose.runtime.ReadOnlyComposable get() = C.bg.copy(alpha = 0.97f)
 private const val SOON_TEXT = "Manuals from ScreenScraper will be added in a future update..... Hopefully"
 
 @Composable
@@ -120,13 +123,13 @@ private fun HubPill(text: String, gold: Boolean = false, enabled: Boolean = true
     val shape = RoundedCornerShape(20.dp)
     Box(
         modifier.heightIn(min = 40.dp).clip(shape)
-            .background(if (gold) C.accent else Color(0x14FFFFFF))
+            .background(if (gold) C.accent else C.x(0x14FFFFFFL))
             .border(1.dp, if (gold) C.accent else LINE, shape)
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 9.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(text, color = if (gold) Color(0xFF1A1505) else if (enabled) INK else SUB, fontSize = 13.sp,
+        Text(text, color = if (gold) C.onAccent else if (enabled) INK else SUB, fontSize = 13.sp,
             fontWeight = if (gold) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1)
     }
 }
@@ -169,14 +172,14 @@ private fun HubRow(
 
 /** "Coming soon" for ScreenScraper (a tap on anything of it). */
 @Composable
-private fun SoonPopup(onDismiss: () -> Unit) {
+private fun SoonPopup(title: String = "ScreenScraper · coming soon", text: String = SOON_TEXT, onDismiss: () -> Unit) {
     Box(Modifier.fillMaxSize().background(Color(0x99000000)).clickable(onClick = onDismiss), contentAlignment = Alignment.Center) {
         Column(
-            Modifier.widthIn(max = 300.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xF71C1A16))
+            Modifier.widthIn(max = 300.dp).clip(RoundedCornerShape(14.dp)).background(PANEL)
                 .border(1.dp, C.accent.copy(alpha = 0.5f), RoundedCornerShape(14.dp)).padding(16.dp)
         ) {
-            Text("ScreenScraper · coming soon", color = INK, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            Text(SOON_TEXT, color = SUB, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp, bottom = 12.dp))
+            Text(title, color = INK, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text(text, color = SUB, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp, bottom = 12.dp))
             HubPill("OK", modifier = Modifier.align(Alignment.End), onClick = onDismiss)
         }
     }
@@ -195,11 +198,13 @@ fun CompanionHub(vm: EclipseVM, g: Game, close: () -> Unit) {
     var manual by remember { mutableStateOf<File?>(null) }
     var searching by remember { mutableStateOf(false) }
     var soon by remember { mutableStateOf(false) }
+    var signIn by remember { mutableStateOf(false) }
     var savedTick by remember { mutableIntStateOf(0) } // bumps when a guide is saved / deleted: lists reload
 
     BackHandler {
         when {
             soon -> soon = false
+            signIn -> signIn = false
             searching -> searching = false
             reading != null -> reading = null
             manual != null -> manual = null
@@ -208,7 +213,15 @@ fun CompanionHub(vm: EclipseVM, g: Game, close: () -> Unit) {
         }
     }
 
-    Box(Modifier.fillMaxSize().background(Color(0xFF080807))) {
+    Box(Modifier.fillMaxSize().background(C.bg)) {
+        // like Now Playing: the game's art (else the theme's bottom-screen wallpaper), blurred, under a dark tint.
+        // Not drawn while the browser / reader / manual covers the hub (a blur redrawn under them made them slow).
+        val covered = browser != null || reading != null || manual != null
+        if (!covered) {
+            val bg = vm.artOf(g, ArtKind.HERO) ?: vm.artOf(g, ArtKind.BACKDROP) ?: vm.wallpaperBottom()
+            if (bg != null) coil.compose.AsyncImage(bg, null, Modifier.fillMaxSize().softBlur(18.dp), contentScale = ContentScale.Crop)
+            Box(Modifier.fillMaxSize().background(Color(0xB307070A)))
+        }
         Column(Modifier.fillMaxSize()) {
             // header
             Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 10.dp, top = 12.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -241,7 +254,7 @@ fun CompanionHub(vm: EclipseVM, g: Game, close: () -> Unit) {
             HorizontalPager(pager, Modifier.fillMaxWidth().weight(1f)) { p ->
                 when (p) {
                     0 -> GuidesTab(g, root, savedTick, open = { browser = it }, read = { reading = it }, changed = { savedTick++ })
-                    else -> ManualTab(g, root, open = { manual = it }, soon = { soon = true })
+                    else -> ManualTab(vm, g, root, open = { manual = it }, soon = { if (vm.ssBuilt) signIn = true else soon = true })
                 }
             }
         }
@@ -258,6 +271,8 @@ fun CompanionHub(vm: EclipseVM, g: Game, close: () -> Unit) {
             browser = Guides.Site("Search", q, Guides.searchUrl(g.name, q), "⌕", 0xFF444444)
         }
         if (soon) SoonPopup { soon = false }
+        if (signIn) SoonPopup("Sign in to ScreenScraper",
+            "Add your ScreenScraper account under Settings \u2192 Connections \u2192 ScreenScraper (free at screenscraper.fr), and manuals from it show up here.") { signIn = false }
     }
 }
 
@@ -314,7 +329,7 @@ private fun GuidesTab(
         }
         deleting?.let { s ->
             Box(Modifier.fillMaxSize().background(Color(0x99000000)).clickable { deleting = null }, contentAlignment = Alignment.Center) {
-                Column(Modifier.widthIn(max = 300.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xF71C1A16)).padding(16.dp)) {
+                Column(Modifier.widthIn(max = 300.dp).clip(RoundedCornerShape(14.dp)).background(PANEL).padding(16.dp)) {
                     Text("Delete this guide?", color = INK, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                     Text(s.title, color = SUB, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
                     Row(Modifier.align(Alignment.End)) {
@@ -337,7 +352,7 @@ private fun HubBrowser(site: Guides.Site, onBack: () -> Unit, onSave: (title: St
     LaunchedEffect(status) { if (status != null) { delay(2500); status = null } }
     BackHandler { val w = web; if (w != null && w.canGoBack()) w.goBack() else onBack() }
 
-    Column(Modifier.fillMaxSize().background(Color(0xFF080807))) {
+    Column(Modifier.fillMaxSize().background(C.bg)) {
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             HubPill("‹ Back") { val w = web; if (w != null && w.canGoBack()) w.goBack() else onBack() }
             Text(title, color = INK, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).padding(horizontal = 10.dp))
@@ -386,7 +401,7 @@ private fun HubBrowser(site: Guides.Site, onBack: () -> Unit, onSave: (title: St
             )
             status?.let { s ->
                 Text(s, color = INK, fontSize = 12.sp, modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp)
-                    .clip(RoundedCornerShape(16.dp)).background(Color(0xF21C1A16)).border(1.dp, C.accent.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(16.dp)).background(PANEL).border(1.dp, C.accent.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
                     .padding(horizontal = 14.dp, vertical = 8.dp))
             }
         }
@@ -411,7 +426,7 @@ private fun HubSearch(g: Game, onCancel: () -> Unit, onGo: (String) -> Unit) {
     Box(Modifier.fillMaxSize().background(Color(0xB3000000)).clickable(onClick = onCancel), contentAlignment = Alignment.TopCenter) {
         Column(
             Modifier.padding(top = 40.dp).widthIn(max = 420.dp).fillMaxWidth().padding(horizontal = 16.dp).clip(RoundedCornerShape(14.dp))
-                .background(Color(0xF71C1A16)).border(1.dp, LINE, RoundedCornerShape(14.dp)).clickable(enabled = false) {}.padding(14.dp)
+                .background(PANEL).border(1.dp, LINE, RoundedCornerShape(14.dp)).clickable(enabled = false) {}.padding(14.dp)
         ) {
             Text("Search the web for ${g.name}", color = INK, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
             Text("The game's name is added for you: just type what you're stuck on.", color = SUB, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp, bottom = 10.dp))
@@ -447,6 +462,8 @@ private fun GuideReader(g: Game, s: Guides.Saved, onBack: () -> Unit) {
     }
     val list = rememberLazyListState()
     var textSp by remember { mutableIntStateOf(Guides.textSize(ctx)) }
+    var look by remember { mutableStateOf(Guides.readerLook(ctx)) }
+    val pal = readerPalette(look)
     var marks by remember { mutableStateOf(Guides.bookmarks(ctx, s)) }
     var bars by remember { mutableStateOf(true) }
     var contents by remember { mutableStateOf(false) }
@@ -470,9 +487,10 @@ private fun GuideReader(g: Game, s: Guides.Saved, onBack: () -> Unit) {
         if (all == null || query.length < 2) emptyList() else all.indices.filter { all[it].text.contains(query, ignoreCase = true) }
     }
 
-    Box(Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
+    Box(Modifier.fillMaxSize().background(pal.bg)) {
         Column(Modifier.fillMaxSize()) {
-            if (bars) Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            // (the bars sit on the theme's panel, so they read the same on a dark or a sepia page)
+            if (bars) Row(Modifier.fillMaxWidth().background(PANEL).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 HubPill("‹ Guides", onClick = onBack)
                 Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
                     Text(s.title, color = INK, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -481,9 +499,9 @@ private fun GuideReader(g: Game, s: Guides.Saved, onBack: () -> Unit) {
             }
             Row(Modifier.fillMaxWidth().weight(1f)) {
                 Box(Modifier.weight(1f).fillMaxHeight().pointerInput(Unit) { detectTapGestures { bars = !bars } }) {
-                    if (all == null) Text("Opening…", color = SUB, fontSize = 13.sp, modifier = Modifier.padding(16.dp))
+                    if (all == null) Text("Opening…", color = pal.sub, fontSize = 13.sp, modifier = Modifier.padding(16.dp))
                     else LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = PaddingValues(start = 16.dp, end = 12.dp, top = 8.dp, bottom = 90.dp)) {
-                        itemsIndexed(all) { i, b -> BlockView(b, textSp, query, i == hit, i in marks) }
+                        itemsIndexed(all) { i, b -> BlockView(b, textSp, query, i == hit, i in marks, pal) }
                     }
                 }
                 // drag (or tap) the rail to jump through the guide
@@ -507,11 +525,15 @@ private fun GuideReader(g: Game, s: Guides.Saved, onBack: () -> Unit) {
             }
         }
         if (bars && all != null) Row(
-            Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp).clip(RoundedCornerShape(24.dp)).background(Color(0xEB1E1C18))
+            Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp).clip(RoundedCornerShape(24.dp)).background(PANEL)
                 .border(1.dp, LINE, RoundedCornerShape(24.dp)).padding(5.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             HubPill("☰ Contents") { contents = true }
+            HubPill(pal.label) {
+                look = Guides.READER_LOOKS[(Guides.READER_LOOKS.indexOf(look) + 1) % Guides.READER_LOOKS.size]
+                Guides.setReaderLook(ctx, look)
+            }
             HubPill("Aa") {
                 textSp = Guides.SIZES[(Guides.SIZES.indexOf(textSp) + 1) % Guides.SIZES.size]
                 Guides.setTextSize(ctx, textSp)
@@ -525,7 +547,7 @@ private fun GuideReader(g: Game, s: Guides.Saved, onBack: () -> Unit) {
         if (contents && all != null) {
             val heads = remember(all) { all.indices.filter { all[it] is Guides.Block.Heading } }
             Box(Modifier.fillMaxSize().background(Color(0x99000000)).clickable { contents = false }) {
-                Column(Modifier.fillMaxHeight().widthIn(max = 340.dp).fillMaxWidth(0.8f).background(Color(0xFA16140F)).clickable(enabled = false) {}.padding(12.dp)) {
+                Column(Modifier.fillMaxHeight().widthIn(max = 340.dp).fillMaxWidth(0.8f).background(PANEL).clickable(enabled = false) {}.padding(12.dp)) {
                     Text("Contents", color = INK, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 6.dp))
                     LazyColumn(Modifier.fillMaxSize()) {
                         if (marks.isNotEmpty()) {
@@ -568,9 +590,19 @@ private fun ContentsRow(title: String, note: String?, current: Boolean = false, 
     }
 }
 
+/** The reader's colours: the theme's (default), or a fixed dark or sepia page for long reading. */
+private data class ReaderPalette(val bg: Color, val text: Color, val pre: Color, val sub: Color, val heading: Color, val label: String)
+
+@Composable
+private fun readerPalette(look: String): ReaderPalette = when (look) {
+    "dark" -> ReaderPalette(Color(0xFF0A0A0A), Color(0xFFE9E5DC), Color(0xFFD9D4C8), Color(0xFF9C978E), C.accent, "◐ Dark")
+    "sepia" -> ReaderPalette(Color(0xFFF4ECD8), Color(0xFF3B2F20), Color(0xFF4A3C2A), Color(0xFF7A6A55), Color(0xFF8A6418), "◐ Sepia")
+    else -> ReaderPalette(C.bg, INK, C.x(0xFFD9D4C8L), SUB, C.accent, "◐ Theme")
+}
+
 /** One block of a guide, with the find word marked in it. */
 @Composable
-private fun BlockView(b: Guides.Block, size: Int, query: String, isHit: Boolean, marked: Boolean) {
+private fun BlockView(b: Guides.Block, size: Int, query: String, isHit: Boolean, marked: Boolean, pal: ReaderPalette) {
     val mark = SpanStyle(background = C.accent.copy(alpha = if (isHit) 0.6f else 0.3f))
     fun lit(t: String): AnnotatedString = if (query.length < 2) AnnotatedString(t) else buildAnnotatedString {
         var i = 0
@@ -585,12 +617,12 @@ private fun BlockView(b: Guides.Block, size: Int, query: String, isHit: Boolean,
     val edge = if (marked) Modifier.background(C.accent.copy(alpha = 0.06f)) else Modifier
     Box(edge.fillMaxWidth().padding(bottom = 10.dp)) {
         when (b) {
-            is Guides.Block.Heading -> Text(lit(b.text.uppercase()), color = C.accent, fontSize = (size - 2).sp, letterSpacing = 1.6.sp,
+            is Guides.Block.Heading -> Text(lit(b.text.uppercase()), color = pal.heading, fontSize = (size - 2).sp, letterSpacing = 1.6.sp,
                 fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 10.dp))
-            is Guides.Block.Para -> Text(lit(b.text), color = Color(0xFFE9E5DC), fontSize = size.sp, lineHeight = (size * 1.55f).sp)
-            is Guides.Block.Lines -> Text(lit(b.text), color = Color(0xFFE9E5DC), fontSize = size.sp, lineHeight = (size * 1.45f).sp)
+            is Guides.Block.Para -> Text(lit(b.text), color = pal.text, fontSize = size.sp, lineHeight = (size * 1.55f).sp)
+            is Guides.Block.Lines -> Text(lit(b.text), color = pal.text, fontSize = size.sp, lineHeight = (size * 1.45f).sp)
             is Guides.Block.Pre -> Box(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-                Text(lit(b.text), color = Color(0xFFD9D4C8), fontSize = (size - 3).sp, fontFamily = FontFamily.Monospace,
+                Text(lit(b.text), color = pal.pre, fontSize = (size - 3).sp, fontFamily = FontFamily.Monospace,
                     lineHeight = ((size - 3) * 1.3f).sp, softWrap = false)
             }
         }
@@ -610,7 +642,7 @@ private fun FindBar(query: String, matches: List<Int>, hit: Int, onQuery: (Strin
     }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         Row(
-            Modifier.padding(8.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color(0xFA1C1A16))
+            Modifier.padding(8.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(PANEL)
                 .border(1.dp, C.accent.copy(alpha = 0.4f), RoundedCornerShape(14.dp)).padding(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -637,13 +669,15 @@ private fun FindBar(query: String, matches: List<Int>, hit: Int, onQuery: (Strin
 // ---------------------------------------------------------------- Manual tab
 
 @Composable
-private fun ManualTab(g: Game, root: File, open: (File) -> Unit, soon: () -> Unit) {
+private fun ManualTab(vm: EclipseVM, g: Game, root: File, open: (File) -> Unit, soon: () -> Unit) {
     val scope = rememberCoroutineScope()
     val kept = remember(g.id) { Guides.manualFile(root, g.id) }
     var keptThere by remember { mutableStateOf(false) }
     var local by remember { mutableStateOf<List<File>>(emptyList()) }
     var hits by remember { mutableStateOf<List<Guides.ArchiveHit>?>(null) }
     var vgm by remember { mutableStateOf<List<Guides.VgmHit>?>(null) }
+    // ScreenScraper's manual: "" = looked, none; null = still looking (or not signed in)
+    var ssUrl by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(g.id) {
@@ -651,6 +685,7 @@ private fun ManualTab(g: Game, root: File, open: (File) -> Unit, soon: () -> Uni
             keptThere = kept.isFile
             local = runCatching { Guides.localManuals(File(g.path)) }.getOrDefault(emptyList())
         }
+        if (vm.ssReady()) ssUrl = runCatching { vm.ssManual(g) }.getOrNull() ?: ""
         vgm = Guides.vgmSearch(g.platform, g.name, g.path)
         hits = Guides.archiveSearch(g.name)
     }
@@ -696,7 +731,17 @@ private fun ManualTab(g: Game, root: File, open: (File) -> Unit, soon: () -> Uni
         }
         error?.let { e -> item { Text(e, color = Color(0xFFFF8A7A), fontSize = 12.sp, modifier = Modifier.padding(4.dp)) } }
         item { SectionLabel("ScreenScraper") }
-        item { HubRow("SS", 0xFF2B4D7A, "ScreenScraper", "Coming soon", greyed = true, trailing = "Soon", onClick = soon) }
+        if (vm.ssReady()) {
+            val u = ssUrl
+            when {
+                u == null -> item { Text("Asking ScreenScraper…", color = SUB, fontSize = 12.sp, modifier = Modifier.padding(4.dp)) }
+                u.isEmpty() -> item { Text("ScreenScraper has no manual for this game.", color = SUB, fontSize = 12.sp, modifier = Modifier.padding(4.dp)) }
+                else -> item { HubRow("SS", 0xFF2B4D7A, "Instruction manual", "ScreenScraper · tap to download and open", trailing = "⤓") { fetch("the manual") { u } } }
+            }
+        } else item {
+            HubRow("SS", 0xFF2B4D7A, "ScreenScraper", if (vm.ssBuilt) "Sign in under Settings → Connections" else "Coming soon",
+                greyed = true, trailing = if (vm.ssBuilt) "›" else "Soon", onClick = soon)
+        }
         item {
             Text("Manuals you already have are found too: a PDF named like the game beside it, in a “manuals” folder, or in ES-DE's downloaded media. A new download replaces the one kept for this game.",
                 color = SUB, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp, start = 2.dp, end = 2.dp, bottom = 16.dp))
@@ -744,7 +789,7 @@ private fun ManualViewer(file: File, onBack: () -> Unit) {
     }
     fun turn(d: Int) { if (pages > 0) page = (page + d).coerceIn(0, pages - 1) }
 
-    Column(Modifier.fillMaxSize().background(Color(0xFF080807))) {
+    Column(Modifier.fillMaxSize().background(C.bg)) {
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             HubPill("‹ Manual", onClick = onBack)
             Text(if (pages > 0) "Page ${page + 1} of $pages" else "", color = SUB, fontSize = 12.sp, modifier = Modifier.weight(1f).padding(horizontal = 10.dp))

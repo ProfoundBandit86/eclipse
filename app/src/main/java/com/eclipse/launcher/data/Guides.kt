@@ -183,6 +183,11 @@ object Guides {
     fun lastRead(ctx: Context, gameId: String): String? = prefs(ctx).getString("last_$gameId", null)
     fun setLastRead(ctx: Context, gameId: String, s: Saved) { prefs(ctx).edit().putString("last_$gameId", s.file.name).apply() }
 
+    /** The reader's look: the theme's colours, or a fixed dark or sepia page. */
+    val READER_LOOKS = listOf("theme", "dark", "sepia")
+    fun readerLook(ctx: Context): String = prefs(ctx).getString("look", "theme")?.takeIf { it in READER_LOOKS } ?: "theme"
+    fun setReaderLook(ctx: Context, look: String) { prefs(ctx).edit().putString("look", look).apply() }
+
     val SIZES = listOf(13, 15, 17, 19)
     fun textSize(ctx: Context): Int = prefs(ctx).getInt("size", 15)
     fun setTextSize(ctx: Context, sp: Int) { prefs(ctx).edit().putInt("size", sp).apply() }

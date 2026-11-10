@@ -321,7 +321,7 @@ code (GPL-2.0-or-later), built into Eclipse in `app/src/main/cpp`.
 - **[RomM](https://github.com/rommapp/romm)** and **[RetroAchievements](https://retroachievements.org)**, whose logos
   belong to their projects.
 - Instruction manuals from **VideoGameManual.com** (scanned by Kirkland) and the **Internet Archive**.
-- Artwork and game data from **libretro thumbnails**, **ArcadeDB**, **GameTDB**, **LaunchBox Games Database**,
+- Artwork and game data from **ScreenScraper**, **libretro thumbnails**, **ArcadeDB**, **GameTDB**, **LaunchBox Games Database**,
   **SteamGridDB**, **IGDB** and **Hasheous**.
 - **[Dolphin](https://dolphin-emu.org)**, whose disc code converts GameCube and Wii games to RVZ.
 - The open-source libraries Eclipse is built on are listed, with their licences, in the app under Settings → Credits.

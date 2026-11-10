@@ -1353,8 +1353,19 @@ private fun ScrapeTab(vm: EclipseVM) {
         if (vm.isConfigured("igdb")) ToggleRow("Use IGDB", null, vm.flag("p_igdb")) { vm.setFlag("p_igdb", it) }
         InfoRow("Where to get them", "dev.twitch.tv → Your Console → Register Your Application (any name, redirect http://localhost) → copy the Client ID and make a secret.")
     }
-    // ScreenScraper: shown, greyed out, not usable yet (a tap says so)
-    Box(Modifier.fillMaxWidth().alpha(0.45f)) {
+    // ScreenScraper: your own account (Eclipse's developer login is built in). A build without that login shows it
+    // greyed out (a tap says so).
+    if (vm.ssBuilt) {
+        val (ssDot, ssText) = statusOf(vm, "ss", "Not signed in")
+        ServiceCard("ScreenScraper", ssText, ssDot, openR == "ss", { toggleR("ss") }) {
+            FieldGroup {
+                FieldRow("Username", vm.key("ss_user")) { vm.setKey("ss_user", it.trim()); vm.checkConnection("ss") }
+                FieldRow("Password", vm.key("ss_pass"), secret = true) { vm.setKey("ss_pass", it); vm.checkConnection("ss") }
+            }
+            if (vm.isConfigured("ss")) ToggleRow("Use ScreenScraper", "Box art, 3D boxes, screenshots, logos, discs, descriptions and manuals.", vm.flag("p_ss")) { vm.setFlag("p_ss", it) }
+            InfoRow("Account", "Free at screenscraper.fr. Games are found by their ROM's checksum; your account sets how many you can look up a day.")
+        }
+    } else Box(Modifier.fillMaxWidth().alpha(0.45f)) {
         ServiceCard("ScreenScraper", "Coming soon", Dot.OFF, false, {
             vm.showNotice(EclipseVM.Notice("Coming soon", "ScreenScraper", "Manuals, artwork and game info from ScreenScraper will be added in a future update..... Hopefully"))
         }) {}
@@ -2484,6 +2495,7 @@ private fun Credits(vm: EclipseVM) {
     CreditRow(vm, "GameTDB", "GameCube, Wii, DS and 3DS covers and disc art.", "https://www.gametdb.com")
     CreditRow(vm, "RetroAchievements", "Achievements and progress.", "https://retroachievements.org")
     CreditRow(vm, "RomM", "Your own game library server, by the RomM project.", "https://github.com/rommapp/romm")
+    CreditRow(vm, "ScreenScraper", "Artwork, game details and manuals, found by the ROM's checksum.", "https://www.screenscraper.fr")
     CreditRow(vm, "VideoGameManual.com", "Instruction manuals scanned by Kirkland (the Companion's Manual tab).", "https://www.videogamemanual.com/")
     CreditRow(vm, "Internet Archive", "Scanned instruction manuals (the Companion's Manual tab).", "https://archive.org")
     CreditRow(
