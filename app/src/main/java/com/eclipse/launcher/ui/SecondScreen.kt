@@ -130,6 +130,8 @@ fun SecondaryContent(vm: EclipseVM, displayId: Int) {
         val pagerScope = rememberCoroutineScope()
         var browser by remember { mutableStateOf<String?>(null) }
         var walkGame by remember { mutableStateOf<Game?>(null) }
+        // the Companion (ui/Companion.kt) open for this game
+        var companion by remember { mutableStateOf<Game?>(null) }
         var drawer by remember { mutableStateOf(false) }
         val dockOn = vm.flag("dock2")
         // opening an app from this screen: ask top or bottom every time, unless "Remember my choice" was ticked
@@ -143,7 +145,7 @@ fun SecondaryContent(vm: EclipseVM, displayId: Int) {
           // frosted look: the page and dock blur behind the drawer and the screen bubble.
           // Not drawn at all while the walkthrough browser covers the screen: every redraw of the web page used to
           // redraw this (blurred wallpaper and all) underneath it, which is what made the browser so slow.
-          if (browser == null) Box(Modifier.fillMaxSize().then(behindBlur(drawer || askPkg != null))) {
+          if (browser == null && companion == null) Box(Modifier.fillMaxSize().then(behindBlur(drawer || askPkg != null))) {
             HorizontalPager(pager, userScrollEnabled = !mirrorPicking) { p ->
                 when (pageIds.getOrNull(p)) {
                     "media" -> MediaPage(vm)
@@ -157,7 +159,8 @@ fun SecondaryContent(vm: EclipseVM, displayId: Int) {
                             wantMirror = true
                             Unit
                         }) else null,
-                        editWalk = { walkGame = it }
+                        editWalk = { walkGame = it },
+                        openCompanion = { companion = it }
                     ) { browser = it }
                 }
             }
@@ -227,6 +230,7 @@ fun SecondaryContent(vm: EclipseVM, displayId: Int) {
                 }
             }
             walkGame?.let { g -> WalkSheet(vm, g, { browser = it }) { walkGame = null } }
+            companion?.let { g -> CompanionHub(vm, g) { companion = null } }
             browser?.let { url -> BrowserOverlay(url) { browser = null } }
         }
     } }
@@ -530,7 +534,7 @@ private fun sessionClock(sec: Long): String =
 @Composable
 private fun NowPlayingPage(
     vm: EclipseVM, dockOn: Boolean, openMirror: (() -> Unit)? = null,
-    editWalk: (Game) -> Unit = {}, openBrowser: (String) -> Unit
+    editWalk: (Game) -> Unit = {}, openCompanion: (Game) -> Unit = {}, openBrowser: (String) -> Unit
 ) {
     // Settings → Dual screen → Show Now Playing: off keeps the clock and wallpaper up while a game runs
     val s = vm.session?.takeIf { vm.flag("np_show", true) }
@@ -634,9 +638,9 @@ private fun NowPlayingPage(
                             NpButton(if (mirroring) "Mirror on" else "Mirror", Icons.Filled.ScreenShare, Modifier.weight(1f)) { openMirror() }
                         }
                         if (vm.flag("npb_walk")) {
-                            // tap: open it; hold: change the search or web address, or the browser
-                            NpButton("Walkthrough", Icons.Filled.MenuBook, Modifier.weight(1f), onLongClick = { editWalk(game) }) {
-                                openWalk(vm, game, openBrowser)
+                            // tap: the Companion (guides, manual); hold: open a web address of your own in the browser
+                            NpButton("Companion", Icons.Filled.MenuBook, Modifier.weight(1f), onLongClick = { editWalk(game) }) {
+                                openCompanion(game)
                             }
                         }
                     }
@@ -837,7 +841,7 @@ private fun WalkSheet(vm: EclipseVM, g: Game, openViewer: (String) -> Unit, clos
         close()
         openWalk(vm, g, openViewer)
     }
-    MenuSheet("Walkthrough", g.name, "Search GameFAQs, or type a web address. Leave it blank for GameFAQs.", onDismiss = close) {
+    MenuSheet("Companion", g.name, "Search GameFAQs, or type a web address. Leave it blank for GameFAQs.", onDismiss = close) {
         Box(
             Modifier.fillMaxWidth().heightIn(min = 38.dp).clip(RoundedCornerShape(9.dp)).background(Color(0x59000000))
                 .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(9.dp)).padding(horizontal = 12.dp, vertical = 9.dp)
@@ -866,7 +870,7 @@ private fun BrowserOverlay(url: String, close: () -> Unit) {
         Row(Modifier.fillMaxWidth().background(C.bg).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Pill("Close", primary = true, onClick = close)
             Spacer(Modifier.width(12.dp))
-            Text("Walkthrough", fontWeight = FontWeight.Bold, color = C.ink)
+            Text("Companion", fontWeight = FontWeight.Bold, color = C.ink)
         }
         AndroidView(
             modifier = Modifier.fillMaxWidth().weight(1f),

@@ -482,7 +482,7 @@ private fun DualScreen(vm: EclipseVM) {
         DropSection("Now Playing")
         ToggleRow("Show Now Playing", "Cover, play time and achievements while a game runs.", vm.flag("np_show", true)) { vm.setFlag("np_show", it) }
         ToggleRow("Screenshot button", "Saves to Pictures/Eclipse.", vm.flag("npb_shot")) { vm.setFlag("npb_shot", it) }
-        ToggleRow("Walkthrough button", "Hold it to change the search.", vm.flag("npb_walk")) { vm.setFlag("npb_walk", it) }
+        ToggleRow("Companion button", "Guides, manuals and more for the game you're playing. Hold it to open a web address.", vm.flag("npb_walk")) { vm.setFlag("npb_walk", it) }
     })
     // while it's off: taps on the greyed part do nothing
     if (!on) Box(Modifier.matchParentSize().pointerInput(Unit) { detectTapGestures { } })
@@ -1352,6 +1352,12 @@ private fun ScrapeTab(vm: EclipseVM) {
         }
         if (vm.isConfigured("igdb")) ToggleRow("Use IGDB", null, vm.flag("p_igdb")) { vm.setFlag("p_igdb", it) }
         InfoRow("Where to get them", "dev.twitch.tv → Your Console → Register Your Application (any name, redirect http://localhost) → copy the Client ID and make a secret.")
+    }
+    // ScreenScraper: shown, greyed out, not usable yet (a tap says so)
+    Box(Modifier.fillMaxWidth().alpha(0.45f)) {
+        ServiceCard("ScreenScraper", "Coming soon", Dot.OFF, false, {
+            vm.showNotice(EclipseVM.Notice("Coming soon", "ScreenScraper", "Manuals, artwork and game info from ScreenScraper will be added in a future update..... Hopefully"))
+        }) {}
     }
     })
 
@@ -2478,6 +2484,8 @@ private fun Credits(vm: EclipseVM) {
     CreditRow(vm, "GameTDB", "GameCube, Wii, DS and 3DS covers and disc art.", "https://www.gametdb.com")
     CreditRow(vm, "RetroAchievements", "Achievements and progress.", "https://retroachievements.org")
     CreditRow(vm, "RomM", "Your own game library server, by the RomM project.", "https://github.com/rommapp/romm")
+    CreditRow(vm, "VideoGameManual.com", "Instruction manuals scanned by Kirkland (the Companion's Manual tab).", "https://www.videogamemanual.com/")
+    CreditRow(vm, "Internet Archive", "Scanned instruction manuals (the Companion's Manual tab).", "https://archive.org")
     CreditRow(
         vm,
         "Artwork and game names",

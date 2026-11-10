@@ -110,7 +110,7 @@ On dual-screen handhelds such as the AYN Thor, the bottom screen isn't left dark
 <table>
   <tr>
     <td width="43%"><img src="docs/images/mirror.jpg" alt="Mario Kart on the top screen, its map mirrored and zoomed in on the bottom screen"></td>
-    <td width="57%"><img src="docs/images/now-playing.jpg" alt="The bottom screen while playing: cover, system, emulator, session and total time, Screenshot, Mirror and Walkthrough buttons"></td>
+    <td width="57%"><img src="docs/images/now-playing.jpg" alt="The bottom screen while playing: cover, system, emulator, session and total time, Screenshot, Mirror and Companion buttons"></td>
   </tr>
   <tr>
     <td><b>Built-in screen mirroring</b>: show the whole top screen underneath, or zoom in on one part of it (a map, a
@@ -121,8 +121,10 @@ On dual-screen handhelds such as the AYN Thor, the bottom screen isn't left dark
 </table>
 
 - **Quick screenshots**: one tap on the bottom screen captures the game on top.
-- **A programmable walkthrough button**: tap it for the game's guides on GameFAQs, opened on the bottom screen while the
-  game keeps running on top. Hold it to point it at any page you like (a wiki, a map, your own notes), saved per game.
+- **Companion**: everything for the game you're playing, on the bottom screen while the game keeps running on top.
+  Guide sites for the game (with the series' own site first: Zelda Dungeon, Omega Metroid, Bulbapedia, Chunkbase),
+  guides saved to the device and read in a clean, ad-free reader that remembers your place, and the instruction manual
+  (from VideoGameManual.com or the Internet Archive, or a PDF you already have). Hold the button to open any page you like, saved per game.
 - **Back where you left off**: return to a running game from the app switcher or Android's Recents, and Now Playing
   comes back with it.
 - **Between games**, the bottom screen shows the highlighted game's cover, details and art, with a dock you can drag and
@@ -273,7 +275,7 @@ No. Eclipse is a frontend: it organizes the games you own and opens them in emul
 <summary><b>Do I need a dual-screen device?</b></summary>
 
 No. Eclipse works on any Android device with a controller or touch screen. The second-screen features (Now Playing,
-mirroring, the walkthrough button, transfers) simply appear when a second display is present.
+mirroring, the Companion, transfers) simply appear when a second display is present.
 </details>
 
 <details>
@@ -318,6 +320,7 @@ code (GPL-2.0-or-later), built into Eclipse in `app/src/main/cpp`.
 - **ColorGrade** system icons by **grvceless**, included with permission.
 - **[RomM](https://github.com/rommapp/romm)** and **[RetroAchievements](https://retroachievements.org)**, whose logos
   belong to their projects.
+- Instruction manuals from **VideoGameManual.com** (scanned by Kirkland) and the **Internet Archive**.
 - Artwork and game data from **libretro thumbnails**, **ArcadeDB**, **GameTDB**, **LaunchBox Games Database**,
   **SteamGridDB**, **IGDB** and **Hasheous**.
 - **[Dolphin](https://dolphin-emu.org)**, whose disc code converts GameCube and Wii games to RVZ.

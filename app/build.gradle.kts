@@ -24,6 +24,13 @@ val keyProps = Properties().apply {
 }
 fun signingValue(env: String, prop: String): String? = System.getenv(env)?.takeIf { it.isNotBlank() } ?: keyProps.getProperty(prop)
 val keystorePath = signingValue("SIGNING_KEYSTORE", "storeFile")
+
+// ScreenScraper developer login (identifies Eclipse to ScreenScraper). Never in the source: GitHub Actions passes the
+// repository secrets SCREENSCRAPER_DEV_ID / SCREENSCRAPER_DEV_PASSWORD; local builds read ssDevId / ssDevPassword from
+// keystore.properties. Missing = ScreenScraper stays greyed out in the app.
+fun quoted(v: String?) = "\"" + (v ?: "").replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+val ssDevId = signingValue("SCREENSCRAPER_DEV_ID", "ssDevId")
+val ssDevPassword = signingValue("SCREENSCRAPER_DEV_PASSWORD", "ssDevPassword")
 val hasReleaseKey = keystorePath != null && file(keystorePath).isFile
 
 android {
@@ -38,6 +45,8 @@ android {
         targetSdk = 35
         versionCode = appVersionCode
         versionName = appVersionName
+        buildConfigField("String", "SS_DEV_ID", quoted(ssDevId))
+        buildConfigField("String", "SS_DEV_PASSWORD", quoted(ssDevPassword))
         // Eclipse runs on ARM64 handhelds; x86_64 for the Android emulator
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         externalNativeBuild {
