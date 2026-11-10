@@ -140,8 +140,10 @@ fun SecondaryContent(vm: EclipseVM, displayId: Int) {
 
 
         Box(Modifier.fillMaxSize().background(Color.Black)) {
-          // frosted look: the page and dock blur behind the drawer and the screen bubble
-          Box(Modifier.fillMaxSize().then(behindBlur(drawer || askPkg != null))) {
+          // frosted look: the page and dock blur behind the drawer and the screen bubble.
+          // Not drawn at all while the walkthrough browser covers the screen: every redraw of the web page used to
+          // redraw this (blurred wallpaper and all) underneath it, which is what made the browser so slow.
+          if (browser == null) Box(Modifier.fillMaxSize().then(behindBlur(drawer || askPkg != null))) {
             HorizontalPager(pager, userScrollEnabled = !mirrorPicking) { p ->
                 when (pageIds.getOrNull(p)) {
                     "media" -> MediaPage(vm)
@@ -871,10 +873,24 @@ private fun BrowserOverlay(url: String, close: () -> Unit) {
             factory = { ctx ->
                 WebView(ctx).apply {
                     settings.javaScriptEnabled = true
-                    webViewClient = WebViewClient()
+                    // guide sites keep their state in web storage; without it their scripts fail and retry
+                    settings.domStorageEnabled = true
+                    settings.loadWithOverviewMode = true
+                    settings.useWideViewPort = true
+                    settings.mediaPlaybackRequiresUserGesture = true // no auto-playing video ads
+                    settings.offscreenPreRaster = true // smoother scrolling through long guides
+                    webViewClient = object : WebViewClient() {
+                        // ads and trackers (data/AdBlock.kt) get an empty answer instead of loading
+                        override fun shouldInterceptRequest(view: WebView?, request: android.webkit.WebResourceRequest?): android.webkit.WebResourceResponse? =
+                            if (com.eclipse.launcher.data.AdBlock.blocked(request?.url?.host))
+                                android.webkit.WebResourceResponse("text/plain", "utf-8", java.io.ByteArrayInputStream(ByteArray(0)))
+                            else null
+                    }
                     loadUrl(url)
                 }
-            }
+            },
+            // closing the browser frees the page (it used to keep running until the screen was rebuilt)
+            onRelease = { w -> runCatching { w.stopLoading(); w.destroy() } }
         )
     }
 }
