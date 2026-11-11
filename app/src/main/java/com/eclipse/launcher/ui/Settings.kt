@@ -1370,6 +1370,26 @@ private fun ScrapeTab(vm: EclipseVM) {
             vm.showNotice(EclipseVM.Notice("Coming soon", "ScreenScraper", "Manuals, artwork and game info from ScreenScraper will be added in a future update..... Hopefully"))
         }) {}
     }
+    // AI helper: the Companion's Ask tab, with your own Claude or Gemini key
+    val (aiDot, aiText) = statusOf(vm, "ai", "Not set up")
+    ServiceCard("AI helper", aiText, aiDot, openR == "ai", { toggleR("ai") }) {
+        val gem = vm.aiProvider == com.eclipse.launcher.data.AiHelper.GEMINI
+        SlimRow("Which one", vm.aiName(), valueColor = C.accent, focusKey = "ai:which") {
+            vm.chooseAi(if (gem) com.eclipse.launcher.data.AiHelper.CLAUDE else com.eclipse.launcher.data.AiHelper.GEMINI)
+        }
+        FieldGroup {
+            FieldRow("Claude API key", vm.key("ai_claude"), secret = true) { vm.setKey("ai_claude", it.trim()); vm.checkConnection("ai") }
+            FieldRow("Gemini API key", vm.key("ai_gemini"), secret = true) { vm.setKey("ai_gemini", it.trim()); vm.checkConnection("ai") }
+        }
+        ToggleRow("No spoilers", "A hint first; the full answer when you ask for it.", vm.flag("ai_nospoil")) { vm.setFlag("ai_nospoil", it) }
+        ToggleRow("Use what's in the Companion", "Your saved guide, checklist and achievements go with each question.", vm.flag("ai_context")) { vm.setFlag("ai_context", it) }
+        FieldRow("Model", vm.aiModel(), hint = if (gem) com.eclipse.launcher.data.AiHelper.GEMINI_MODEL else com.eclipse.launcher.data.AiHelper.CLAUDE_MODEL) {
+            vm.setKey(if (gem) "ai_gemini_model" else "ai_claude_model", it.trim()); vm.checkConnection("ai")
+        }
+        if (vm.aiReady()) ActionRow("Test the key", aiText) { vm.checkConnection("ai") }
+        InfoRow("Where to get a key", "Gemini: aistudio.google.com \u2192 Get API key (has a free tier). Claude: console.anthropic.com \u2192 API keys (paid by use). Keys stay encrypted on this device and are only sent to the service you pick.")
+        InfoRow("Where it's used", "Companion \u2192 Ask, on the bottom screen while you play or from a game's page. Answers come from the web and can be wrong: each lists its sources.")
+    }
     })
 
 }

@@ -3949,6 +3949,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         "ra" -> key("ra_user").isNotBlank() && key("ra_key").isNotBlank()
         "romm" -> rommConn() != null
         "ss" -> ssBuilt && key("ss_user").isNotBlank() && key("ss_pass").isNotBlank()
+        "ai" -> aiReady()
         else -> false
     }
 
@@ -3965,11 +3966,25 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
                 "ss" -> com.eclipse.launcher.data.ScreenScraper.account(key("ss_user"), key("ss_pass"))?.let { a ->
                     true to ("Signed in as ${a.name}" + if (a.maxPerDay > 0) " \u00b7 ${a.today} of ${a.maxPerDay} lookups today" else "")
                 } ?: (false to "Username or password not accepted, or no connection")
+                "ai" -> com.eclipse.launcher.data.AiHelper.test(aiProvider, aiKey(), aiModel())?.let { false to it }
+                    ?: (true to "Working \u00b7 " + aiName())
                 else -> return@launch
             }
             connCheck = connCheck + (id to r)
         }
     }
+
+    // ---- the Companion's Ask tab: Claude or Gemini with your own key (data/AiHelper.kt; Settings → Connections → AI helper) ----
+    /** "claude" or "gemini": the one chosen, else the one that has a key. */
+    val aiProvider: String get() = key("ai_provider").ifBlank {
+        if (key("ai_claude").isBlank() && key("ai_gemini").isNotBlank()) com.eclipse.launcher.data.AiHelper.GEMINI else com.eclipse.launcher.data.AiHelper.CLAUDE
+    }
+    fun aiName(): String = if (aiProvider == com.eclipse.launcher.data.AiHelper.GEMINI) "Gemini" else "Claude"
+    fun aiKey(): String = key(if (aiProvider == com.eclipse.launcher.data.AiHelper.GEMINI) "ai_gemini" else "ai_claude")
+    /** A model of your own choosing (blank = Eclipse's default). */
+    fun aiModel(): String = key(if (aiProvider == com.eclipse.launcher.data.AiHelper.GEMINI) "ai_gemini_model" else "ai_claude_model")
+    fun aiReady(): Boolean = aiKey().isNotBlank()
+    fun chooseAi(p: String) { setKey("ai_provider", p); checkConnection("ai") }
 
     /** RomM on http:// sends your password unencrypted (Basic auth): the server settings warn about it. */
     fun rommInsecure(): Boolean = rommConn()?.base?.startsWith("http://") == true
@@ -3993,7 +4008,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         else ok to msg
     }
 
-    fun checkConnections() = listOf("sgdb", "igdb", "ra", "romm", "ss").forEach { if (isConfigured(it) && it !in connCheck) checkConnection(it) }
+    fun checkConnections() = listOf("sgdb", "igdb", "ra", "romm", "ss", "ai").forEach { if (isConfigured(it) && it !in connCheck) checkConnection(it) }
 
     // ---- Hasheous: identify games from the ROM file itself ----
     /** The Hasheous match for this game (hashing the file the first time), or null. Cached per game. */

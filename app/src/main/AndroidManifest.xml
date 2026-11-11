@@ -7,6 +7,8 @@
     <uses-feature android:name="android.hardware.gamepad" android:required="false" />
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- the Companion's Ask tab: speak a question (asked for the first time the mic is tapped) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- RomM downloads keep going in the background, with a progress notification. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />

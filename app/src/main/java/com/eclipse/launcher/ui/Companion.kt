@@ -195,7 +195,7 @@ fun CompanionHub(vm: EclipseVM, g: Game, close: () -> Unit) {
     val ctx = LocalContext.current
     val root = ctx.filesDir
     val scope = rememberCoroutineScope()
-    val tabs = listOf("Guides", "Manual", "Maps", "Checklist", "Trophies")
+    val tabs = listOf("Guides", "Manual", "Maps", "Checklist", "Trophies", "Ask")
     val pager = rememberPagerState(pageCount = { tabs.size })
     var browser by remember { mutableStateOf<Guides.Site?>(null) }
     var reading by remember { mutableStateOf<Guides.Saved?>(null) }
@@ -284,6 +284,7 @@ fun CompanionHub(vm: EclipseVM, g: Game, close: () -> Unit) {
                     2 -> MapsTab(g, root, savedTick, open = { browser = it }, view = { mapView = it }, changed = { savedTick++ })
                     3 -> ChecklistTab(g, root, savedTick, changed = { savedTick++ })
                     4 -> TrophiesTab(ra, raLoaded)
+                    5 -> AskTab(vm, g, root, open = { browser = it }, changed = { savedTick++ })
                     else -> ManualTab(vm, g, root, open = { manual = it }, soon = { if (vm.ssBuilt) signIn = true else soon = true })
                 }
             }
@@ -1303,6 +1304,398 @@ private fun MapViewer(g: Game, root: File, map0: CompanionData.GameMap, onBack: 
         HubInput("Marker", "What's here? (heart piece, locked door…)", "Add", onCancel = { pending = null }) { label ->
             pending = null
             keep(map.copy(markers = map.markers + CompanionData.Marker(at.x, at.y, label)))
+        }
+    }
+}
+
+
+// ---------------------------------------------------------------- Ask tab (Claude or Gemini: data/AiHelper.kt)
+
+private val GUIDE_ASK = Regex("walk ?through|guide|faq|100\\s?%", RegexOption.IGNORE_CASE)
+
+/** "**bold**" drawn bold; everything else as it is. */
+private fun boldText(s: String): AnnotatedString = buildAnnotatedString {
+    var i = 0
+    val r = Regex("\\*\\*(.+?)\\*\\*")
+    for (m in r.findAll(s)) {
+        append(s.substring(i, m.range.first))
+        pushStyle(SpanStyle(fontWeight = FontWeight.SemiBold)); append(m.groupValues[1]); pop()
+        i = m.range.last + 1
+    }
+    append(s.substring(i))
+}
+
+/** What the AI is told about the game besides its name: where you are in your saved guide, your checklist, achievements. */
+private suspend fun askContext(vm: EclipseVM, ctx: android.content.Context, g: Game, root: File): String = buildString {
+    withContext(Dispatchers.IO) {
+        runCatching {
+            val n = Guides.lastRead(ctx, g.id)
+            val last = n?.let { name -> Guides.saved(root, g.id).firstOrNull { it.file.name == name } }
+            if (last != null) {
+                val blocks = Guides.reflow(last.file.readText(), last.html)
+                if (blocks.isNotEmpty()) {
+                    val pos = Guides.position(ctx, last).coerceIn(0, blocks.lastIndex)
+                    val heading = blocks.take(pos + 1).lastOrNull { it is Guides.Block.Heading }?.text
+                    val around = blocks.subList(maxOf(0, pos - 2), minOf(blocks.size, pos + 10)).joinToString("\n") { it.text }.take(2500)
+                    append("They're reading the guide \"${last.title}\" (${last.source})")
+                    if (heading != null) append(", in the section \"$heading\"")
+                    append(". The text around where they are:\n").append(around).append("\n\n")
+                }
+            }
+        }
+        val list = runCatching { CompanionData.checklist(root, g.id) }.getOrDefault(emptyList())
+        if (list.isNotEmpty()) {
+            append("Their checklist (✓ = done):\n")
+            list.take(60).forEach { append(if (it.done) "✓ " else "☐ ").append(it.text).append('\n') }
+            append('\n')
+        }
+    }
+    val ra = runCatching { vm.loadRa(g) }.getOrNull()
+    if (ra != null && ra.total > 0) {
+        append("RetroAchievements: ${ra.earned} of ${ra.total} unlocked.")
+        val locked = ra.achievements.filter { !it.earned }.take(30)
+        if (locked.isNotEmpty()) {
+            append(" Not unlocked yet:\n")
+            locked.forEach { append("- ").append(it.title).append(": ").append(it.description).append('\n') }
+        }
+    }
+}
+
+/** A picture of the top screen, made small enough to send: JPEG, at most 1280 pixels wide. */
+private fun shrink(b: Bitmap): ByteArray {
+    val w = minOf(b.width, 1280)
+    val scaled = if (w == b.width) b else Bitmap.createScaledBitmap(b, w, (b.height.toFloat() * w / b.width).toInt().coerceAtLeast(1), true)
+    val out = java.io.ByteArrayOutputStream()
+    scaled.compress(Bitmap.CompressFormat.JPEG, 82, out)
+    if (scaled !== b) scaled.recycle()
+    return out.toByteArray()
+}
+
+@Composable
+private fun RoundButton(text: String, gold: Boolean = false, on: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
+    Box(
+        Modifier.size(42.dp).clip(CircleShape)
+            .background(if (gold) C.accent else if (on) C.accent.copy(alpha = 0.25f) else C.x(0x14FFFFFFL))
+            .border(1.dp, if (gold || on) C.accent else LINE, CircleShape)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) { Text(text, color = if (gold) C.onAccent else INK, fontSize = 16.sp, modifier = Modifier.graphicsLayer { alpha = if (enabled) 1f else 0.4f }) }
+}
+
+@Composable
+private fun SourceChip(text: String, label: String? = null, onClick: () -> Unit) {
+    Row(
+        Modifier.padding(end = 6.dp).heightIn(min = 30.dp).clip(RoundedCornerShape(12.dp)).background(C.x(0x12FFFFFFL)).border(1.dp, LINE, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick).padding(horizontal = 10.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (label != null) Text(label, color = C.accent, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        Text((if (label != null) " · " else "") + text, color = INK, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 200.dp))
+    }
+}
+
+/**
+ * Ask: questions about the game for Claude or Gemini (your own key, Settings → Connections → AI helper). They search
+ * the web first; each answer lists its sources (tap one to open it in the Companion's browser). 📷 sends a picture of
+ * the top screen with the question; 🎤 fills the box by voice. With "No spoilers" on, a hint comes first.
+ */
+@Composable
+private fun AskTab(vm: EclipseVM, g: Game, root: File, open: (Guides.Site) -> Unit, changed: () -> Unit) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val keyboard = LocalSoftwareKeyboardController.current
+    var msgs by remember { mutableStateOf<List<CompanionData.Msg>>(emptyList()) }
+    LaunchedEffect(g.id) { msgs = withContext(Dispatchers.IO) { CompanionData.conversation(root, g.id) } }
+    var busy by remember { mutableStateOf(false) }
+    var input by remember { mutableStateOf("") }
+    var typing by remember { mutableStateOf(false) }
+    var shot by remember { mutableStateOf<ByteArray?>(null) }
+    var shotPic by remember { mutableStateOf<Bitmap?>(null) }
+    var status by remember { mutableStateOf<String?>(null) }
+    var listening by remember { mutableStateOf(false) }
+    var added by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var confirmClear by remember { mutableStateOf(false) }
+    val list = rememberLazyListState()
+    val fr = remember { FocusRequester() }
+    LaunchedEffect(status) { if (status != null) { delay(4000); status = null } }
+    LaunchedEffect(msgs.size, busy) { if (msgs.isNotEmpty()) runCatching { list.animateScrollToItem(msgs.size + (if (busy) 1 else 0)) } }
+    // the bottom screen's window takes focus only while typing (it can't get the keyboard otherwise)
+    LaunchedEffect(typing) {
+        val p = com.eclipse.launcher.media.SecondaryPresentation.current
+        if (typing) { p?.setTyping(true); delay(80); runCatching { fr.requestFocus() }; keyboard?.show() }
+        else { keyboard?.hide(); p?.setTyping(false) }
+    }
+    val recognizer = remember { mutableStateOf<android.speech.SpeechRecognizer?>(null) }
+    DisposableEffect(Unit) {
+        onDispose {
+            com.eclipse.launcher.media.SecondaryPresentation.current?.setTyping(false)
+            runCatching { recognizer.value?.destroy() }
+        }
+    }
+    fun keep(l: List<CompanionData.Msg>) {
+        msgs = l
+        scope.launch(Dispatchers.IO) { CompanionData.saveConversation(root, g.id, l) }
+    }
+
+    fun send(q0: String) {
+        val q = q0.trim()
+        val img = shot
+        if (busy || (q.isEmpty() && img == null)) return
+        if (!vm.aiReady()) { status = "Add a key under Settings → Connections → AI helper first"; return }
+        typing = false; input = ""; shot = null; shotPic = null
+        busy = true
+        scope.launch {
+            val imgFile = img?.let { b -> withContext(Dispatchers.IO) { CompanionData.newAskImage(root, g.id).also { it.writeBytes(b) } } }
+            val question = CompanionData.Msg(System.currentTimeMillis(), true, q.ifEmpty { "Where am I and what should I do next?" }, imgFile?.path)
+            keep(msgs + question)
+            val context = if (vm.flag("ai_context")) runCatching { askContext(vm, ctx, g, root) }.getOrNull() else null
+            val system = com.eclipse.launcher.data.AiHelper.system(
+                Guides.cleanTitle(g.name), Platforms.byId(g.platform)?.name ?: g.platform, vm.flag("ai_nospoil"), context
+            )
+            // the conversation so far (the last few exchanges); only the new question carries its picture
+            val turns = msgs.filter { !it.error }.takeLast(12).map { m ->
+                com.eclipse.launcher.data.AiHelper.Turn(m.user, if (m.user) m.text else listOfNotNull(m.hint, m.text).joinToString("\n\n"),
+                    if (m.id == question.id) img else null)
+            }
+            val reply = try {
+                val a = com.eclipse.launcher.data.AiHelper.ask(vm.aiProvider, vm.aiKey(), vm.aiModel(), system, turns)
+                CompanionData.Msg(System.currentTimeMillis(), false, a.full, hint = a.hint, sources = a.sources, checklist = a.checklist)
+            } catch (e: com.eclipse.launcher.data.AiHelper.AiError) {
+                CompanionData.Msg(System.currentTimeMillis(), false, e.message ?: "Something went wrong", error = true)
+            } catch (e: Exception) {
+                CompanionData.Msg(System.currentTimeMillis(), false, "Something went wrong (${e.javaClass.simpleName})", error = true)
+            }
+            busy = false
+            keep(msgs + reply)
+        }
+    }
+
+    fun takeShot() {
+        if (shot != null) { shot = null; shotPic = null; return }
+        val started = com.eclipse.launcher.media.ScreenshotService.grab { b ->
+            if (b == null) { status = "Couldn't take a picture of the top screen" } else
+            scope.launch {
+                val bytes = withContext(Dispatchers.Default) { shrink(b) }
+                shot = bytes
+                shotPic = withContext(Dispatchers.Default) { Bitmap.createScaledBitmap(b, 160, (b.height * 160f / b.width).toInt().coerceAtLeast(1), true) }
+                b.recycle()
+            }
+        }
+        if (!started) status = "Turn on Eclipse's accessibility helper (Settings) to send the top screen"
+    }
+
+    fun listen() {
+        if (listening) { runCatching { recognizer.value?.stopListening() }; return }
+        val perm = android.Manifest.permission.RECORD_AUDIO
+        if (androidx.core.content.ContextCompat.checkSelfPermission(ctx, perm) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            (com.eclipse.launcher.media.SecondScreenHost.owner as? android.app.Activity)?.let {
+                androidx.core.app.ActivityCompat.requestPermissions(it, arrayOf(perm), 7301)
+            }
+            status = "Allow the microphone on the top screen, then tap 🎤 again"
+            return
+        }
+        if (!android.speech.SpeechRecognizer.isRecognitionAvailable(ctx)) { status = "Speaking isn't available on this device"; return }
+        runCatching { recognizer.value?.destroy() }
+        val r = android.speech.SpeechRecognizer.createSpeechRecognizer(ctx.applicationContext)
+        recognizer.value = r
+        r.setRecognitionListener(object : android.speech.RecognitionListener {
+            override fun onReadyForSpeech(params: android.os.Bundle?) {}
+            override fun onBeginningOfSpeech() {}
+            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onEndOfSpeech() {}
+            override fun onEvent(eventType: Int, params: android.os.Bundle?) {}
+            override fun onPartialResults(b: android.os.Bundle?) {
+                b?.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.let { if (it.isNotBlank()) input = it }
+            }
+            override fun onResults(b: android.os.Bundle?) {
+                listening = false
+                b?.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.let { if (it.isNotBlank()) input = it }
+            }
+            override fun onError(error: Int) {
+                listening = false
+                status = if (error == android.speech.SpeechRecognizer.ERROR_NO_MATCH || error == android.speech.SpeechRecognizer.ERROR_SPEECH_TIMEOUT) "Didn't catch that" else "Couldn't listen (error $error)"
+            }
+        })
+        listening = true
+        r.startListening(android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_PARTIAL_RESULTS, true))
+    }
+
+    fun openSource(s: com.eclipse.launcher.data.AiHelper.Source) = open(Guides.Site(s.title, s.url, s.url, "AI", 0xFF444444))
+
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
+            LazyColumn(Modifier.fillMaxWidth().weight(1f), state = list, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) {
+                if (!vm.aiReady()) item {
+                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(11.dp)).background(CARD).border(1.dp, LINE, RoundedCornerShape(11.dp)).padding(14.dp)) {
+                        Text("Ask Claude or Gemini about this game", color = INK, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        Text("Add your own key under Settings → Connections → AI helper (on the top screen). Gemini's comes with a free tier at aistudio.google.com; Claude's is paid by use at console.anthropic.com.",
+                            color = SUB, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                    }
+                }
+                if (vm.aiReady() && msgs.isEmpty()) item {
+                    Column {
+                        SectionLabel("Try")
+                        listOf("Find the best 100% walkthrough", "What can I miss?", "What are the controls?", "Make a checklist of the collectibles").forEach { t ->
+                            Box(Modifier.padding(bottom = 6.dp).clip(RoundedCornerShape(16.dp)).background(CARD).border(1.dp, LINE, RoundedCornerShape(16.dp))
+                                .clickable { send(t) }.padding(horizontal = 12.dp, vertical = 9.dp)) {
+                                Text(t, color = INK, fontSize = 12.5.sp)
+                            }
+                        }
+                        Text("📷 sends a picture of the top screen with your question: try \"Where am I and where do I go next?\"",
+                            color = SUB, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp, start = 2.dp))
+                    }
+                }
+                if (msgs.isNotEmpty()) item {
+                    Row(Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(vm.aiName() + (if (vm.flag("ai_nospoil")) " · no spoilers" else ""), color = SUB, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                        HubPill("New chat") { confirmClear = true }
+                    }
+                }
+                itemsIndexed(msgs, key = { _, m -> m.id }) { i, m ->
+                    if (m.user) {
+                        Column(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalAlignment = Alignment.End) {
+                            Column(Modifier.widthIn(max = 380.dp).clip(RoundedCornerShape(14.dp, 14.dp, 4.dp, 14.dp))
+                                .background(C.accent.copy(alpha = 0.16f)).border(1.dp, C.accent.copy(alpha = 0.35f), RoundedCornerShape(14.dp, 14.dp, 4.dp, 14.dp))
+                                .padding(horizontal = 11.dp, vertical = 8.dp)) {
+                                m.image?.let { path ->
+                                    coil.compose.AsyncImage(File(path), null, Modifier.padding(bottom = 6.dp).size(width = 200.dp, height = 112.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+                                }
+                                Text(m.text, color = INK, fontSize = 13.sp)
+                            }
+                        }
+                    } else {
+                        val asked = msgs.getOrNull(i - 1)?.takeIf { it.user }
+                        val hidden = m.hint != null && !m.revealed
+                        Column(Modifier.fillMaxWidth(0.94f).padding(top = 7.dp).clip(RoundedCornerShape(14.dp, 14.dp, 14.dp, 4.dp)).background(CARD)
+                            .border(1.dp, if (m.error) Color(0x73FF8A7A) else LINE, RoundedCornerShape(14.dp, 14.dp, 14.dp, 4.dp)).padding(horizontal = 11.dp, vertical = 9.dp)) {
+                            Text(if (m.error) "Couldn't answer" else if (hidden) "Hint · no spoilers" else vm.aiName(), color = if (m.error) Color(0xFFFF8A7A) else SUB,
+                                fontSize = 9.5.sp, letterSpacing = 1.4.sp, modifier = Modifier.padding(bottom = 4.dp))
+                            if (hidden) {
+                                Row {
+                                    Box(Modifier.width(3.dp).height(36.dp).background(C.accent))
+                                    Text(boldText(m.hint!!), color = INK, fontSize = 13.sp, lineHeight = 19.sp, modifier = Modifier.padding(start = 8.dp))
+                                }
+                                Box(Modifier.padding(top = 8.dp).clip(RoundedCornerShape(14.dp)).border(1.dp, C.accent.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
+                                    .clickable { keep(msgs.map { if (it.id == m.id) it.copy(revealed = true) else it }) }.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                                    Text("Show the full answer", color = C.accent, fontSize = 12.sp)
+                                }
+                            } else Text(boldText(m.text), color = INK, fontSize = 13.sp, lineHeight = 19.sp)
+                            if (m.error && asked != null) Box(Modifier.padding(top = 8.dp)) {
+                                HubPill("Try again") {
+                                    // the failed answer goes, the question is asked again (with its picture, if it had one)
+                                    val img = asked.image?.let { runCatching { File(it).readBytes() }.getOrNull() }
+                                    keep(msgs.filter { it.id != m.id && it.id != asked.id })
+                                    shot = img
+                                    send(asked.text)
+                                }
+                            }
+                            // sources: as rows when the question was for guides, else as chips
+                            if (!m.error && m.sources.isNotEmpty()) {
+                                if (asked != null && GUIDE_ASK.containsMatchIn(asked.text)) {
+                                    Column(Modifier.padding(top = 8.dp)) {
+                                        m.sources.forEach { s ->
+                                            HubRow(s.title.take(3).uppercase(), 0xFF1D3B6E, s.title, runCatching { java.net.URI(s.url).host?.removePrefix("www.") }.getOrNull() ?: s.url, trailing = "↗") { openSource(s) }
+                                        }
+                                    }
+                                } else Row(Modifier.padding(top = 8.dp).horizontalScroll(rememberScrollState())) {
+                                    m.sources.forEach { s -> SourceChip(s.title, null) { openSource(s) } }
+                                }
+                            }
+                            // things the answer offers to keep
+                            val extras = m.checklist.isNotEmpty() || asked?.image != null
+                            if (!m.error && extras) Row(Modifier.padding(top = 6.dp).horizontalScroll(rememberScrollState())) {
+                                if (m.checklist.isNotEmpty()) {
+                                    val done = m.id in added
+                                    SourceChip(if (done) "Added to the checklist" else "＋ Add ${m.checklist.size} to the checklist") {
+                                        if (done) return@SourceChip
+                                        added = added + m.id
+                                        scope.launch {
+                                            withContext(Dispatchers.IO) {
+                                                val have = CompanionData.checklist(root, g.id)
+                                                val known = have.map { it.text.lowercase() }.toHashSet()
+                                                var id = System.currentTimeMillis()
+                                                val more = m.checklist.filter { known.add(it.lowercase()) }.map { CompanionData.Item(id++, it) }
+                                                CompanionData.saveChecklist(root, g.id, have + more)
+                                            }
+                                            changed()
+                                            status = "Added to Checklist"
+                                        }
+                                    }
+                                }
+                                asked?.image?.let { path ->
+                                    SourceChip("📍 Keep the picture as a map") {
+                                        scope.launch {
+                                            val ok = withContext(Dispatchers.IO) {
+                                                runCatching {
+                                                    val f = CompanionData.newMapFile(root, g.id)
+                                                    File(path).copyTo(f, overwrite = true)
+                                                    val stamp = java.text.SimpleDateFormat("d MMM, HH:mm", java.util.Locale.US).format(java.util.Date())
+                                                    CompanionData.addMap(root, g.id, f, "Screenshot · $stamp")
+                                                }.isSuccess
+                                            }
+                                            status = if (ok) "Kept · it's under Maps" else "Couldn't keep the picture"
+                                            if (ok) changed()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if (busy) item {
+                    Column(Modifier.fillMaxWidth(0.94f).padding(top = 7.dp).clip(RoundedCornerShape(14.dp)).background(CARD).border(1.dp, LINE, RoundedCornerShape(14.dp)).padding(11.dp)) {
+                        Text(vm.aiName().uppercase() + " · SEARCHING…", color = SUB, fontSize = 9.5.sp, letterSpacing = 1.4.sp)
+                        Text("Looking it up on the web", color = SUB, fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp))
+                    }
+                }
+                item { Spacer(Modifier.height(8.dp)) }
+            }
+            status?.let { st -> Text(st, color = C.accent, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 2.dp)) }
+            // the picture waiting to go with the next question
+            shotPic?.let { b ->
+                Row(Modifier.padding(start = 12.dp, bottom = 4.dp).clip(RoundedCornerShape(10.dp)).background(CARD).border(1.dp, LINE, RoundedCornerShape(10.dp)).padding(5.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Image(b.asImageBitmap(), null, Modifier.size(width = 64.dp, height = 36.dp).clip(RoundedCornerShape(6.dp)), contentScale = ContentScale.Crop)
+                    Text("Top screen goes with your question", color = SUB, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 8.dp))
+                    Text("✕", color = INK, fontSize = 13.sp, modifier = Modifier.clickable { shot = null; shotPic = null }.padding(6.dp))
+                }
+            }
+            // the bar: 📷, the question, 🎤, send
+            Row(Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 10.dp, top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                RoundButton("📷", on = shot != null) { takeShot() }
+                Spacer(Modifier.width(6.dp))
+                Box(Modifier.weight(1f).heightIn(min = 42.dp).clip(RoundedCornerShape(21.dp)).background(Color(0x73000000)).border(1.dp, if (typing) C.accent else LINE, RoundedCornerShape(21.dp))
+                    .padding(horizontal = 14.dp, vertical = 10.dp), contentAlignment = Alignment.CenterStart) {
+                    BasicTextField(
+                        input, { input = it }, enabled = typing, maxLines = 3,
+                        textStyle = TextStyle(color = INK, fontSize = 14.sp), cursorBrush = SolidColor(C.accent),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                        keyboardActions = KeyboardActions(onSend = { send(input) }),
+                        modifier = Modifier.fillMaxWidth().focusRequester(fr)
+                    )
+                    if (input.isEmpty()) Text(if (listening) "Listening…" else "Ask about ${Guides.cleanTitle(g.name)}…", color = SUB, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    // a tap starts typing (the window can't take the keyboard until then)
+                    if (!typing) Box(Modifier.matchParentSize().clickable { typing = true })
+                }
+                Spacer(Modifier.width(6.dp))
+                RoundButton(if (listening) "■" else "🎤", on = listening) { listen() }
+                Spacer(Modifier.width(6.dp))
+                RoundButton("➤", gold = true, enabled = !busy && (input.isNotBlank() || shot != null)) { send(input) }
+            }
+        }
+        if (confirmClear) HubSheet("Start a new chat?", "This conversation and its pictures are deleted.", onDismiss = { confirmClear = false }) {
+            Row {
+                HubPill("Cancel") { confirmClear = false }
+                Spacer(Modifier.width(8.dp))
+                HubPill("New chat", gold = true) {
+                    confirmClear = false
+                    msgs = emptyList()
+                    scope.launch(Dispatchers.IO) { CompanionData.clearConversation(root, g.id) }
+                }
+            }
         }
     }
 }

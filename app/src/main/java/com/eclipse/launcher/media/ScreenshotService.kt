@@ -129,6 +129,28 @@ class ScreenshotService : AccessibilityService() {
             return true
         }
 
+        /**
+         * A picture of the top screen, handed to [onDone] (on the main thread) without saving it anywhere: the
+         * Companion's Ask tab sends it with a question. Null on failure. Returns false when the service is off or
+         * Android is older than 11.
+         */
+        fun grab(onDone: (Bitmap?) -> Unit): Boolean {
+            val s = instance ?: return false
+            if (Build.VERSION.SDK_INT < 30) return false
+            val main = Handler(Looper.getMainLooper())
+            s.takeScreenshot(Screens.mainId, s.mainExecutor, object : AccessibilityService.TakeScreenshotCallback {
+                override fun onSuccess(result: AccessibilityService.ScreenshotResult) {
+                    val hw = result.hardwareBuffer
+                    val bmp = try {
+                        Bitmap.wrapHardwareBuffer(hw, result.colorSpace)?.copy(Bitmap.Config.ARGB_8888, false)
+                    } catch (e: Throwable) { null } finally { runCatching { hw.close() } }
+                    main.post { onDone(bmp) }
+                }
+                override fun onFailure(errorCode: Int) { main.post { onDone(null) } }
+            })
+            return true
+        }
+
         /** Each game gets its own folder: Pictures/Eclipse/<game>/<game>_<date>.png (no game running: Pictures/Eclipse/Eclipse). */
         private fun save(ctx: Context, bmp: Bitmap, game: String?): Uri? {
             val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())

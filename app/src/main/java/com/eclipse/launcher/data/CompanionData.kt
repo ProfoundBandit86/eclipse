@@ -92,4 +92,58 @@ object CompanionData {
         map.file.delete()
         writeMaps(root, gameId, maps(root, gameId).filter { it.file != map.file })
     }
+
+    // ---------------------------------------------------------------- Ask (the AI helper's conversation)
+
+    /**
+     * One message of the Ask tab. A question: [text], and [image] (a picture of the top screen kept beside it, if one
+     * was sent). An answer: [hint] / [text] (the full answer), [sources], [checklist]; [revealed] once the full answer
+     * of a hinted one has been opened; [error] when asking failed.
+     */
+    data class Msg(
+        val id: Long, val user: Boolean, val text: String, val image: String? = null, val hint: String? = null,
+        val sources: List<AiHelper.Source> = emptyList(), val checklist: List<String> = emptyList(),
+        val revealed: Boolean = false, val error: Boolean = false,
+    )
+
+    private fun askFile(root: File, gameId: String) = File(Guides.dir(root, gameId), "ask.json")
+
+    fun conversation(root: File, gameId: String): List<Msg> {
+        val arr = runCatching { JSONArray(askFile(root, gameId).readText()) }.getOrNull() ?: return emptyList()
+        return (0 until arr.length()).mapNotNull { i ->
+            val o = arr.optJSONObject(i) ?: return@mapNotNull null
+            val src = o.optJSONArray("sources") ?: JSONArray()
+            val ch = o.optJSONArray("checklist") ?: JSONArray()
+            Msg(
+                o.optLong("id"), o.optBoolean("user"), o.optString("text"), o.optString("image").ifEmpty { null },
+                o.optString("hint").ifEmpty { null },
+                (0 until src.length()).mapNotNull { j -> src.optJSONObject(j)?.let { AiHelper.Source(it.optString("title"), it.optString("url")) } },
+                (0 until ch.length()).map { ch.optString(it) }, o.optBoolean("revealed"), o.optBoolean("error"),
+            )
+        }
+    }
+
+    /** Keeps the last 60 messages (pictures of messages that fall off are deleted). */
+    fun saveConversation(root: File, gameId: String, list: List<Msg>) {
+        val keep = list.takeLast(60)
+        list.dropLast(keep.size).forEach { m -> m.image?.let { File(it).delete() } }
+        val arr = JSONArray()
+        keep.forEach { m ->
+            val src = JSONArray(); m.sources.forEach { src.put(JSONObject().put("title", it.title).put("url", it.url)) }
+            val ch = JSONArray(); m.checklist.forEach { ch.put(it) }
+            arr.put(JSONObject().put("id", m.id).put("user", m.user).put("text", m.text).put("image", m.image ?: "")
+                .put("hint", m.hint ?: "").put("sources", src).put("checklist", ch).put("revealed", m.revealed).put("error", m.error))
+        }
+        Guides.dir(root, gameId).mkdirs()
+        askFile(root, gameId).writeText(arr.toString())
+    }
+
+    /** Starts over: the conversation and its pictures go. */
+    fun clearConversation(root: File, gameId: String) {
+        conversation(root, gameId).forEach { m -> m.image?.let { File(it).delete() } }
+        askFile(root, gameId).delete()
+    }
+
+    /** Where a picture sent with a question is kept. */
+    fun newAskImage(root: File, gameId: String): File = File(Guides.dir(root, gameId).apply { mkdirs() }, "ask_" + System.currentTimeMillis() + ".jpg")
 }
