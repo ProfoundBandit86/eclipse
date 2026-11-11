@@ -104,6 +104,8 @@ object CompanionData {
         val id: Long, val user: Boolean, val text: String, val image: String? = null, val hint: String? = null,
         val sources: List<AiHelper.Source> = emptyList(), val checklist: List<String> = emptyList(),
         val revealed: Boolean = false, val error: Boolean = false,
+        /** how it was answered, when that's worth saying ("not checked on the web …") */
+        val note: String? = null,
     )
 
     private fun askFile(root: File, gameId: String) = File(Guides.dir(root, gameId), "ask.json")
@@ -119,6 +121,7 @@ object CompanionData {
                 o.optString("hint").ifEmpty { null },
                 (0 until src.length()).mapNotNull { j -> src.optJSONObject(j)?.let { AiHelper.Source(it.optString("title"), it.optString("url")) } },
                 (0 until ch.length()).map { ch.optString(it) }, o.optBoolean("revealed"), o.optBoolean("error"),
+                o.optString("note").ifEmpty { null },
             )
         }
     }
@@ -132,7 +135,7 @@ object CompanionData {
             val src = JSONArray(); m.sources.forEach { src.put(JSONObject().put("title", it.title).put("url", it.url)) }
             val ch = JSONArray(); m.checklist.forEach { ch.put(it) }
             arr.put(JSONObject().put("id", m.id).put("user", m.user).put("text", m.text).put("image", m.image ?: "")
-                .put("hint", m.hint ?: "").put("sources", src).put("checklist", ch).put("revealed", m.revealed).put("error", m.error))
+                .put("hint", m.hint ?: "").put("sources", src).put("checklist", ch).put("revealed", m.revealed).put("error", m.error).put("note", m.note ?: ""))
         }
         Guides.dir(root, gameId).mkdirs()
         askFile(root, gameId).writeText(arr.toString())

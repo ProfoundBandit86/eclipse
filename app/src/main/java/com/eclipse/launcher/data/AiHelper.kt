@@ -37,9 +37,12 @@ object AiHelper {
         val sources: List<Source>,
         /** things to tick off, when the answer listed some */
         val checklist: List<String>,
+        /** something to say about how it was answered (Gemini's free tier refusing web search, say) */
+        val note: String? = null,
     )
 
-    class AiError(message: String) : Exception(message)
+    /** [code]: the HTTP status the service answered with (0 = no answer). */
+    class AiError(message: String, val code: Int = 0) : Exception(message)
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -101,16 +104,18 @@ object AiHelper {
         val (code, text) = try {
             client.newCall(rb.build()).execute().use { it.code to (it.body?.string() ?: "") }
         } catch (e: java.io.IOException) {
-            throw AiError("No connection (${e.message ?: "network error"})")
+            throw AiError("No connection (${e.message ?: "network error"})", 0)
         }
         val o = runCatching { JSONObject(text) }.getOrNull()
         if (code !in 200..299) {
-            val msg = o?.optJSONObject("error")?.optString("message").orEmpty()
+            // the service's own words (first lines only): which limit, which model …
+            val msg = o?.optJSONObject("error")?.optString("message").orEmpty().lines().map { it.trim() }.filter { it.isNotEmpty() }
+                .take(3).joinToString(" ").take(260)
             throw AiError(when (code) {
-                401, 403 -> "The API key wasn't accepted"
-                429 -> "Too many questions for now (the key's limit). Try again in a minute."
+                401, 403 -> "The API key wasn't accepted" + if (msg.isNotBlank()) ": $msg" else ""
+                429 -> "The key's limit was reached" + if (msg.isNotBlank()) ": $msg" else ". Try again in a minute."
                 else -> "The service answered $code" + if (msg.isNotBlank()) ": $msg" else ""
-            })
+            }, code)
         }
         o ?: throw AiError("The service sent something unreadable")
     }
@@ -199,11 +204,22 @@ object AiHelper {
             parts.put(JSONObject().put("text", t.text.ifBlank { "What's on the screen?" }))
             contents.put(JSONObject().put("role", if (t.user) "user" else "model").put("parts", parts))
         }
-        val body = JSONObject()
-            .put("system_instruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", system))))
+        fun body(search: Boolean) = JSONObject()
+            .put("system_instruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text",
+                if (search) system else system + "\nWeb search isn't available for this answer: answer from what you know, and say plainly when you're unsure.\n"))))
             .put("contents", contents)
-            .put("tools", JSONArray().put(JSONObject().put("google_search", JSONObject())))
-        val r = post("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent", mapOf("x-goog-api-key" to key), body)
+            .apply { if (search) put("tools", JSONArray().put(JSONObject().put("google_search", JSONObject()))) }
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent"
+        // Google's free tier often refuses web search ("Grounding with Google Search") with 429 while plain questions
+        // still work: then the question is asked again without searching, and the answer says so
+        var note: String? = null
+        val r = try {
+            post(url, mapOf("x-goog-api-key" to key), body(true))
+        } catch (e: AiError) {
+            if (e.code != 429) throw e
+            note = "Not checked on the web: your Gemini key's free tier refused web search"
+            post(url, mapOf("x-goog-api-key" to key), body(false))
+        }
         val cand = r.optJSONArray("candidates")?.optJSONObject(0)
             ?: throw AiError(r.optJSONObject("promptFeedback")?.optString("blockReason")?.let { "The question was refused ($it)" } ?: "No answer came back")
         val parts = cand.optJSONObject("content")?.optJSONArray("parts") ?: JSONArray()
@@ -217,7 +233,7 @@ object AiHelper {
                 if (u.startsWith("http")) sources += Source(w.optString("title").ifBlank { hostOf(u) }, u)
             }
         }
-        return parse(text.toString(), sources)
+        return parse(text.toString(), sources).copy(note = note)
     }
 
     private fun hostOf(u: String) = runCatching { java.net.URI(u).host?.removePrefix("www.") }.getOrNull() ?: u

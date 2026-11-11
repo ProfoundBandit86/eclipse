@@ -49,6 +49,17 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.PhotoCamera
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -396,6 +407,51 @@ internal fun WebView.smoothScrolling() {
     if (android.os.Build.VERSION.SDK_INT >= 26) setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false)
     overScrollMode = android.view.View.OVER_SCROLL_NEVER
     settings.setGeolocationEnabled(false)
+    keepFlings()
+}
+
+/**
+ * Quick swipes ("flings") that the page drops. On the bottom screen a fast swipe often did nothing while a slow drag
+ * worked: the browser saw too few touch points to treat it as a fling. The swipe's speed is measured here from every
+ * touch point (each carries its own time, so late-arriving ones still count), and when the page is standing still
+ * right after a fast swipe, it's flung by hand. Taps, pinches and the browser's own flings are left alone.
+ */
+@android.annotation.SuppressLint("ClickableViewAccessibility")
+private fun WebView.keepFlings() {
+    var tracker: android.view.VelocityTracker? = null
+    var multi = false
+    val cfg = android.view.ViewConfiguration.get(context)
+    val minFling = cfg.scaledMinimumFlingVelocity * 3f
+    val maxFling = cfg.scaledMaximumFlingVelocity.toFloat()
+    setOnTouchListener { v, e ->
+        val w = v as WebView
+        when (e.actionMasked) {
+            android.view.MotionEvent.ACTION_DOWN -> {
+                tracker?.recycle(); tracker = android.view.VelocityTracker.obtain().also { it.addMovement(e) }; multi = false
+            }
+            android.view.MotionEvent.ACTION_POINTER_DOWN -> multi = true
+            android.view.MotionEvent.ACTION_MOVE -> tracker?.addMovement(e)
+            android.view.MotionEvent.ACTION_UP -> {
+                val t = tracker
+                if (t != null && !multi) {
+                    t.addMovement(e)
+                    t.computeCurrentVelocity(1000, maxFling)
+                    val vy = t.yVelocity
+                    val vx = t.xVelocity
+                    if (kotlin.math.abs(vy) > minFling && kotlin.math.abs(vy) > kotlin.math.abs(vx)) {
+                        val y0 = w.scrollY
+                        // give the browser a moment to start its own fling; only if the page hasn't moved, fling it
+                        w.postDelayed({
+                            if (w.isAttachedToWindow && w.scrollY == y0) runCatching { w.flingScroll(0, (-vy).toInt()) }
+                        }, 60)
+                    }
+                }
+                tracker?.recycle(); tracker = null
+            }
+            android.view.MotionEvent.ACTION_CANCEL -> { tracker?.recycle(); tracker = null }
+        }
+        false   // the page still gets every touch
+    }
 }
 
 /** The in-Companion browser: ads blocked, and a Save button that keeps the page's guide text for the reader. */
@@ -1371,15 +1427,23 @@ private fun shrink(b: Bitmap): ByteArray {
     return out.toByteArray()
 }
 
+/** A button inside the question bar: an icon in a soft circle, lit with the accent while it's on. */
 @Composable
-private fun RoundButton(text: String, gold: Boolean = false, on: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
-    Box(
-        Modifier.size(42.dp).clip(CircleShape)
-            .background(if (gold) C.accent else if (on) C.accent.copy(alpha = 0.25f) else C.x(0x14FFFFFFL))
-            .border(1.dp, if (gold || on) C.accent else LINE, CircleShape)
-            .clickable(enabled = enabled, onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) { Text(text, color = if (gold) C.onAccent else INK, fontSize = 16.sp, modifier = Modifier.graphicsLayer { alpha = if (enabled) 1f else 0.4f }) }
+private fun BarIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, on: Boolean = false, pulse: Boolean = false, onClick: () -> Unit) {
+    val halo = if (pulse) {
+        val t = rememberInfiniteTransition(label = "listen")
+        t.animateFloat(0f, 1f, infiniteRepeatable(tween(1100), RepeatMode.Restart), label = "halo").value
+    } else 0f
+    Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+        // listening: a ring that keeps growing out of the button and fading
+        if (pulse) Box(Modifier.size(40.dp).graphicsLayer { val sc = 0.7f + 0.5f * halo; scaleX = sc; scaleY = sc; alpha = 1f - halo }
+            .clip(CircleShape).background(C.accent.copy(alpha = 0.45f)))
+        Box(
+            Modifier.size(36.dp).clip(CircleShape).background(if (on || pulse) C.accent.copy(alpha = 0.22f) else Color.Transparent)
+                .clickable(onClick = onClick),
+            contentAlignment = Alignment.Center
+        ) { Icon(icon, label, tint = if (on || pulse) C.accent else SUB, modifier = Modifier.size(21.dp)) }
+    }
 }
 
 @Composable
@@ -1459,7 +1523,7 @@ private fun AskTab(vm: EclipseVM, g: Game, root: File, open: (Guides.Site) -> Un
             }
             val reply = try {
                 val a = com.eclipse.launcher.data.AiHelper.ask(vm.aiProvider, vm.aiKey(), vm.aiModel(), system, turns)
-                CompanionData.Msg(System.currentTimeMillis(), false, a.full, hint = a.hint, sources = a.sources, checklist = a.checklist)
+                CompanionData.Msg(System.currentTimeMillis(), false, a.full, hint = a.hint, sources = a.sources, checklist = a.checklist, note = a.note)
             } catch (e: com.eclipse.launcher.data.AiHelper.AiError) {
                 CompanionData.Msg(System.currentTimeMillis(), false, e.message ?: "Something went wrong", error = true)
             } catch (e: Exception) {
@@ -1544,7 +1608,7 @@ private fun AskTab(vm: EclipseVM, g: Game, root: File, open: (Guides.Site) -> Un
                                 Text(t, color = INK, fontSize = 12.5.sp)
                             }
                         }
-                        Text("📷 sends a picture of the top screen with your question: try \"Where am I and where do I go next?\"",
+                        Text("The camera button sends a picture of the top screen with your question: try \"Where am I and where do I go next?\"",
                             color = SUB, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp, start = 2.dp))
                     }
                 }
@@ -1573,6 +1637,7 @@ private fun AskTab(vm: EclipseVM, g: Game, root: File, open: (Guides.Site) -> Un
                             .border(1.dp, if (m.error) Color(0x73FF8A7A) else LINE, RoundedCornerShape(14.dp, 14.dp, 14.dp, 4.dp)).padding(horizontal = 11.dp, vertical = 9.dp)) {
                             Text(if (m.error) "Couldn't answer" else if (hidden) "Hint · no spoilers" else vm.aiName(), color = if (m.error) Color(0xFFFF8A7A) else SUB,
                                 fontSize = 9.5.sp, letterSpacing = 1.4.sp, modifier = Modifier.padding(bottom = 4.dp))
+                            m.note?.let { n -> Text(n, color = Color(0xFFE6B450), fontSize = 10.5.sp, modifier = Modifier.padding(bottom = 5.dp)) }
                             if (hidden) {
                                 Row {
                                     Box(Modifier.width(3.dp).height(36.dp).background(C.accent))
@@ -1660,30 +1725,43 @@ private fun AskTab(vm: EclipseVM, g: Game, root: File, open: (Guides.Site) -> Un
                     verticalAlignment = Alignment.CenterVertically) {
                     Image(b.asImageBitmap(), null, Modifier.size(width = 64.dp, height = 36.dp).clip(RoundedCornerShape(6.dp)), contentScale = ContentScale.Crop)
                     Text("Top screen goes with your question", color = SUB, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 8.dp))
-                    Text("✕", color = INK, fontSize = 13.sp, modifier = Modifier.clickable { shot = null; shotPic = null }.padding(6.dp))
+                    Box(Modifier.size(28.dp).clip(CircleShape).clickable { shot = null; shotPic = null }, contentAlignment = Alignment.Center) {
+                        Icon(Icons.Rounded.Close, "Don't send the picture", tint = SUB, modifier = Modifier.size(16.dp))
+                    }
                 }
             }
-            // the bar: 📷, the question, 🎤, send
+            // the bar: one rounded field holding the camera, the question and the microphone, and a round send button
             Row(Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 10.dp, top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                RoundButton("📷", on = shot != null) { takeShot() }
-                Spacer(Modifier.width(6.dp))
-                Box(Modifier.weight(1f).heightIn(min = 42.dp).clip(RoundedCornerShape(21.dp)).background(Color(0x73000000)).border(1.dp, if (typing) C.accent else LINE, RoundedCornerShape(21.dp))
-                    .padding(horizontal = 14.dp, vertical = 10.dp), contentAlignment = Alignment.CenterStart) {
-                    BasicTextField(
-                        input, { input = it }, enabled = typing, maxLines = 3,
-                        textStyle = TextStyle(color = INK, fontSize = 14.sp), cursorBrush = SolidColor(C.accent),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                        keyboardActions = KeyboardActions(onSend = { send(input) }),
-                        modifier = Modifier.fillMaxWidth().focusRequester(fr)
-                    )
-                    if (input.isEmpty()) Text(if (listening) "Listening…" else "Ask about ${Guides.cleanTitle(g.name)}…", color = SUB, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    // a tap starts typing (the window can't take the keyboard until then)
-                    if (!typing) Box(Modifier.matchParentSize().clickable { typing = true })
+                val field = RoundedCornerShape(24.dp)
+                Row(
+                    Modifier.weight(1f).heightIn(min = 48.dp).clip(field).background(Color(0x66000000))
+                        .border(1.dp, if (typing || listening) C.accent.copy(alpha = 0.7f) else LINE, field).padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    BarIcon(Icons.Rounded.PhotoCamera, "Send the top screen with the question", on = shot != null) { takeShot() }
+                    Box(Modifier.weight(1f).padding(horizontal = 6.dp, vertical = 12.dp), contentAlignment = Alignment.CenterStart) {
+                        BasicTextField(
+                            input, { input = it }, enabled = typing, maxLines = 3,
+                            textStyle = TextStyle(color = INK, fontSize = 14.sp), cursorBrush = SolidColor(C.accent),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                            keyboardActions = KeyboardActions(onSend = { send(input) }),
+                            modifier = Modifier.fillMaxWidth().focusRequester(fr)
+                        )
+                        if (input.isEmpty()) Text(if (listening) "Listening…" else "Ask about ${Guides.cleanTitle(g.name)}…",
+                            color = if (listening) C.accent else SUB, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        // a tap starts typing (the window can't take the keyboard until then)
+                        if (!typing) Box(Modifier.matchParentSize().clickable { typing = true })
+                    }
+                    BarIcon(Icons.Rounded.Mic, if (listening) "Stop listening" else "Speak the question", pulse = listening) { listen() }
                 }
-                Spacer(Modifier.width(6.dp))
-                RoundButton(if (listening) "■" else "🎤", on = listening) { listen() }
-                Spacer(Modifier.width(6.dp))
-                RoundButton("➤", gold = true, enabled = !busy && (input.isNotBlank() || shot != null)) { send(input) }
+                Spacer(Modifier.width(8.dp))
+                val canSend = !busy && (input.isNotBlank() || shot != null)
+                Box(
+                    Modifier.size(48.dp).clip(CircleShape).background(if (canSend) C.accent else C.x(0x14FFFFFFL))
+                        .border(1.dp, if (canSend) C.accent else LINE, CircleShape)
+                        .clickable(enabled = canSend) { send(input) },
+                    contentAlignment = Alignment.Center
+                ) { Icon(Icons.Rounded.ArrowUpward, "Ask", tint = if (canSend) C.onAccent else SUB, modifier = Modifier.size(24.dp)) }
             }
         }
         if (confirmClear) HubSheet("Start a new chat?", "This conversation and its pictures are deleted.", onDismiss = { confirmClear = false }) {
