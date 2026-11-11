@@ -430,12 +430,17 @@ fun GameMenu(vm: EclipseVM, g: Game) = Glass {
                         if (fmt != null) fOpts += {
                             val j = vm.chdJobFor(g)
                             val saved = vm.chdSavedFor[g.id]
-                            val label = if (fmt == "ZIP") "Compress to ZIP" else "Convert to $fmt"
+                            val label = when (fmt) {
+                                "ZIP", "ZAR" -> "Compress to $fmt"
+                                "Z3DS" -> "Compress for Azahar"
+                                "XISO" -> "Make XISO"
+                                else -> "Convert to $fmt"
+                            }
                             when {
                                 j != null -> OptRow(label, "${j.phase} ${(j.progress * 100).toInt()}%") { }
                                 saved != null -> OptRow(label, "Saved ${vm.fmtBytes(saved)}") { }
                                 vm.canConvertToChd(g) -> OptRow(label, "\u203A") { vm.convertGameToChd(g) }
-                                else -> OptRow(label, if (fmt == "ZIP") "Already compressed" else "Not a disc game", muted = true) { }
+                                else -> OptRow(label, when (fmt) { "Z3DS" -> "Already compressed, or not a .cci / .cxi / .3dsx / .cia"; "ZIP", "ZAR", "XISO" -> "Already compressed"; else -> "Not a disc game" }, muted = true) { }
                             }
                         }
                         run { val f = first(); fOpts += { OptRow("Rescrape", "\u203A", fr = f) { vm.rescrapeGame(g) } } }

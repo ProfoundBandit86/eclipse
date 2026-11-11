@@ -19,6 +19,8 @@ With it, from Dolphin's Externals:
   - Zstandard: Copyright (c) Meta Platforms, Inc. and affiliates. BSD licence (externals/zstd/LICENSE).
   - {fmt}: Copyright (c) 2012 - present, Victor Zverovich. MIT licence (externals/fmt/LICENSE).
   - liblzma (XZ Utils): public domain / 0BSD (externals/liblzma/COPYING).
+  - ZArchive (Xbox 360 .zar files): Copyright 2022 Exzap. MIT No Attribution (externals/zarchive/LICENSE).
+  - Zstandard's seekable format (Azahar's Z3DS files), part of Zstandard: BSD licence.
   - Mbed TLS (AES, SHA-1, MD5 only): Copyright The Mbed TLS Contributors. Apache License 2.0
     (externals/mbedtls/LICENSE).
 

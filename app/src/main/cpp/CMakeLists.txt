@@ -17,9 +17,10 @@ set(EXT ${CMAKE_CURRENT_SOURCE_DIR}/externals)
 set(DOL ${CMAKE_CURRENT_SOURCE_DIR}/dolphin)
 
 # ---- zstd ----
-file(GLOB ZSTD_SRC ${EXT}/zstd/common/*.c ${EXT}/zstd/compress/*.c ${EXT}/zstd/decompress/*.c)
+# (plus zstd's seekable format, for Azahar's Z3DS files)
+file(GLOB ZSTD_SRC ${EXT}/zstd/common/*.c ${EXT}/zstd/compress/*.c ${EXT}/zstd/decompress/*.c ${EXT}/zstd/contrib/seekable_format/*.c)
 add_library(ezstd STATIC ${ZSTD_SRC})
-target_include_directories(ezstd PUBLIC ${EXT}/zstd)
+target_include_directories(ezstd PUBLIC ${EXT}/zstd ${EXT}/zstd/contrib/seekable_format PRIVATE ${EXT}/zstd/common)
 # no hand-written x86 assembly (it isn't used on ARM either)
 target_compile_definitions(ezstd PRIVATE ZSTD_DISABLE_ASM)
 
@@ -39,6 +40,12 @@ add_library(embedtls STATIC
   ${EXT}/mbedtls/library/aes.c ${EXT}/mbedtls/library/aesni.c ${EXT}/mbedtls/library/sha1.c
   ${EXT}/mbedtls/library/md5.c ${EXT}/mbedtls/library/platform_util.c)
 target_include_directories(embedtls PUBLIC ${EXT}/mbedtls/include PRIVATE ${EXT}/mbedtls/library)
+
+# ---- ZArchive (.zar, Exzap's format: Xbox 360 discs for Xenia-based emulators). MIT-0. ----
+add_library(ezarchive STATIC ${EXT}/zarchive/src/zarchivewriter.cpp ${EXT}/zarchive/src/zarchivereader.cpp ${EXT}/zarchive/src/sha_256.c)
+target_include_directories(ezarchive PUBLIC ${EXT}/zarchive/include PRIVATE ${EXT}/zarchive/src)
+target_compile_features(ezarchive PRIVATE cxx_std_20)
+target_link_libraries(ezarchive PRIVATE ezstd)
 
 # ---- Dolphin DiscIO ----
 set(DOLPHIN_SRC
@@ -88,7 +95,7 @@ target_compile_options(eclipse_rvz PRIVATE -w -fvisibility=hidden)
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
   target_compile_options(eclipse_rvz PRIVATE -march=armv8-a+crc)
 endif()
-target_link_libraries(eclipse_rvz PRIVATE ezstd elzma embedtls z)
+target_link_libraries(eclipse_rvz PRIVATE ezarchive ezstd elzma embedtls z)
 if(ANDROID)
   find_library(log-lib log)
   target_link_libraries(eclipse_rvz PRIVATE ${log-lib})

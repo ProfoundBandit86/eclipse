@@ -852,8 +852,37 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         val rvz: Boolean = false, val psp: Boolean = false,
         /** a cartridge ROM, compressed into a .zip (data/RomZip.kt) */
         val zip: Boolean = false,
+        /** an original Xbox disc, rebuilt as an XISO (data/XIso.kt): what xemu plays, often gigabytes smaller */
+        val xiso: Boolean = false,
+        /** a 3DS file compressed for Azahar (.zcci .zcxi .z3dsx .zcia; data/Archives.kt) */
+        val z3ds: com.eclipse.launcher.data.Archives.Z3ds? = null,
+        /** an Xbox 360 disc packed as a ZArchive (.zar), for Xenia-based emulators (data/Archives.kt) */
+        val zar: Boolean = false,
     ) {
-        val ext: String get() = if (zip) "zip" else if (rvz) "rvz" else "chd"
+        val ext: String get() = z3ds?.ext ?: if (zar) "zar" else if (xiso) "xiso.iso" else if (zip) "zip" else if (rvz) "rvz" else "chd"
+        /** what it becomes, as people know it */
+        val format: String get() = if (xiso) "XISO" else ext.uppercase()
+    }
+
+    /** A game's own file as something to compress: a cartridge ROM → ZIP, a 3DS file → Z3DS (Azahar). Null otherwise. */
+    private fun romItem(g: Game): ChdItem? {
+        zipItem(g)?.let { return it }
+        if (g.platform != "3ds") return null
+        val f = java.io.File(g.path)
+        val kind = com.eclipse.launcher.data.Archives.z3dsKind(f) ?: return null
+        if (java.io.File(f.parentFile, f.nameWithoutExtension + "." + kind.ext).exists()) return null
+        return ChdItem(f, listOf(f), f.length(), false, z3ds = kind)
+    }
+
+    /**
+     * An Xbox disc image worth rebuilding as an XISO: a Redump image (video partition and padding) or an XISO that
+     * still carries padding. Null when it isn't one, or the rebuild would save less than 64 MB.
+     */
+    private fun xisoItem(f: java.io.File, done: Boolean): ChdItem? {
+        if (!f.extension.equals("iso", true)) return null
+        val newSize = runCatching { com.eclipse.launcher.data.XIso.rebuiltSize(f) }.getOrNull() ?: return null
+        if (f.length() - newSize < 64L * 1024 * 1024) return null
+        return ChdItem(f, listOf(f), f.length(), done, xiso = true)
     }
 
     /** [g]'s ROM as something to zip, or null (not a zip system, compressed already, zipped beside it …). */
@@ -906,6 +935,15 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         val parts = if (f.extension.equals("cue", true)) com.eclipse.launcher.data.Chd.cueFiles(f) else listOf(f)
         val bytes = parts.sumOf { it.length() }
         val sys = discSystem(f, platformId)
+        // original Xbox: no CHD for it (xemu can't read it), but a Redump image can become a much smaller XISO
+        if (sys?.id == "xbox" || sys == null) xisoItem(f, done)?.let { return it }
+        if (sys?.id == "xbox") return null
+        // Xbox 360: a ZArchive (.zar), which Xenia Canary and X360 Mobile read
+        if (sys?.id == "xbox360" || sys == null) {
+            if (f.extension.equals("iso", true) && runCatching { com.eclipse.launcher.data.Archives.zarSource(f) }.getOrDefault(false))
+                return ChdItem(f, listOf(f), f.length(), done, zar = true)
+            if (sys?.id == "xbox360") return null
+        }
         val nintendo = !f.extension.equals("cue", true) && com.eclipse.launcher.data.Rvz.isNintendoDisc(f)
         return when {
             sys == null -> when {
@@ -925,7 +963,9 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         java.io.File(disc.parentFile, disc.nameWithoutExtension + if (com.eclipse.launcher.data.Rvz.isNintendoDisc(disc)) ".rvz" else ".chd")
     /** A .chd or .rvz of this disc is already there. */
     private fun alreadyConverted(disc: java.io.File): Boolean =
-        java.io.File(disc.parentFile, disc.nameWithoutExtension + ".chd").exists() || java.io.File(disc.parentFile, disc.nameWithoutExtension + ".rvz").exists()
+        java.io.File(disc.parentFile, disc.nameWithoutExtension + ".chd").exists() || java.io.File(disc.parentFile, disc.nameWithoutExtension + ".rvz").exists() ||
+            java.io.File(disc.parentFile, disc.nameWithoutExtension + ".xiso.iso").exists() ||
+            java.io.File(disc.parentFile, disc.nameWithoutExtension + ".zar").exists()
     /** Disc images the converter takes: .cue sheets, .iso (and .gcm, GameCube's own). */
     private fun isConvertible(f: java.io.File) = f.extension.lowercase().let { it == "cue" || it == "iso" || it == "gcm" }
     /** null = not scanned yet */
@@ -935,9 +975,9 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     var chdDelete by mutableStateOf(store.str("chd_delete") == "1")
     fun chooseChdDelete(on: Boolean) { chdDelete = on; store.putStr("chd_delete", if (on) "1" else "") }
     /** while converting: what's happening now */
-    data class ChdJob(val index: Int, val total: Int, val name: String, val phase: String, val progress: Float, val rvz: Boolean = false, val zip: Boolean = false) {
-        /** what it's turning into: "CHD", "RVZ" or "ZIP" */
-        val format: String get() = if (zip) "ZIP" else if (rvz) "RVZ" else "CHD"
+    data class ChdJob(val index: Int, val total: Int, val name: String, val phase: String, val progress: Float, val rvz: Boolean = false, val zip: Boolean = false, val xiso: Boolean = false, val other: String? = null) {
+        /** what it's turning into: "CHD", "RVZ", "ZIP", "XISO", or [other] ("ZCCI", "ZAR" …) */
+        val format: String get() = other ?: if (xiso) "XISO" else if (zip) "ZIP" else if (rvz) "RVZ" else "CHD"
     }
     var chdJob by mutableStateOf<ChdJob?>(null)
     /** one line per disc when a run finishes */
@@ -1041,7 +1081,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
                         discItem(f, alreadyConverted(f))?.let { list.add(it) }
                     }
                 // cartridge ROMs that can be zipped (from the library: the system is known there)
-                games.forEach { g -> zipItem(g)?.takeIf { seen.add(it.src.absolutePath) }?.let { list.add(it) } }
+                games.forEach { g -> romItem(g)?.takeIf { seen.add(it.src.absolutePath) }?.let { list.add(it) } }
                 list.sortedWith(compareBy({ it.done }, { it.src.name.lowercase() }))
             }
             chdItems = found
@@ -1086,15 +1126,22 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
                     val ext = item.ext
                     val out = java.io.File(item.src.parentFile, "$name.$ext")
                     val part = java.io.File(item.src.parentFile, "$name.$ext.part")
-                    chdJob = ChdJob(i, items.size, name, if (item.zip) "Compressing" else "Converting", 0f, rvz, item.zip)
+                    chdJob = ChdJob(i, items.size, name, if (item.zip || item.z3ds != null || item.zar) "Compressing" else if (item.xiso) "Rebuilding" else "Converting", 0f, rvz, item.zip, item.xiso,
+                        if (item.z3ds != null || item.zar) item.format else null)
                     val result = withContext(Dispatchers.IO) {
                         try {
-                            if (item.zip) com.eclipse.launcher.data.RomZip.zip(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
+                            if (item.z3ds != null) com.eclipse.launcher.data.Archives.compress3ds(item.src, part, item.z3ds, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
+                            else if (item.zar) com.eclipse.launcher.data.Archives.makeZar(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
+                            else if (item.xiso) com.eclipse.launcher.data.XIso.rebuild(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
+                            else if (item.zip) com.eclipse.launcher.data.RomZip.zip(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
                             else if (rvz) com.eclipse.launcher.data.Rvz.convert(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
                             else com.eclipse.launcher.data.Chd.convert(item.src, part, threads, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel }, psp = item.psp)
                             chdJob = chdJob?.copy(phase = "Checking", progress = 0f)
                             // RVZ: read it all back through Dolphin and compare with the original, byte for byte
-                            val good = if (item.zip) com.eclipse.launcher.data.RomZip.same(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
+                            val good = if (item.z3ds != null) com.eclipse.launcher.data.Archives.same3ds(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
+                                else if (item.zar) com.eclipse.launcher.data.Archives.sameZar(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
+                                else if (item.xiso) com.eclipse.launcher.data.XIso.same(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
+                                else if (item.zip) com.eclipse.launcher.data.RomZip.same(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
                                 else if (rvz) com.eclipse.launcher.data.Rvz.same(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
                                 else com.eclipse.launcher.data.Chd.verify(part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
                             if (!good) {
@@ -1104,7 +1151,11 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
                                 out.delete()
                                 if (!part.renameTo(out)) throw java.io.IOException("couldn't rename the finished file")
                                 saved += item.bytes - out.length()
-                                if (del) { item.parts.forEach { it.delete() }; keepId(item.src, out) }
+                                if (del) {
+                                    item.parts.forEach { it.delete() }
+                                    // an XISO takes the original's place and name (still an .iso): the game keeps its path
+                                    if (item.xiso && !out.renameTo(item.src)) keepId(item.src, out) else if (!item.xiso) keepId(item.src, out)
+                                }
                                 "\u2713 $name: ${fmtBytes(item.bytes)} \u2192 ${fmtBytes(out.length())}" + if (del) ", originals deleted" else ""
                             }
                         } catch (e: InterruptedException) { part.delete(); null
@@ -1129,7 +1180,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
                     val g = games.firstOrNull { it.path == first.absolutePath || it.path == convertedOf(first).absolutePath ||
                         it.path == java.io.File(first.parentFile, first.nameWithoutExtension + "." + items.first().ext).absolutePath }
                     val pic = g?.let { artOf(it, ArtKind.BOX) }
-                    if (ok > 0) showNotice(Notice(if (items.all { it.zip }) "Compressed to ZIP" else if (items.all { it.rvz }) "Converted to RVZ" else if (items.all { !it.rvz && !it.zip }) "Converted to CHD" else "Converted", if (ok == 1) (g?.name ?: first.nameWithoutExtension) else "$ok discs",
+                    if (ok > 0) showNotice(Notice(if (items.all { it.xiso }) "Made XISO" else if (items.all { it.zar }) "Compressed to ZAR" else if (items.all { it.z3ds != null }) "Compressed for Azahar" else if (items.all { it.zip }) "Compressed to ZIP" else if (items.all { it.rvz }) "Converted to RVZ" else if (items.all { !it.rvz && !it.zip }) "Converted to CHD" else "Converted", if (ok == 1) (g?.name ?: first.nameWithoutExtension) else "$ok discs",
                         if (saved > 0) "Saved ${fmtBytes(saved)}" else null, pic, "chd"))
                     else if (log.any { it.startsWith("\u2717") }) showNotice(Notice("Couldn't convert", g?.name ?: first.nameWithoutExtension, "The originals were kept", pic, "error"))
                 }
@@ -1150,7 +1201,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     /** A game's page: can this one game be turned into a CHD? (an .iso or .cue with no .chd beside it yet) */
     fun canConvertToChd(g: Game): Boolean {
         if (g.platform == "android" || g.id.startsWith("rm:")) return false
-        return zipItem(g) != null || chdDiscsOf(g).isNotEmpty()
+        return romItem(g) != null || chdDiscsOf(g).isNotEmpty()
     }
 
     /**
@@ -1184,6 +1235,9 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     /** What a game's discs are converted to, by its system: "RVZ" for GameCube / Wii (Dolphin's format), else "CHD". */
     fun convertFormat(g: Game): String? {
         // a cartridge ROM of a zip system (a PC Engine CD's .cue in the same system still goes to CHD)
+        if (g.platform == "xbox") return "XISO"
+        if (g.platform == "xbox360") return "ZAR"
+        if (g.platform == "3ds") return "Z3DS"
         if (g.platform in com.eclipse.launcher.data.RomZip.SYSTEMS && java.io.File(g.path).extension.lowercase() !in setOf("cue", "iso", "gcm", "chd", "rvz", "m3u", "gdi", "ccd", "pbp", "cso"))
             return "ZIP"
         val exts = com.eclipse.launcher.data.Platforms.byId(g.platform)?.exts ?: return null
@@ -1193,8 +1247,8 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     /** A game's page → Convert to CHD: just this disc (originals deleted only if Settings → Tools says so). */
     fun convertGameToChd(g: Game) {
         if (chdJob != null) { message = "Already converting a disc: wait for it to finish (Settings \u2192 Tools)"; return }
-        zipItem(g)?.let { z ->
-            message = "Compressing ${g.name} to ZIP\u2026"
+        romItem(g)?.let { z ->
+            message = "Compressing ${g.name} to ${z.format}\u2026"
             runChd(listOf(z), chdDelete, auto = true) { saved, ok -> if (ok > 0) chdSavedFor[g.id] = saved }
             return
         }
@@ -3256,7 +3310,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     private fun readyNotice(rom: RomM.Rom, name: String, converted: Boolean, savedBytes: Long, file: File) {
         val set = rommDiscs[rom.id]
         // GameCube / Wii discs become RVZ, the rest CHD
-        val fmt = if (file.extension.equals("rvz", true) || (converted && com.eclipse.launcher.data.Rvz.isNintendoDisc(file))) "RVZ" else "CHD"
+        val fmt = if (rom.bp == "xbox") "XISO" else if (file.extension.equals("rvz", true) || (converted && com.eclipse.launcher.data.Rvz.isNintendoDisc(file))) "RVZ" else "CHD"
         val kind = if (set != null && set.size > 1) "Disc ${set.indexOfFirst { it.id == rom.id } + 1} of ${set.size} ready" else "Ready to play"
         val detail = "Downloaded from RomM" + when {
             converted && savedBytes > 0 -> " \u00b7 $fmt, saved ${fmtBytes(savedBytes)}"
@@ -3281,10 +3335,11 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         val item = discItem(file, false, rom.bp) ?: return false
         viewModelScope.launch {
             while (chdJob != null) delay(1000)
-            val rvz = item.rvz
-            message = "Converting ${rom.name} to ${if (rvz) "RVZ" else "CHD"}\u2026"
-            runChd(listOf(item), chdDelete, auto = true, romm = true) { saved, ok ->
-                val done = File(file.parentFile, file.nameWithoutExtension + if (rvz) ".rvz" else ".chd")
+            message = "Converting ${rom.name} to ${item.format}\u2026"
+            val del = chdDelete
+            runChd(listOf(item), del, auto = true, romm = true) { saved, ok ->
+                // (an XISO replaces the original under its own name when originals are deleted)
+                val done = if (item.xiso && del) file else File(file.parentFile, file.nameWithoutExtension + "." + item.ext)
                 rommInstalled(rom, if (ok > 0 && done.isFile) done else file, playNow, converted = true, savedBytes = if (ok > 0) saved else -1L)
             }
         }

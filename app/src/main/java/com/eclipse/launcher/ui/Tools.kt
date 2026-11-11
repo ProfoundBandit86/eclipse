@@ -207,7 +207,7 @@ private fun RowScope.ChdTab(
                             val g = byPath[ci.src.absolutePath]
                             val running = job != null && job.name == ci.src.nameWithoutExtension
                             val kind = (if (ci.src.extension.equals("cue", true)) "BIN / CUE · ${ci.parts.size} FILES" else ci.src.extension.uppercase()) +
-                                " → " + ci.ext.uppercase()
+                                " → " + ci.format
                             ToolRow(
                                 ci.src.absolutePath in vm.chdPicked, g?.name ?: ci.src.nameWithoutExtension, kind,
                                 g?.let { gg -> vm.artOf(gg, ArtKind.BOX) }, "chd:${ci.src.absolutePath}", if (idx == 0) first else null,
@@ -245,7 +245,7 @@ private fun RowScope.ChdTab(
                 if (picked.isEmpty()) "Nothing ticked" else "Compress ${picked.size} game${if (picked.size == 1) "" else "s"}",
                 Modifier.fillMaxWidth(), primary = true
             ) { vm.startChd() }
-            SideNote(vm.chdLog.lastOrNull() ?: "One at a time, each checked before the originals go. Discs become CHD (GameCube / Wii: RVZ), cartridge ROMs ZIP. Games keep their artwork and play time. Playlists are pointed at the new files.")
+            SideNote(vm.chdLog.lastOrNull() ?: "One at a time, each checked before the originals go. Discs become CHD (GameCube / Wii: RVZ; Xbox: XISO; Xbox 360: ZAR), cartridge ROMs ZIP, 3DS files Azahar's Z3DS. Games keep their artwork and play time. Playlists are pointed at the new files.")
         }
     }
 }

@@ -954,7 +954,7 @@ private fun ToolsTab(vm: EclipseVM) {
                 vm.chdJob != null -> "Converting ${vm.chdJob!!.index + 1} of ${vm.chdJob!!.total}\u2026"
                 chd == null -> "Looking for games to compress\u2026"
                 chd == 0 -> "Everything is already compressed."
-                else -> "$chd game${if (chd == 1) "" else "s"} not compressed yet. Smaller files, same games: discs to CHD (GameCube / Wii to RVZ), cartridges to ZIP."
+                else -> "$chd game${if (chd == 1) "" else "s"} not compressed yet. Smaller files, same games: discs to CHD (GameCube / Wii to RVZ, Xbox to XISO, Xbox 360 to ZAR), cartridges to ZIP, 3DS to Z3DS for Azahar."
             }
         ) { open(0) }
         DropSection("Multi-disc games")
@@ -2474,6 +2474,7 @@ private fun Credits(vm: EclipseVM) {
     CreditHeader("Open-source libraries")
     CreditRow(vm, "Dolphin (disc code: RVZ converter)", "Dolphin Emulator Project \u00b7 GPL-2.0-or-later", "https://github.com/dolphin-emu/dolphin")
     CreditRow(vm, "Zstandard, liblzma, {fmt}, Mbed TLS", "Used by Dolphin's converter \u00b7 BSD, public domain, MIT, Apache 2.0", "https://github.com/dolphin-emu/dolphin/tree/master/Externals")
+    CreditRow(vm, "ZArchive (Xbox 360 .zar files)", "Exzap \u00b7 MIT No Attribution", "https://github.com/Exzap/ZArchive")
     CreditRow(vm, "jcifs-ng (network shares)", "AgNO3 & contributors \u00b7 LGPL 2.1", "https://github.com/AgNO3/jcifs-ng")
     CreditRow(vm, "Jetpack Compose, AndroidX & Material icons", "Google \u00b7 Apache License 2.0", "https://developer.android.com/jetpack/androidx")
     CreditRow(vm, "Kotlin & kotlinx.coroutines", "JetBrains \u00b7 Apache License 2.0", "https://github.com/Kotlin/kotlinx.coroutines")

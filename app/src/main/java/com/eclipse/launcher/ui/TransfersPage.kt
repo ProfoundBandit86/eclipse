@@ -115,7 +115,7 @@ fun TransfersPage(vm: EclipseVM) {
         chd?.let { j ->
             val p = j.progress
             TxCard(
-                Color(0xFF5B5BD6), Icons.Filled.Album, if (j.zip) "COMPRESS TO ZIP" else "CONVERT TO ${j.format}",
+                Color(0xFF5B5BD6), Icons.Filled.Album, if (j.zip || j.other != null) "COMPRESS TO ${j.format}" else if (j.xiso) "MAKE XISO" else "CONVERT TO ${j.format}",
                 if (j.total > 1) "${j.index} of ${j.total}" else "",
                 j.name, j.phase.replaceFirstChar { it.uppercase() },
                 p.takeIf { it >= 0f }, etaText(rememberEta("chd:${j.index}:${j.name}", p)),
