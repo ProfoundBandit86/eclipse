@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.1.0" src="https://img.shields.io/badge/version-0.1.0-D4AF37">
+  <img alt="Version 0.1.21" src="https://img.shields.io/badge/version-0.1.21-D4AF37">
   <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin and Jetpack Compose" src="https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF?logo=kotlin&logoColor=white">
   <img alt="Dual screen" src="https://img.shields.io/badge/dual%20screen-AYN%20Thor-1F1F1F">
@@ -36,8 +36,8 @@ sorts them by system, so even a large library stays easy to browse and easy to l
 
 - **Simple where it should be.** One press to play. Every screen works with the D-pad and buttons as well as touch, and
   nothing has to be configured before your games appear.
-- **Powerful when you want it.** Per-game emulators, artwork from several sources, file tools, a RomM server,
-  RetroAchievements, themes and custom views.
+- **Powerful when you want it.** Per-game emulators, artwork from several sources, file tools that shrink your games,
+  a RomM server, RetroAchievements, a game Companion with guides, maps and an AI helper, themes and custom views.
 - **Native and fast.** Written in Kotlin with Jetpack Compose, built first for the dual-screen **AYN Thor** and at home
   on any Android handheld or TV box.
 
@@ -50,7 +50,9 @@ sorts them by system, so even a large library stays easy to browse and easy to l
   - [Your library, in one place](#your-library-in-one-place)
   - [Your RomM library, one press away](#your-romm-library-one-press-away)
   - [Two screens, both put to work](#two-screens-both-put-to-work)
+  - [The Companion: help for the game you're playing](#the-companion-help-for-the-game-youre-playing)
   - [Every game, looked after](#every-game-looked-after)
+  - [Smaller files, same games](#smaller-files-same-games)
   - [Show it the way you like](#show-it-the-way-you-like)
 - [Supported systems](#supported-systems)
 - [Requirements](#requirements)
@@ -81,8 +83,12 @@ sorts them by system, so even a large library stays easy to browse and easy to l
   `n64` …) are recognised, across more than 100 systems.
 - **Organized your way.** Sort by name, year or last played; favourites and hidden games; one search across everything,
   by voice too; a letter bar for long lists; systems pinned to the dock.
-- **Keeps your files tidy.** Settings → Tools converts disc images to CHD, builds `.m3u` playlists for multi-disc games,
-  and shrinks artwork losslessly to WebP.
+- **Your own system order.** Hold a system and drag it: the others slide out of its way as it moves, like icons on a
+  phone's home screen. The D-pad works too.
+- **PlayStation Vita without the fuss.** Games installed in Vita3K are found and added with their real names; Eclipse
+  makes the `.psvita` shortcuts itself.
+- **Keeps your files tidy.** Settings → Tools compresses your games (see [Smaller files, same games](#smaller-files-same-games)),
+  builds `.m3u` playlists for multi-disc games, and shrinks artwork losslessly to WebP.
 
 ### Your RomM library, one press away
 
@@ -101,7 +107,7 @@ a system between **All**, **Local** and **RomM**.
 | **Saves follow you** | Save files are kept in sync with RomM. |
 | **Send games back** | Upload games RomM doesn't have yet; Eclipse asks it to scan afterwards. |
 | **Multi-disc games** | Arrive as one game with a playlist, not a pile of discs. |
-| **See every transfer** | Downloads, uploads and CHD conversions show their progress on the cover, in the options panel and on the second screen. |
+| **See every transfer** | Downloads, uploads and conversions show their progress on the cover, in the options panel and on the second screen. |
 
 ### Two screens, both put to work
 
@@ -121,14 +127,63 @@ On dual-screen handhelds such as the AYN Thor, the bottom screen isn't left dark
 </table>
 
 - **Quick screenshots**: one tap on the bottom screen captures the game on top.
-- **Companion**: everything for the game you're playing, on the bottom screen while the game keeps running on top.
-  Guide sites for the game (with the series' own site first: Zelda Dungeon, Omega Metroid, Bulbapedia, Chunkbase),
-  guides saved to the device and read in a clean, ad-free reader that remembers your place, and the instruction manual
-  (from VideoGameManual.com or the Internet Archive, or a PDF you already have). Hold the button to open any page you like, saved per game.
+- **Companion**: guides, the manual, maps, a checklist, achievements and an AI helper for the game you're playing,
+  on the bottom screen while the game keeps running on top. See [the Companion](#the-companion-help-for-the-game-youre-playing).
 - **Back where you left off**: return to a running game from the app switcher or Android's Recents, and Now Playing
   comes back with it.
 - **Between games**, the bottom screen shows the highlighted game's cover, details and art, with a dock you can drag and
   restyle.
+
+### The Companion: help for the game you're playing
+
+Tap **Companion** on the bottom screen while you play, or on any game's page. Everything is touch-friendly and kept per
+game, on the device.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/companion-guides.jpg" alt="The Companion's Guides tab: continue reading, guides found for the game, the series' own wiki"></td>
+    <td width="50%"><img src="docs/images/companion-ask.jpg" alt="The Ask tab: a question about the game, a spoiler-free hint with a button for the full answer, and its sources"></td>
+  </tr>
+  <tr>
+    <td><b>Guides</b>: guide sites opened on the game's own page, the series' own site first. Save any guide to read
+    it offline in an ad-free reader that remembers your place.</td>
+    <td><b>Ask</b>: questions about the game, answered by Claude or Gemini after searching the web, with the sources
+    listed. A hint comes first, so nothing is spoiled unless you ask.</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/images/companion-maps.jpg" alt="The Maps tab: a game map with markers dropped on it"></td>
+    <td width="50%"><img src="docs/images/companion-checklist.jpg" alt="The Checklist and Trophies tabs: collectibles ticked off, a missable one marked, achievements still locked"></td>
+  </tr>
+  <tr>
+    <td><b>Maps</b>: keep a map from any web page or a screenshot of the game's own map screen, then pinch, drag and
+    drop labelled markers.</td>
+    <td><b>Checklist & Trophies</b>: your own list for the game (or one made from a guide or by the AI helper),
+    missables marked, and your RetroAchievements with the missable ones first.</td>
+  </tr>
+</table>
+<p align="center"><sub>Design mock-ups of the Companion; the app follows them closely.</sub></p>
+
+| Tab | What it does |
+| --- | --- |
+| **Guides** | GameFAQs, StrategyWiki and the series' own site (Zelda Dungeon, Omega Metroid, Bulbapedia, Chunkbase). Save a guide to the device and read it in a clean reader: contents, find, bookmarks, text size, theme / dark / sepia. |
+| **Manual** | The instruction manual from VideoGameManual.com, the Internet Archive, ScreenScraper, or a PDF you already have. Pinch to zoom, swipe to turn pages. |
+| **Maps** | Maps saved from web pages (VGMaps for classic systems), or screenshots of the top screen. Markers with labels are kept. |
+| **Checklist** | Tap to tick; hold to mark missable or delete; import a saved guide's sections as items. |
+| **Trophies** | Your RetroAchievements for the game: locked, missable or all. |
+| **Ask** | Claude or Gemini, with your own key. Type or speak a question, or send a picture of the top screen ("where am I, where do I go next?"). It knows which game you're playing and, if you like, where you are in your saved guide, your checklist and your achievements. Lists in an answer can go straight into your checklist. |
+
+<details>
+<summary><b>Setting up the AI helper</b></summary>
+
+Settings → Connections → **AI helper**: pick Claude or Gemini and paste your key.
+
+- **Gemini**: a key from [Google AI Studio](https://aistudio.google.com) (it has a free tier).
+- **Claude**: a key from the [Claude Console](https://console.anthropic.com) (paid by use).
+
+Keys stay encrypted on your device and are only sent to the service you pick. **No spoilers** and **Use what's in the
+Companion** can be switched off there, and **Model** lets you choose a different model. Answers come from the web and
+can be wrong, which is why each one lists where it came from.
+</details>
 
 ### Every game, looked after
 
@@ -141,15 +196,36 @@ On dual-screen handhelds such as the AYN Thor, the bottom screen isn't left dark
   <tr>
     <td><b>Overview</b>: play, favourite, the description, last played, play time and size.</td>
     <td><b>Artwork</b>: box art, poster, backdrop, logo, disc / cartridge and 3D box, each one changeable.</td>
-    <td><b>Options</b>: emulator, start screen, RomM, CHD, rescrape or match by hand.</td>
+    <td><b>Options</b>: emulator, start screen, RomM, compress, rescrape or match by hand.</td>
   </tr>
 </table>
 
-- **Artwork and details** from free sources out of the box (libretro thumbnails, ArcadeDB, GameTDB), plus LaunchBox,
-  SteamGridDB and IGDB. Choose a different picture at any time, or upload your own.
+- **Artwork and details** from free sources out of the box (libretro thumbnails, ArcadeDB, GameTDB), plus ScreenScraper,
+  LaunchBox, SteamGridDB and IGDB. Choose a different picture at any time, or upload your own.
+- **A Companion button** on every game's page opens its guides, manual, maps and AI helper.
 - **Missing art, filled in.** Optionally, Eclipse builds discs, cartridges and 3D boxes from a game's cover, in the style
   of the rest of that system.
 - **Per-game settings**: a different emulator or screen for a single game, without touching the rest of its system.
+
+### Smaller files, same games
+
+Settings → Tools → **Compress** (or a single game's page) turns your games into the smaller format each system's
+emulators read. Every file is read back and compared with the original before anything is deleted, and games keep
+their artwork, play time and favourites.
+
+| Games | Become | Played by |
+| --- | --- | --- |
+| Disc images (`.cue` / `.bin`, `.iso`) of PlayStation, PS2, PSP, Saturn, Dreamcast, Sega CD, PC Engine CD and more | **CHD** | RetroArch cores and standalone emulators that read CHD |
+| GameCube and Wii discs | **RVZ** | Dolphin |
+| Original Xbox discs | **XISO** (the unused space removed) | xemu |
+| Xbox 360 discs | **ZAR** | Xenia Canary, X360 Mobile |
+| 3DS files (`.cci`, `.cxi`, `.3dsx`, `.cia`) | **Z3DS** (`.zcci` …) | Azahar |
+| Wii U disc images (`.wud`) | **WUX** | Cemu |
+| Wii U game folders | **WUA** | Cemu |
+| Cartridge ROMs | **ZIP** | RetroArch and most standalone emulators |
+
+Systems whose emulators can't read a compressed format are left alone. New downloads (from RomM or your own folders) can
+be converted automatically.
 
 ### Show it the way you like
 
@@ -205,6 +281,7 @@ own.
 | **Android** | 8.0 (API 26) or newer, landscape |
 | **Device** | Any Android handheld or TV box with a controller; dual-screen features need a second display, such as the AYN Thor's |
 | **Emulators** | Installed separately: RetroArch and/or standalone emulators for the systems you play |
+| **Optional** | A RomM server; a RetroAchievements, ScreenScraper, SteamGridDB or IGDB account; a Claude or Gemini API key for the Companion's AI helper |
 | **To build** | JDK 17 or newer and the Android SDK |
 
 ## Installation
@@ -301,6 +378,20 @@ You can still make a shortcut by hand: a text file named after the game with the
 </details>
 
 <details>
+<summary><b>Do I need an AI key to use the Companion?</b></summary>
+
+No. Guides, the manual, maps, the checklist and trophies all work without one. Only the **Ask** tab needs a Claude or
+Gemini key, which you add yourself under Settings → Connections → AI helper.
+</details>
+
+<details>
+<summary><b>Is it safe to let Eclipse delete my originals after compressing?</b></summary>
+
+Eclipse checks every new file against the original, byte for byte, before deleting anything; if the check fails, the
+original is kept. Try a game or two with **Delete originals** off first to make sure your emulator plays the new format.
+</details>
+
+<details>
 <summary><b>Is a RomM server required?</b></summary>
 
 No. RomM is optional. Without it, Eclipse works entirely with the games on your device.
@@ -324,6 +415,10 @@ code (GPL-2.0-or-later), built into Eclipse in `app/src/main/cpp`.
 - Artwork and game data from **ScreenScraper**, **libretro thumbnails**, **ArcadeDB**, **GameTDB**, **LaunchBox Games Database**,
   **SteamGridDB**, **IGDB** and **Hasheous**.
 - **[Dolphin](https://dolphin-emu.org)**, whose disc code converts GameCube and Wii games to RVZ.
+- **[ZArchive](https://github.com/Exzap/ZArchive)** by Exzap (Xbox 360 `.zar` and Wii U `.wua`) and
+  **[Zstandard](https://github.com/facebook/zstd)** (Azahar's Z3DS files).
+- Guide sites **GameFAQs**, **StrategyWiki**, **Zelda Dungeon**, **Omega Metroid**, **Bulbapedia**, **Chunkbase** and
+  **VGMaps**, opened in the Companion.
 - The open-source libraries Eclipse is built on are listed, with their licences, in the app under Settings → Credits.
 
 Game artwork shown in the screenshots belongs to its respective publishers. All trademarks are the property of their
