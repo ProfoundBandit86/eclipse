@@ -15,28 +15,74 @@ object Guides {
 
     // ---------------------------------------------------------------- guide sites
 
-    /** A place to look for help: opened in the Companion's browser. [best] = the series' own site. */
-    data class Site(val name: String, val note: String, val url: String, val badge: String, val color: Long, val best: Boolean = false)
+    /**
+     * A place to look for help: opened in the Companion's browser. [best] = the series' own site. [fallback]: where to
+     * go instead when [url] (a guess at the game's own page) turns out not to exist.
+     */
+    data class Site(val name: String, val note: String, val url: String, val badge: String, val color: Long, val best: Boolean = false, val fallback: String? = null)
+
+    /** "The Legend of Zelda: Ocarina of Time (USA) [!]" → "The Legend of Zelda: Ocarina of Time". */
+    fun cleanTitle(title: String): String {
+        val t = title.replace(Regex("\\s*[\\(\\[][^)\\]]*[)\\]]"), "").replace(Regex("\\s+"), " ").trim()
+        // ROM-set naming: "Legend of Zelda, The - A Link to the Past" → "The Legend of Zelda: A Link to the Past"
+        val m = Regex("^(.+), (The|A|An)( - (.+))?$").find(t) ?: return t
+        return m.groupValues[2] + " " + m.groupValues[1] + (m.groupValues[4].takeIf { it.isNotEmpty() }?.let { ": $it" } ?: "")
+    }
+
+    /** "Super Metroid" → "super-metroid", "Link's Awakening" → "links-awakening". */
+    fun slug(s: String): String =
+        java.text.Normalizer.normalize(s.lowercase(), java.text.Normalizer.Form.NFD).replace(Regex("\\p{M}"), "")
+            .replace("'", "").replace("\u2019", "").replace("&", "and").replace(Regex("[^a-z0-9]+"), "-").trim('-')
+
+    /** VGMaps' atlas folder for a system (its own names), or "" for the atlas's front page. */
+    private val VGMAPS = mapOf(
+        "nes" to "NES", "fds" to "NES", "snes" to "SuperNES", "sfc" to "SuperNES", "gb" to "GB-GBC", "gbc" to "GB-GBC", "gba" to "GBA",
+        "n64" to "N64", "nds" to "DS", "genesis" to "Genesis", "megadrive" to "Genesis", "sms" to "MasterSystem", "gg" to "GameGear",
+        "psx" to "PSX", "ps1" to "PSX", "tg16" to "TG16", "pce" to "TG16"
+    )
 
     /**
-     * Guide sites for [title]. A series with a better home than the general sites gets it first: Zelda → Zelda
-     * Dungeon, Metroid → Omega Metroid, Pokémon → Bulbapedia, Minecraft → Chunkbase. Then GameFAQs and StrategyWiki.
+     * Guide sites for [title0], each opened on the game's own page where its address can be worked out (the site's
+     * own search when that page doesn't exist). A series with a better home than the general sites gets it first:
+     * Zelda → Zelda Dungeon, Metroid → Omega Metroid, Pokémon → Bulbapedia, Minecraft → Chunkbase. Then GameFAQs and
+     * StrategyWiki.
      */
-    fun sites(title: String): List<Site> {
+    fun sites(title0: String): List<Site> {
+        val title = cleanTitle(title0)
         val t = title.lowercase()
         val q = Http.enc(title)
         val out = ArrayList<Site>()
-        if ("zelda" in t)
-            out += Site("Zelda Dungeon", "Walkthroughs, maps and items for every Zelda", "https://www.zeldadungeon.net/?s=" + Http.enc("$title walkthrough"), "ZD", 0xFF2E6B3A, true)
+        if ("zelda" in t) {
+            // zeldadungeon.net/<game>-walkthrough/, the game named without "The Legend of Zelda:" in front
+            val game = title.replace(Regex("^(the )?legend of zelda\\s*[:\\-]\\s*", RegexOption.IGNORE_CASE), "")
+                .replace(Regex("^zelda (ii|2)\\s*[:\\-]\\s*", RegexOption.IGNORE_CASE), "")
+            out += Site("Zelda Dungeon", "Walkthroughs, maps and items for every Zelda", "https://www.zeldadungeon.net/" + slug(game) + "-walkthrough/", "ZD", 0xFF2E6B3A, true,
+                fallback = "https://www.zeldadungeon.net/?s=" + Http.enc("$title walkthrough"))
+        }
         if ("metroid" in t)
-            out += Site("Omega Metroid", "Maps, item locations and walkthroughs", "https://lite.duckduckgo.com/lite/?q=" + Http.enc("site:omegametroid.com $title"), "OM", 0xFF7A2E2E, true)
-        if (Regex("pok[eé]mon").containsMatchIn(t))
-            out += Site("Bulbapedia", "Walkthrough, Pokédex and locations", "https://bulbapedia.bulbagarden.net/w/index.php?search=" + Http.enc("$title walkthrough"), "BP", 0xFF2D5F9E, true)
+            out += Site("Omega Metroid", "Maps, item locations and walkthroughs", "https://omegametroid.com/" + slug(title) + "-walkthrough/", "OM", 0xFF7A2E2E, true,
+                fallback = "https://omegametroid.com/?s=" + q)
+        if (Regex("pok[eé]mon").containsMatchIn(t)) {
+            // Bulbapedia's walkthroughs are "Walkthrough:Pokémon Emerald" (no "Version")
+            val game = title.replace(Regex("pokemon", RegexOption.IGNORE_CASE), "Pokémon").replace(Regex("\\s+version\\b", RegexOption.IGNORE_CASE), "").trim()
+            out += Site("Bulbapedia", "Walkthrough, Pokédex and locations", "https://bulbapedia.bulbagarden.net/wiki/Walkthrough:" + Http.enc(game.replace(' ', '_')), "BP", 0xFF2D5F9E, true,
+                fallback = "https://bulbapedia.bulbagarden.net/w/index.php?search=" + Http.enc("$game walkthrough"))
+        }
         if ("minecraft" in t)
             out += Site("Chunkbase", "Seed map, biome and structure finder", "https://www.chunkbase.com/apps/", "CB", 0xFF3E7A2A, true)
         out += Site("GameFAQs", "Classic guides · open one and tap Save", "https://gamefaqs.gamespot.com/search?game=$q", "FAQ", 0xFF1D3B6E)
-        out += Site("StrategyWiki", "Community wiki guide", "https://strategywiki.org/w/index.php?search=$q", "SW", 0xFF2C5A3A)
+        // (the wiki's guide for a game is the page named after it; its search jumps there, or lists near matches)
+        out += Site("StrategyWiki", "Community wiki guide", "https://strategywiki.org/wiki/" + Http.enc(title.replace(' ', '_')), "SW", 0xFF2C5A3A,
+            fallback = "https://strategywiki.org/w/index.php?search=$q")
         return out
+    }
+
+    /** Where to look for maps of a game: VGMaps' atlas for its system. */
+    fun mapSite(platform: String): Site {
+        val folder = VGMAPS[platform]
+        return Site("VGMaps", "Full maps of classic games · open one and tap Save map",
+            if (folder != null) "https://www.vgmaps.com/Atlas/$folder/index.htm" else "https://www.vgmaps.com/Atlas/index.htm", "MAP", 0xFF3A5A2C,
+            fallback = "https://www.vgmaps.com/")
     }
 
     /** A web search that already knows the game: its name goes in front of what you typed. */

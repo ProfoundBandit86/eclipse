@@ -245,7 +245,7 @@ private fun RowScope.ChdTab(
                 if (picked.isEmpty()) "Nothing ticked" else "Compress ${picked.size} game${if (picked.size == 1) "" else "s"}",
                 Modifier.fillMaxWidth(), primary = true
             ) { vm.startChd() }
-            SideNote(vm.chdLog.lastOrNull() ?: "One at a time, each checked before the originals go. Discs become CHD (GameCube / Wii: RVZ; Xbox: XISO; Xbox 360: ZAR), cartridge ROMs ZIP, 3DS files Azahar's Z3DS. Games keep their artwork and play time. Playlists are pointed at the new files.")
+            SideNote(vm.chdLog.lastOrNull() ?: "One at a time, each checked before the originals go. Discs become CHD (GameCube / Wii: RVZ; Xbox: XISO; Xbox 360: ZAR), cartridge ROMs ZIP, 3DS files Azahar's Z3DS, Wii U .wud files WUX and game folders WUA. Games keep their artwork and play time. Playlists are pointed at the new files.")
         }
     }
 }

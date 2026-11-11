@@ -131,7 +131,8 @@ fun SecondaryContent(vm: EclipseVM, displayId: Int) {
         var browser by remember { mutableStateOf<String?>(null) }
         var walkGame by remember { mutableStateOf<Game?>(null) }
         // the Companion (ui/Companion.kt) open for this game
-        var companion by remember { mutableStateOf<Game?>(null) }
+        // (kept in the view model, so a game's page on the top screen can open it here too)
+        val companion = vm.companionBottom
         var drawer by remember { mutableStateOf(false) }
         val dockOn = vm.flag("dock2")
         // opening an app from this screen: ask top or bottom every time, unless "Remember my choice" was ticked
@@ -160,7 +161,7 @@ fun SecondaryContent(vm: EclipseVM, displayId: Int) {
                             Unit
                         }) else null,
                         editWalk = { walkGame = it },
-                        openCompanion = { companion = it }
+                        openCompanion = { vm.companionBottom = it }
                     ) { browser = it }
                 }
             }
@@ -230,7 +231,7 @@ fun SecondaryContent(vm: EclipseVM, displayId: Int) {
                 }
             }
             walkGame?.let { g -> WalkSheet(vm, g, { browser = it }) { walkGame = null } }
-            companion?.let { g -> CompanionHub(vm, g) { companion = null } }
+            companion?.let { g -> CompanionHub(vm, g) { vm.companionBottom = null } }
             browser?.let { url -> BrowserOverlay(url) { browser = null } }
         }
     } }
@@ -882,7 +883,7 @@ private fun BrowserOverlay(url: String, close: () -> Unit) {
                     settings.loadWithOverviewMode = true
                     settings.useWideViewPort = true
                     settings.mediaPlaybackRequiresUserGesture = true // no auto-playing video ads
-                    settings.offscreenPreRaster = true // smoother scrolling through long guides
+                    smoothScrolling()
                     webViewClient = object : WebViewClient() {
                         // ads and trackers (data/AdBlock.kt) get an empty answer instead of loading
                         override fun shouldInterceptRequest(view: WebView?, request: android.webkit.WebResourceRequest?): android.webkit.WebResourceResponse? =

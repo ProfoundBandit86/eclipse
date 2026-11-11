@@ -157,6 +157,114 @@ object Archives {
         }
     }
 
+    // ---------------------------------------------------------------- WUA (Cemu's Wii U archive, also a ZArchive)
+
+    /**
+     * A decrypted Wii U game as a folder (code / content / meta): the folder, and the name Cemu wants for it inside a
+     * .wua, "<title id, 16 hex digits>_v<version>". Found from the game's .rpx (in code/). Only base games (title ids
+     * starting 00050000): updates and DLC are left alone.
+     */
+    data class WiiUTitle(val dir: File, val inner: String)
+
+    fun wiiuTitle(rpx: File): WiiUTitle? {
+        if (!rpx.isFile || !rpx.extension.equals("rpx", true)) return null
+        val code = rpx.parentFile ?: return null
+        if (!code.name.equals("code", true)) return null
+        val dir = code.parentFile ?: return null
+        val meta = File(dir, "meta/meta.xml")
+        if (!meta.isFile || !File(dir, "content").isDirectory) return null
+        val xml = runCatching { meta.readText() }.getOrNull() ?: return null
+        val id = Regex("<title_id[^>]*>\\s*([0-9A-Fa-f]{16})\\s*<").find(xml)?.groupValues?.get(1)?.lowercase() ?: return null
+        val ver = Regex("<title_version[^>]*>\\s*(\\d+)\\s*<").find(xml)?.groupValues?.get(1)?.toIntOrNull() ?: return null
+        if (!id.startsWith("00050000") || ver > 0xFFFF) return null
+        return WiiUTitle(dir, "${id}_v$ver")
+    }
+
+    /** Every file in [dir] as (path inside the archive, file); folders as (path + "/", null). */
+    private fun folderItems(dir: File, prefix: String): List<Pair<String, File?>> {
+        val out = ArrayList<Pair<String, File?>>()
+        fun go(d: File, p: String) {
+            out += p to null
+            for (c in d.listFiles().orEmpty().sortedBy { it.name }) {
+                if (c.isDirectory) go(c, "$p/${c.name}") else if (c.isFile) out += "$p/${c.name}" to c
+            }
+        }
+        go(dir, prefix)
+        return out
+    }
+
+    /** Packs the game folder [t] into [out] as a .wua. Throws on failure. */
+    fun makeWua(t: WiiUTitle, out: File, progress: (Float) -> Unit, cancelled: () -> Boolean) {
+        if (!available) throw IOException("the compressor isn't available on this device")
+        val items = folderItems(t.dir, t.inner)
+        val total = items.sumOf { it.second?.length() ?: 0L }.coerceAtLeast(1L)
+        out.delete()
+        val h = zarOpen(out.absolutePath)
+        if (h == 0L) throw IOException("can't write the new file")
+        var ok = false
+        try {
+            val buf = ByteArray(1 shl 20)
+            var done = 0L
+            for ((path, f) in items) {
+                if (cancelled()) throw InterruptedException()
+                if (f == null) { if (!zarDir(h, path)) throw IOException("couldn't add folder $path"); continue }
+                if (!zarFile(h, path)) throw IOException("couldn't add $path")
+                f.inputStream().use { s ->
+                    while (true) {
+                        val n = s.read(buf)
+                        if (n < 0) break
+                        if (n > 0) zarData(h, buf, n)
+                        done += n
+                    }
+                }
+                progress(done.toFloat() / total)
+            }
+            ok = true
+        } finally {
+            val written = zarClose(h, ok)
+            if (!ok || !written) out.delete()
+            if (ok && !written) throw IOException("couldn't write the new file")
+        }
+    }
+
+    /** Reads every file of [wua] and checks it against the game folder [t], byte for byte. */
+    fun sameWua(t: WiiUTitle, wua: File, progress: (Float) -> Unit = {}, cancelled: () -> Boolean = { false }): Boolean {
+        if (!available) return false
+        val items = folderItems(t.dir, t.inner)
+        val total = items.sumOf { it.second?.length() ?: 0L }.coerceAtLeast(1L)
+        val r = zarReader(wua.absolutePath)
+        if (r == 0L) return false
+        try {
+            val a = ByteArray(1 shl 20)
+            val b = ByteArray(1 shl 20)
+            var done = 0L
+            for ((path, f) in items) {
+                if (f == null) continue
+                if (cancelled()) return false
+                val size = f.length()
+                if (zarSize(r, path) != size) return false
+                f.inputStream().use { s ->
+                    var off = 0L
+                    while (off < size) {
+                        val n = minOf(size - off, a.size.toLong()).toInt()
+                        var got = 0
+                        while (got < n) { val k = s.read(a, got, n - got); if (k < 0) return false; got += k }
+                        if (zarRead(r, path, off, b, n) != n) return false
+                        for (i in 0 until n) if (a[i] != b[i]) return false
+                        off += n
+                        done += n
+                    }
+                }
+                progress(done.toFloat() / total)
+            }
+            return true
+        } catch (e: Exception) {
+            return false
+        } finally {
+            zarReaderClose(r)
+        }
+    }
+
     /** Reads every file of [zar] and checks it against the disc in [original], byte for byte. */
     fun sameZar(original: File, zar: File, progress: (Float) -> Unit = {}, cancelled: () -> Boolean = { false }): Boolean {
         if (!available) return false

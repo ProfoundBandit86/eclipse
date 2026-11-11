@@ -88,7 +88,7 @@ fun Root(vm: EclipseVM, pickFolder: () -> Unit, pickImage: () -> Unit) {
 
     val autoHide = vm.flag("dock_autohide")
     val overlayOpen = vm.menuGame != null || vm.artGame != null || vm.platArtScreen != null || vm.dockMenu != null ||
-        vm.setupOpen || vm.platReorder || vm.appearancePicker != null || vm.appMenu != null || vm.platformMenu != null || vm.emuMenu != null || vm.sysEdit != null || vm.viewMenu || vm.searchOpen || vm.onDeckRemove != null || vm.hiddenScreen || vm.storeDelete != null || vm.gameDelete != null || vm.updateShowing || vm.colorPicker != null || vm.themeImport != null || vm.smbBrowse != null || vm.packImport != null || vm.rommAsk != null || vm.rommDiscAsk != null || vm.toolsOpen || !vm.splashDone
+        vm.setupOpen || vm.platReorder || vm.companionTop != null || vm.appearancePicker != null || vm.appMenu != null || vm.platformMenu != null || vm.emuMenu != null || vm.sysEdit != null || vm.viewMenu || vm.searchOpen || vm.onDeckRemove != null || vm.hiddenScreen || vm.storeDelete != null || vm.gameDelete != null || vm.updateShowing || vm.colorPicker != null || vm.themeImport != null || vm.smbBrowse != null || vm.packImport != null || vm.rommAsk != null || vm.rommDiscAsk != null || vm.toolsOpen || !vm.splashDone
     // when the last menu closes, put the controller back where it was
     // leaving a page: its right panel opens on its first row again next time
     LaunchedEffect(vm.screen, vm.homeSection, vm.platformSel) { vm.drawerMemory.clear() }
@@ -340,6 +340,8 @@ fun Root(vm: EclipseVM, pickFolder: () -> Unit, pickImage: () -> Unit) {
         if (vm.hiddenScreen) HiddenGamesSheet(vm)
         if (vm.toolsOpen) ToolsScreen(vm)
         if (vm.platReorder) PlatformReorder(vm)
+        // the Companion over this screen (no bottom screen showing), above the game's page
+        vm.companionTop?.let { g -> CompanionHub(vm, g) { vm.companionTop = null } }
         vm.appearancePicker?.let { if (it == "colours") ColoursScreen(vm) else AppearancePicker(vm, it) }
         vm.colorPicker?.let { ColorWheelDialog(vm, it) }
         vm.themeImport?.let { ThemeImportScreen(vm, it) }

@@ -1,5 +1,6 @@
 package com.eclipse.launcher.ui
 
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -49,6 +50,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.focus.focusRequester
@@ -2012,14 +2014,21 @@ fun PlatformReorder(vm: EclipseVM) {
         withFrameNanos { }
         runCatching { (list.firstOrNull()?.let { reqs[it.id] } ?: done).requestFocus() }
     }
-    fun moveTo(id: String, j0: Int) {
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    fun moveTo(id: String, j0: Int, save: Boolean = true) {
         val i = list.indexOfFirst { it.id == id }
         val j = j0.coerceIn(0, list.lastIndex)
         if (i < 0 || i == j) return
         list = list.toMutableList().apply { add(j, removeAt(i)) }
+        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+        if (save) {
+            vm.savePlatOrder(list.map { it.id })
+            if (vm.platSort != "custom") vm.choosePlatSort("custom")
+        }
+    }
+    fun saveOrder() {
         vm.savePlatOrder(list.map { it.id })
         if (vm.platSort != "custom") vm.choosePlatSort("custom")
-        scope.launch { withFrameNanos { }; runCatching { reqs[id]?.requestFocus() } }
     }
     Glass {
         Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { } }) {
@@ -2038,53 +2047,121 @@ fun PlatformReorder(vm: EclipseVM) {
                         Pill("Done", Modifier.padding(start = 12.dp).width(110.dp), primary = true, focusRequester = done) { close() }
                     }
                     BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                        // Like a phone launcher: every tile sits at its slot and glides there when the order changes;
+                        // the one you drag follows your finger and the others slide out of its way as it passes.
                         val cols = 6
                         val gap = 10.dp
                         val cell = (maxWidth - gap * (cols - 1)) / cols
-                        val cellPx = with(LocalDensity.current) { (cell + gap).toPx() }
+                        val density = LocalDensity.current
+                        val cellPx = with(density) { (cell + gap).toPx() }
+                        val viewPx = with(density) { maxHeight.toPx() }
+                        val tilePx = with(density) { cell.toPx() }
+                        val rows = (list.size + cols - 1) / cols
+                        val scroll = rememberScrollState()
+                        RightStick.Register(scroll)
                         var dragId by remember { mutableStateOf<String?>(null) }
-                        var drag by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
-                        Column(Modifier.fillMaxSize().menuScroll(), verticalArrangement = Arrangement.spacedBy(gap)) {
-                            list.chunked(cols).forEachIndexed { r, line ->
-                                Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
-                                    line.forEachIndexed { c, p ->
-                                        val i = r * cols + c
+                        // the dragged tile's top-left corner, in the grid's own coordinates
+                        var dragPos by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+                        val spots = remember { HashMap<String, androidx.compose.animation.core.Animatable<androidx.compose.ui.geometry.Offset, androidx.compose.animation.core.AnimationVector2D>>() }
+                        fun slot(i: Int) = androidx.compose.ui.geometry.Offset((i % cols) * cellPx, (i / cols) * cellPx)
+                        // the slot under the dragged tile's centre becomes its place
+                        fun follow(id: String) {
+                            val c = Math.round(dragPos.x / cellPx).coerceIn(0, cols - 1)
+                            val r = Math.round(dragPos.y / cellPx).coerceIn(0, rows - 1)
+                            moveTo(id, r * cols + c, save = false)
+                        }
+                        // dragging near the top or bottom edge scrolls the grid
+                        LaunchedEffect(dragId) {
+                            val id = dragId ?: return@LaunchedEffect
+                            val edge = tilePx * 0.6f
+                            while (true) {
+                                withFrameNanos { }
+                                val y = dragPos.y - scroll.value
+                                val push = when {
+                                    y < edge * 0.2f -> -((edge * 0.2f - y) / edge).coerceIn(0.15f, 1f)
+                                    y + tilePx > viewPx - edge * 0.2f -> ((y + tilePx - (viewPx - edge * 0.2f)) / edge).coerceIn(0.15f, 1f)
+                                    else -> 0f
+                                }
+                                if (push != 0f) {
+                                    val moved = scroll.scrollBy(push * 14f * density.density)
+                                    if (moved != 0f) { dragPos = dragPos.copy(y = dragPos.y + moved); follow(id) }
+                                }
+                            }
+                        }
+                        val order = remember { list.map { it.id } }   // drawn in one fixed order, so a tile keeps its focus and its gesture while it moves
+                        Box(Modifier.fillMaxSize().verticalScroll(scroll)) {
+                            Box(Modifier.fillMaxWidth().height(cell * rows + gap * (rows - 1).coerceAtLeast(0))) {
+                                order.forEach { pid ->
+                                    androidx.compose.runtime.key(pid) {
+                                        val i = list.indexOfFirst { it.id == pid }
+                                        val p = list[i]
                                         val req = reqs.getOrPut(p.id) { FocusRequester() }
                                         val isHeld = held == p.id
                                         val dragging = dragId == p.id
+                                        val target = slot(i)
+                                        val spot = spots.getOrPut(p.id) { androidx.compose.animation.core.Animatable(target, androidx.compose.ui.geometry.Offset.VectorConverter) }
+                                        LaunchedEffect(target, dragging) {
+                                            // moved with the D-pad past the edge of the page: the page follows it
+                                            if (isHeld) {
+                                                if (target.y < scroll.value) launch { scroll.animateScrollTo(target.y.toInt()) }
+                                                else if (target.y + tilePx > scroll.value + viewPx) launch { scroll.animateScrollTo((target.y + tilePx - viewPx).toInt()) }
+                                            }
+                                            if (!dragging) spot.animateTo(target, androidx.compose.animation.core.spring(dampingRatio = 0.78f, stiffness = 380f))
+                                        }
+                                        val lift by animateFloatAsState(if (dragging || isHeld) 1f else 0f, androidx.compose.animation.core.spring(dampingRatio = 0.6f, stiffness = 500f), label = "lift")
                                         FocusBox(
-                                            Modifier.size(cell)
-                                                .zIndex(if (dragging || isHeld) 1f else 0f)
+                                            Modifier
+                                                .offset { val o = if (dragging) dragPos else spot.value; androidx.compose.ui.unit.IntOffset(Math.round(o.x), Math.round(o.y)) }
+                                                .size(cell)
+                                                .zIndex(if (dragging || isHeld) 2f else if (lift > 0.01f) 1f else 0f)
                                                 .graphicsLayer {
-                                                    if (dragging) { translationX = drag.x; translationY = drag.y }
-                                                    val sc = if (dragging || isHeld) 1.08f else 1f; scaleX = sc; scaleY = sc
+                                                    val sc = 1f + 0.1f * lift; scaleX = sc; scaleY = sc
+                                                    shadowElevation = 18.dp.toPx() * lift
+                                                    shape = RoundedCornerShape(14.dp); clip = false
                                                 }
                                                 .onPreviewKeyEvent { e ->
                                                     if (!isHeld || e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                                                    val at = list.indexOfFirst { it.id == p.id }
                                                     when (e.key) {
-                                                        Key.DirectionLeft -> { moveTo(p.id, i - 1); true }
-                                                        Key.DirectionRight -> { moveTo(p.id, i + 1); true }
-                                                        Key.DirectionUp -> { moveTo(p.id, i - cols); true }
-                                                        Key.DirectionDown -> { moveTo(p.id, i + cols); true }
+                                                        Key.DirectionLeft -> { moveTo(p.id, at - 1); true }
+                                                        Key.DirectionRight -> { moveTo(p.id, at + 1); true }
+                                                        Key.DirectionUp -> { if (at - cols >= 0) moveTo(p.id, at - cols); true }
+                                                        Key.DirectionDown -> { moveTo(p.id, at + cols); true }
                                                         else -> false
                                                     }
                                                 }
-                                                .pointerInput(p.id, i) {
+                                                .pointerInput(p.id) {
                                                     detectDragGesturesAfterLongPress(
-                                                        onDragStart = { dragId = p.id; drag = androidx.compose.ui.geometry.Offset.Zero },
-                                                        onDragEnd = {
-                                                            val dc = Math.round(drag.x / cellPx); val dr = Math.round(drag.y / cellPx)
-                                                            val id = p.id
-                                                            dragId = null; drag = androidx.compose.ui.geometry.Offset.Zero
-                                                            moveTo(id, i + dc + dr * cols)
+                                                        onDragStart = {
+                                                            held = null
+                                                            dragPos = spot.value; dragId = p.id
+                                                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                                                         },
-                                                        onDragCancel = { dragId = null; drag = androidx.compose.ui.geometry.Offset.Zero }
-                                                    ) { ch, d -> ch.consume(); drag += d }
+                                                        onDragEnd = {
+                                                            // settle from where it was let go into its slot
+                                                            scope.launch { spot.snapTo(dragPos); dragId = null }
+                                                            saveOrder()
+                                                        },
+                                                        onDragCancel = {
+                                                            scope.launch { spot.snapTo(dragPos); dragId = null }
+                                                            saveOrder()
+                                                        }
+                                                    ) { ch, d ->
+                                                        ch.consume()
+                                                        dragPos = androidx.compose.ui.geometry.Offset(
+                                                            (dragPos.x + d.x).coerceIn(-cellPx * 0.4f, (cols - 1) * cellPx + cellPx * 0.4f),
+                                                            (dragPos.y + d.y).coerceIn(-cellPx * 0.4f, (rows - 1) * cellPx + cellPx * 0.4f)
+                                                        )
+                                                        follow(p.id)
+                                                    }
                                                 },
                                             shape = RoundedCornerShape(14.dp),
                                             focusRequester = req,
                                             focusKey = "reorder:${p.id}",
-                                            onClick = { held = if (isHeld) null else p.id }
+                                            onClick = {
+                                                held = if (isHeld) null else p.id
+                                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                            }
                                         ) {
                                             Box(Modifier.fillMaxSize().clip(RoundedCornerShape(14.dp))) {
                                                 PlatformFace(vm, p, Modifier.fillMaxSize())
@@ -2092,9 +2169,9 @@ fun PlatformReorder(vm: EclipseVM) {
                                                 Text(
                                                     "${i + 1}", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold,
                                                     modifier = Modifier.align(Alignment.TopStart).padding(5.dp).clip(RoundedCornerShape(6.dp))
-                                                        .background(if (isHeld) C.accent else Color(0x99000000)).padding(horizontal = 6.dp, vertical = 2.dp)
+                                                        .background(if (isHeld || dragging) C.accent else Color(0x99000000)).padding(horizontal = 6.dp, vertical = 2.dp)
                                                 )
-                                                if (isHeld) Box(Modifier.matchParentSize().border(3.dp, C.accent, RoundedCornerShape(14.dp)))
+                                                if (isHeld || dragging) Box(Modifier.matchParentSize().border(3.dp, C.accent, RoundedCornerShape(14.dp)))
                                             }
                                         }
                                     }

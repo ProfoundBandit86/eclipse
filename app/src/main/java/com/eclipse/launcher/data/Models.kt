@@ -72,7 +72,9 @@ data class Achievement(
     val badge: String,
     val earned: Boolean,
     val date: String?,
-    val points: Int = 0
+    val points: Int = 0,
+    /** RetroAchievements' own label: "missable", "progression", "win_condition" or "" */
+    val type: String = ""
 )
 
 data class RaProgress(

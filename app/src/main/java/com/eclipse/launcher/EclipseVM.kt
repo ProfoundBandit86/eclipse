@@ -167,6 +167,14 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     }
     var appearancePicker by mutableStateOf<String?>(null)  // "theme" / "icons" / "backdrops" picker open in Settings
     var platReorder by mutableStateOf(false)              // the "reorder platforms" screen is open
+    /** The Companion (ui/Companion.kt) open for this game on the bottom screen / on this screen (no bottom screen showing). */
+    var companionBottom by mutableStateOf<Game?>(null)
+    var companionTop by mutableStateOf<Game?>(null)
+    /** A game's page → Companion: on the bottom screen when it's showing, else over this one. */
+    fun openCompanion(g: Game) {
+        if (com.eclipse.launcher.media.SecondaryPresentation.current != null) { companionBottom = g; message = "Companion opened on the bottom screen" }
+        else companionTop = g
+    }
     var onDeckRemove by mutableStateOf<Game?>(null)       // "remove from Recently Played?" (Select on an On Deck game)
     /** Which systems the platforms show: "local" (only ones you have games for) or "romm" (plus your RomM systems). */
     /** Search (its right dock): where results come from ("all", "local" or "romm") and whether the letter strip shows. */
@@ -858,8 +866,14 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         val z3ds: com.eclipse.launcher.data.Archives.Z3ds? = null,
         /** an Xbox 360 disc packed as a ZArchive (.zar), for Xenia-based emulators (data/Archives.kt) */
         val zar: Boolean = false,
+        /** a Wii U disc image (.wud) with its repeated sectors stored once (.wux; data/Wux.kt), for Cemu */
+        val wux: Boolean = false,
+        /** a decrypted Wii U game folder packed as Cemu's .wua (data/Archives.kt); [src] is its .rpx */
+        val wua: com.eclipse.launcher.data.Archives.WiiUTitle? = null,
+        /** where the result goes when it isn't "<src's name>.<ext>" beside [src] (a .wua goes beside the game's folder) */
+        val dest: java.io.File? = null,
     ) {
-        val ext: String get() = z3ds?.ext ?: if (zar) "zar" else if (xiso) "xiso.iso" else if (zip) "zip" else if (rvz) "rvz" else "chd"
+        val ext: String get() = z3ds?.ext ?: if (wua != null) "wua" else if (wux) "wux" else if (zar) "zar" else if (xiso) "xiso.iso" else if (zip) "zip" else if (rvz) "rvz" else "chd"
         /** what it becomes, as people know it */
         val format: String get() = if (xiso) "XISO" else ext.uppercase()
     }
@@ -867,11 +881,25 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     /** A game's own file as something to compress: a cartridge ROM → ZIP, a 3DS file → Z3DS (Azahar). Null otherwise. */
     private fun romItem(g: Game): ChdItem? {
         zipItem(g)?.let { return it }
+        if (g.platform == "wiiu") return wiiuItem(java.io.File(g.path))
         if (g.platform != "3ds") return null
         val f = java.io.File(g.path)
         val kind = com.eclipse.launcher.data.Archives.z3dsKind(f) ?: return null
         if (java.io.File(f.parentFile, f.nameWithoutExtension + "." + kind.ext).exists()) return null
         return ChdItem(f, listOf(f), f.length(), false, z3ds = kind)
+    }
+
+    /** A Wii U game to compress: a .wud → .wux, or a decrypted game folder (found by its .rpx) → .wua. */
+    private fun wiiuItem(f: java.io.File): ChdItem? {
+        if (com.eclipse.launcher.data.Wux.isWud(f)) {
+            if (java.io.File(f.parentFile, f.nameWithoutExtension + ".wux").exists()) return null
+            return ChdItem(f, listOf(f), f.length(), false, wux = true)
+        }
+        val t = com.eclipse.launcher.data.Archives.wiiuTitle(f) ?: return null
+        val out = java.io.File(t.dir.parentFile, t.dir.name + ".wua")
+        if (out.exists()) return null
+        val bytes = t.dir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+        return ChdItem(f, listOf(t.dir), bytes, false, wua = t, dest = out)
     }
 
     /**
@@ -1121,16 +1149,19 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
             try {
                 for ((i, item) in items.withIndex()) {
                     if (chdCancel) break
-                    val name = item.src.nameWithoutExtension
+                    val name = item.dest?.nameWithoutExtension ?: item.src.nameWithoutExtension
                     val rvz = item.rvz
                     val ext = item.ext
-                    val out = java.io.File(item.src.parentFile, "$name.$ext")
-                    val part = java.io.File(item.src.parentFile, "$name.$ext.part")
-                    chdJob = ChdJob(i, items.size, name, if (item.zip || item.z3ds != null || item.zar) "Compressing" else if (item.xiso) "Rebuilding" else "Converting", 0f, rvz, item.zip, item.xiso,
-                        if (item.z3ds != null || item.zar) item.format else null)
+                    val out = item.dest ?: java.io.File(item.src.parentFile, "$name.$ext")
+                    val part = java.io.File(out.parentFile, out.name + ".part")
+                    val other = item.z3ds != null || item.zar || item.wux || item.wua != null
+                    chdJob = ChdJob(i, items.size, name, if (item.zip || other) "Compressing" else if (item.xiso) "Rebuilding" else "Converting", 0f, rvz, item.zip, item.xiso,
+                        if (other) item.format else null)
                     val result = withContext(Dispatchers.IO) {
                         try {
-                            if (item.z3ds != null) com.eclipse.launcher.data.Archives.compress3ds(item.src, part, item.z3ds, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
+                            if (item.wua != null) com.eclipse.launcher.data.Archives.makeWua(item.wua, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
+                            else if (item.wux) com.eclipse.launcher.data.Wux.compress(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
+                            else if (item.z3ds != null) com.eclipse.launcher.data.Archives.compress3ds(item.src, part, item.z3ds, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
                             else if (item.zar) com.eclipse.launcher.data.Archives.makeZar(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
                             else if (item.xiso) com.eclipse.launcher.data.XIso.rebuild(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
                             else if (item.zip) com.eclipse.launcher.data.RomZip.zip(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
@@ -1138,7 +1169,9 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
                             else com.eclipse.launcher.data.Chd.convert(item.src, part, threads, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel }, psp = item.psp)
                             chdJob = chdJob?.copy(phase = "Checking", progress = 0f)
                             // RVZ: read it all back through Dolphin and compare with the original, byte for byte
-                            val good = if (item.z3ds != null) com.eclipse.launcher.data.Archives.same3ds(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
+                            val good = if (item.wua != null) com.eclipse.launcher.data.Archives.sameWua(item.wua, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
+                                else if (item.wux) com.eclipse.launcher.data.Wux.same(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
+                                else if (item.z3ds != null) com.eclipse.launcher.data.Archives.same3ds(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
                                 else if (item.zar) com.eclipse.launcher.data.Archives.sameZar(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
                                 else if (item.xiso) com.eclipse.launcher.data.XIso.same(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
                                 else if (item.zip) com.eclipse.launcher.data.RomZip.same(item.src, part, { p -> chdJob = chdJob?.copy(progress = p) }, { chdCancel })
@@ -1152,7 +1185,8 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
                                 if (!part.renameTo(out)) throw java.io.IOException("couldn't rename the finished file")
                                 saved += item.bytes - out.length()
                                 if (del) {
-                                    item.parts.forEach { it.delete() }
+                                    // (a .wua's original is the game's whole folder)
+                                    item.parts.forEach { if (it.isDirectory) it.deleteRecursively() else it.delete() }
                                     // an XISO takes the original's place and name (still an .iso): the game keeps its path
                                     if (item.xiso && !out.renameTo(item.src)) keepId(item.src, out) else if (!item.xiso) keepId(item.src, out)
                                 }
@@ -1166,7 +1200,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
                 addChdSaved(saved, log.count { it.startsWith("\u2713") })
                 onDone?.invoke(maxOf(0L, saved), log.count { it.startsWith("\u2713") })
                 withContext(Dispatchers.IO) {
-                    val dirs = items.map { it.src.parentFile }.distinct().filterNotNull()
+                    val dirs = items.map { it.dest?.parentFile ?: it.src.parentFile }.distinct().filterNotNull()
                     pointPlaylistsAtChd(dirs)
                     if (!romm) writeDiscPlaylists(dirs)
                 }
@@ -1180,7 +1214,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
                     val g = games.firstOrNull { it.path == first.absolutePath || it.path == convertedOf(first).absolutePath ||
                         it.path == java.io.File(first.parentFile, first.nameWithoutExtension + "." + items.first().ext).absolutePath }
                     val pic = g?.let { artOf(it, ArtKind.BOX) }
-                    if (ok > 0) showNotice(Notice(if (items.all { it.xiso }) "Made XISO" else if (items.all { it.zar }) "Compressed to ZAR" else if (items.all { it.z3ds != null }) "Compressed for Azahar" else if (items.all { it.zip }) "Compressed to ZIP" else if (items.all { it.rvz }) "Converted to RVZ" else if (items.all { !it.rvz && !it.zip }) "Converted to CHD" else "Converted", if (ok == 1) (g?.name ?: first.nameWithoutExtension) else "$ok discs",
+                    if (ok > 0) showNotice(Notice(if (items.all { it.xiso }) "Made XISO" else if (items.all { it.zar }) "Compressed to ZAR" else if (items.all { it.wux }) "Compressed to WUX" else if (items.all { it.wua != null }) "Compressed to WUA" else if (items.all { it.z3ds != null }) "Compressed for Azahar" else if (items.all { it.zip }) "Compressed to ZIP" else if (items.all { it.rvz }) "Converted to RVZ" else if (items.all { !it.rvz && !it.zip }) "Converted to CHD" else "Converted", if (ok == 1) (g?.name ?: first.nameWithoutExtension) else "$ok discs",
                         if (saved > 0) "Saved ${fmtBytes(saved)}" else null, pic, "chd"))
                     else if (log.any { it.startsWith("\u2717") }) showNotice(Notice("Couldn't convert", g?.name ?: first.nameWithoutExtension, "The originals were kept", pic, "error"))
                 }
@@ -1223,7 +1257,9 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     /** The CHD conversion running for [g] right now, if it is (any of its discs, for a playlist). */
     fun chdJobFor(g: Game): ChdJob? = chdJob?.takeIf { j ->
         val f = java.io.File(g.path)
-        j.name == f.nameWithoutExtension || (f.extension.equals("m3u", true) && runCatching { f.readText() }.getOrDefault("").contains(j.name))
+        j.name == f.nameWithoutExtension ||
+            // a Wii U game folder (…/Game/code/game.rpx) is compressed under the folder's name
+            (f.extension.equals("rpx", true) && f.parentFile?.parentFile?.name == j.name) || (f.extension.equals("m3u", true) && runCatching { f.readText() }.getOrDefault("").contains(j.name))
     }
 
     /**
@@ -1238,6 +1274,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         if (g.platform == "xbox") return "XISO"
         if (g.platform == "xbox360") return "ZAR"
         if (g.platform == "3ds") return "Z3DS"
+        if (g.platform == "wiiu") return if (java.io.File(g.path).extension.equals("rpx", true)) "WUA" else "WUX"
         if (g.platform in com.eclipse.launcher.data.RomZip.SYSTEMS && java.io.File(g.path).extension.lowercase() !in setOf("cue", "iso", "gcm", "chd", "rvz", "m3u", "gdi", "ccd", "pbp", "cso"))
             return "ZIP"
         val exts = com.eclipse.launcher.data.Platforms.byId(g.platform)?.exts ?: return null

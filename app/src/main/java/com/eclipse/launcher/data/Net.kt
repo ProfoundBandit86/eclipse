@@ -307,7 +307,8 @@ object RetroAch {
             items.add(
                 Achievement(
                     a.optInt("ID"), a.optString("Title"), a.optString("Description"),
-                    a.optString("BadgeName"), date != null, date, a.optInt("Points")
+                    a.optString("BadgeName"), date != null, date, a.optInt("Points"),
+                    a.optString("type").let { if (it == "null") "" else it }
                 )
             )
         }

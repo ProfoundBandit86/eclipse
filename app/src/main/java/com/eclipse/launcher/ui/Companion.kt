@@ -17,6 +17,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -88,6 +89,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.eclipse.launcher.EclipseVM
 import com.eclipse.launcher.data.ArtKind
+import com.eclipse.launcher.data.CompanionData
+import com.eclipse.launcher.data.RaProgress
+import com.eclipse.launcher.data.RetroAch
 import com.eclipse.launcher.data.Game
 import com.eclipse.launcher.data.Guides
 import com.eclipse.launcher.data.Platforms
@@ -191,7 +195,7 @@ fun CompanionHub(vm: EclipseVM, g: Game, close: () -> Unit) {
     val ctx = LocalContext.current
     val root = ctx.filesDir
     val scope = rememberCoroutineScope()
-    val tabs = listOf("Guides", "Manual")
+    val tabs = listOf("Guides", "Manual", "Maps", "Checklist", "Trophies")
     val pager = rememberPagerState(pageCount = { tabs.size })
     var browser by remember { mutableStateOf<Guides.Site?>(null) }
     var reading by remember { mutableStateOf<Guides.Saved?>(null) }
@@ -200,6 +204,19 @@ fun CompanionHub(vm: EclipseVM, g: Game, close: () -> Unit) {
     var soon by remember { mutableStateOf(false) }
     var signIn by remember { mutableStateOf(false) }
     var savedTick by remember { mutableIntStateOf(0) } // bumps when a guide is saved / deleted: lists reload
+    var mapView by remember { mutableStateOf<CompanionData.GameMap?>(null) }
+    // what the tabs say beside their names: maps kept, checklist ticked / total, achievements earned
+    var mapCount by remember { mutableIntStateOf(0) }
+    var ticks by remember { mutableStateOf(0 to 0) }
+    var ra by remember { mutableStateOf<RaProgress?>(null) }
+    var raLoaded by remember { mutableStateOf(false) }
+    LaunchedEffect(g.id, savedTick) {
+        withContext(Dispatchers.IO) {
+            mapCount = CompanionData.maps(root, g.id).size
+            ticks = CompanionData.checklist(root, g.id).let { l -> l.count { it.done } to l.size }
+        }
+    }
+    LaunchedEffect(g.id) { ra = runCatching { vm.loadRa(g) }.getOrNull(); raLoaded = true }
 
     BackHandler {
         when {
@@ -207,6 +224,7 @@ fun CompanionHub(vm: EclipseVM, g: Game, close: () -> Unit) {
             signIn -> signIn = false
             searching -> searching = false
             reading != null -> reading = null
+            mapView != null -> mapView = null
             manual != null -> manual = null
             browser != null -> browser = null
             else -> close()
@@ -216,7 +234,7 @@ fun CompanionHub(vm: EclipseVM, g: Game, close: () -> Unit) {
     Box(Modifier.fillMaxSize().background(C.bg)) {
         // like Now Playing: the game's art (else the theme's bottom-screen wallpaper), blurred, under a dark tint.
         // Not drawn while the browser / reader / manual covers the hub (a blur redrawn under them made them slow).
-        val covered = browser != null || reading != null || manual != null
+        val covered = browser != null || reading != null || manual != null || mapView != null
         if (!covered) {
             val bg = vm.artOf(g, ArtKind.HERO) ?: vm.artOf(g, ArtKind.BACKDROP) ?: vm.wallpaperBottom()
             if (bg != null) coil.compose.AsyncImage(bg, null, Modifier.fillMaxSize().softBlur(18.dp), contentScale = ContentScale.Crop)
@@ -237,15 +255,24 @@ fun CompanionHub(vm: EclipseVM, g: Game, close: () -> Unit) {
                 HubPill("✕ Close", onClick = close)
             }
             // tabs: tap one, or swipe the page
-            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp)) {
                 tabs.forEachIndexed { i, t ->
                     val on = pager.currentPage == i
+                    val count = when (t) {
+                        "Maps" -> mapCount.takeIf { it > 0 }?.toString()
+                        "Checklist" -> ticks.takeIf { it.second > 0 }?.let { "${it.first}/${it.second}" }
+                        "Trophies" -> ra?.takeIf { it.total > 0 }?.let { "${it.earned * 100 / it.total}%" }
+                        else -> null
+                    }
                     Column(
                         Modifier.clickable { scope.launch { pager.animateScrollToPage(i) } }.padding(horizontal = 12.dp, vertical = 11.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(t.uppercase(), color = if (on) INK else SUB, fontSize = 11.5.sp, letterSpacing = 1.4.sp,
-                            fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(t.uppercase(), color = if (on) INK else SUB, fontSize = 11.5.sp, letterSpacing = 1.4.sp,
+                                fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal)
+                            if (count != null) Text(count, color = C.accent, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 5.dp))
+                        }
                         Box(Modifier.padding(top = 6.dp).size(width = 44.dp, height = 2.dp).background(if (on) C.accent else Color.Transparent))
                     }
                 }
@@ -254,16 +281,30 @@ fun CompanionHub(vm: EclipseVM, g: Game, close: () -> Unit) {
             HorizontalPager(pager, Modifier.fillMaxWidth().weight(1f)) { p ->
                 when (p) {
                     0 -> GuidesTab(g, root, savedTick, open = { browser = it }, read = { reading = it }, changed = { savedTick++ })
+                    2 -> MapsTab(g, root, savedTick, open = { browser = it }, view = { mapView = it }, changed = { savedTick++ })
+                    3 -> ChecklistTab(g, root, savedTick, changed = { savedTick++ })
+                    4 -> TrophiesTab(ra, raLoaded)
                     else -> ManualTab(vm, g, root, open = { manual = it }, soon = { if (vm.ssBuilt) signIn = true else soon = true })
                 }
             }
         }
         browser?.let { site ->
-            HubBrowser(site, onBack = { browser = null }) { title, text, html, url ->
+            HubBrowser(site, onBack = { browser = null },
+                // the picture on the page, kept as a map (Maps tab)
+                onMap = { url, title ->
+                    val f = CompanionData.newMapFile(root, g.id)
+                    val ok = com.eclipse.launcher.data.Http.download(url, f) &&
+                        withContext(Dispatchers.IO) { android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }.also { android.graphics.BitmapFactory.decodeFile(f.path, it) }.outWidth > 0 }
+                    if (ok) withContext(Dispatchers.IO) { CompanionData.addMap(root, g.id, f, title) } else f.delete()
+                    if (ok) savedTick++
+                    ok
+                }
+            ) { title, text, html, url ->
                 Guides.save(root, g.id, title, site.name, url, text, html)
                 savedTick++
             }
         }
+        mapView?.let { m -> MapViewer(g, root, m) { mapView = null; savedTick++ } }
         reading?.let { s -> GuideReader(g, s) { reading = null; savedTick++ } }
         manual?.let { f -> ManualViewer(f) { manual = null } }
         if (searching) HubSearch(g, onCancel = { searching = false }) { q ->
@@ -343,9 +384,26 @@ private fun GuidesTab(
     }
 }
 
+/**
+ * Settings that keep a guide page scrolling smoothly. No pre-drawing of the whole page off screen (on a long guide
+ * that's a lot of memory and drawing for nothing: the browser already draws a little ahead of what's showing); the
+ * page's own process keeps full priority (the bottom screen's window never has focus, which can lower it); no
+ * stretch effect at the ends.
+ */
+internal fun WebView.smoothScrolling() {
+    settings.offscreenPreRaster = false
+    if (android.os.Build.VERSION.SDK_INT >= 26) setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false)
+    overScrollMode = android.view.View.OVER_SCROLL_NEVER
+    settings.setGeolocationEnabled(false)
+}
+
 /** The in-Companion browser: ads blocked, and a Save button that keeps the page's guide text for the reader. */
 @Composable
-private fun HubBrowser(site: Guides.Site, onBack: () -> Unit, onSave: (title: String, text: String, html: Boolean, url: String) -> Unit) {
+private fun HubBrowser(
+    site: Guides.Site, onBack: () -> Unit, onMap: suspend (url: String, title: String) -> Boolean,
+    onSave: (title: String, text: String, html: Boolean, url: String) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
     var web by remember { mutableStateOf<WebView?>(null) }
     var status by remember { mutableStateOf<String?>(null) }
     var title by remember { mutableStateOf(site.name) }
@@ -356,6 +414,26 @@ private fun HubBrowser(site: Guides.Site, onBack: () -> Unit, onSave: (title: St
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             HubPill("‹ Back") { val w = web; if (w != null && w.canGoBack()) w.goBack() else onBack() }
             Text(title, color = INK, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).padding(horizontal = 10.dp))
+            HubPill("⤓ Map") {
+                val w = web ?: return@HubPill
+                // the page itself when it's a picture, else the biggest picture on it
+                val js = """(function(){
+                    if((document.contentType||'').indexOf('image/')===0) return JSON.stringify([location.href, document.title||'']);
+                    var best=null, area=0, imgs=document.images;
+                    for(var i=0;i<imgs.length;i++){var im=imgs[i], a=im.naturalWidth*im.naturalHeight;
+                        if(im.naturalWidth>=300&&im.naturalHeight>=200&&a>area){area=a;best=im;}}
+                    return JSON.stringify([best?best.currentSrc||best.src:'', (best&&best.alt)||document.title||'']);
+                })()"""
+                w.evaluateJavascript(js) { res ->
+                    val arr = runCatching { JSONArray(JSONArray("[$res]").getString(0)) }.getOrNull()
+                    val url = arr?.optString(0).orEmpty()
+                    if (!url.startsWith("http")) { status = "No map picture on this page"; return@evaluateJavascript }
+                    status = "Saving the map…"
+                    val name = arr?.optString(1).orEmpty().ifBlank { url.substringAfterLast('/').substringBeforeLast('.') }.take(60)
+                    scope.launch { status = if (onMap(url, name)) "Saved · it's under Maps" else "That picture couldn't be saved" }
+                }
+            }
+            Spacer(Modifier.width(6.dp))
             HubPill("⤓ Save", gold = true) {
                 val w = web ?: return@HubPill
                 // the guide's own text: GameFAQs' plain-text guides sit in a <pre>; wiki and article pages in their
@@ -385,13 +463,22 @@ private fun HubBrowser(site: Guides.Site, onBack: () -> Unit, onSave: (title: St
                         settings.loadWithOverviewMode = true
                         settings.useWideViewPort = true
                         settings.mediaPlaybackRequiresUserGesture = true
-                        settings.offscreenPreRaster = true
+                        smoothScrolling()
                         webViewClient = object : WebViewClient() {
                             override fun shouldInterceptRequest(view: WebView?, request: android.webkit.WebResourceRequest?): android.webkit.WebResourceResponse? =
                                 if (com.eclipse.launcher.data.AdBlock.blocked(request?.url?.host))
                                     android.webkit.WebResourceResponse("text/plain", "utf-8", java.io.ByteArrayInputStream(ByteArray(0)))
                                 else null
                             override fun onPageFinished(view: WebView?, url: String?) { title = view?.title?.takeIf { it.isNotBlank() } ?: site.name }
+                            // the game's own page was a guess and isn't there: the site's search instead
+                            private var fellBack = false
+                            override fun onReceivedHttpError(view: WebView?, request: android.webkit.WebResourceRequest?, errorResponse: android.webkit.WebResourceResponse?) {
+                                val fb = site.fallback ?: return
+                                if (!fellBack && request?.isForMainFrame == true && request.url?.toString() == site.url && (errorResponse?.statusCode ?: 0) >= 400) {
+                                    fellBack = true
+                                    view?.post { view.loadUrl(fb) }
+                                }
+                            }
                         }
                         loadUrl(site.url)
                         web = this
@@ -835,6 +922,387 @@ private fun ManualViewer(file: File, onBack: () -> Unit) {
                 else -> Image(bmp!!.asImageBitmap(), null, contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize().graphicsLayer { scaleX = scale; scaleY = scale; translationX = offset.x; translationY = offset.y })
             }
+        }
+    }
+}
+
+
+// ---------------------------------------------------------------- a small typing box (new checklist item, marker label)
+
+@Composable
+private fun HubInput(title: String, hint: String, button: String, start: String = "", onCancel: () -> Unit, onGo: (String) -> Unit) {
+    var text by remember { mutableStateOf(start) }
+    val fr = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    // the bottom screen's window takes focus while typing (it can't get the keyboard otherwise)
+    DisposableEffect(Unit) { onDispose { com.eclipse.launcher.media.SecondaryPresentation.current?.setTyping(false) } }
+    LaunchedEffect(Unit) {
+        com.eclipse.launcher.media.SecondaryPresentation.current?.setTyping(true)
+        delay(80)
+        runCatching { fr.requestFocus() }
+        keyboard?.show()
+    }
+    fun go() { keyboard?.hide(); if (text.isNotBlank()) onGo(text.trim()) else onCancel() }
+    Box(Modifier.fillMaxSize().background(Color(0xB3000000)).clickable(onClick = onCancel), contentAlignment = Alignment.TopCenter) {
+        Column(
+            Modifier.padding(top = 40.dp).widthIn(max = 420.dp).fillMaxWidth().padding(horizontal = 16.dp).clip(RoundedCornerShape(14.dp))
+                .background(PANEL).border(1.dp, LINE, RoundedCornerShape(14.dp)).clickable(enabled = false) {}.padding(14.dp)
+        ) {
+            Text(title, color = INK, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 10.dp))
+            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0x59000000)).border(1.dp, LINE, RoundedCornerShape(10.dp)).padding(12.dp)) {
+                BasicTextField(
+                    text, { text = it }, singleLine = true,
+                    textStyle = TextStyle(color = INK, fontSize = 15.sp), cursorBrush = SolidColor(C.accent),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { go() }),
+                    modifier = Modifier.fillMaxWidth().focusRequester(fr)
+                )
+                if (text.isEmpty()) Text(hint, color = SUB, fontSize = 15.sp)
+            }
+            Row(Modifier.align(Alignment.End).padding(top = 12.dp)) {
+                HubPill("Cancel", onClick = onCancel)
+                Spacer(Modifier.width(8.dp))
+                HubPill(button, gold = true) { go() }
+            }
+        }
+    }
+}
+
+/** A small pop-up with a title, a note and its buttons. */
+@Composable
+private fun HubSheet(title: String, note: String?, onDismiss: () -> Unit, buttons: @Composable () -> Unit) {
+    Box(Modifier.fillMaxSize().background(Color(0x99000000)).clickable(onClick = onDismiss), contentAlignment = Alignment.Center) {
+        Column(Modifier.widthIn(max = 320.dp).clip(RoundedCornerShape(14.dp)).background(PANEL)
+            .border(1.dp, LINE, RoundedCornerShape(14.dp)).clickable(enabled = false) {}.padding(16.dp)) {
+            Text(title, color = INK, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            if (note != null) Text(note, color = SUB, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+            Spacer(Modifier.height(12.dp))
+            buttons()
+        }
+    }
+}
+
+// ---------------------------------------------------------------- Checklist tab
+
+/** Your own list for the game: tap to tick, hold for Missable / Delete. Items can come from a saved guide's sections. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ChecklistTab(g: Game, root: File, tick: Int, changed: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var items by remember { mutableStateOf<List<CompanionData.Item>>(emptyList()) }
+    var guides by remember { mutableStateOf<List<Guides.Saved>>(emptyList()) }
+    LaunchedEffect(g.id) { items = withContext(Dispatchers.IO) { CompanionData.checklist(root, g.id) } }
+    LaunchedEffect(g.id, tick) { guides = withContext(Dispatchers.IO) { Guides.saved(root, g.id) } }
+    var adding by remember { mutableStateOf(false) }
+    var importing by remember { mutableStateOf(false) }
+    var menu by remember { mutableStateOf<CompanionData.Item?>(null) }
+    var note by remember { mutableStateOf<String?>(null) }
+    fun put(list: List<CompanionData.Item>) {
+        items = list
+        scope.launch { withContext(Dispatchers.IO) { CompanionData.saveChecklist(root, g.id, list) }; changed() }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) {
+            if (items.isNotEmpty()) item {
+                val done = items.count { it.done }
+                Column {
+                    SectionLabel("$done of ${items.size} done")
+                    Box(Modifier.padding(bottom = 8.dp).fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color(0x1AFFFFFF))) {
+                        Box(Modifier.fillMaxWidth(done.toFloat() / items.size).fillMaxHeight().background(C.accent))
+                    }
+                }
+            } else item {
+                Text("Nothing on the list yet. Add what you want to keep track of: collectibles, side quests, things you can miss.",
+                    color = SUB, fontSize = 12.sp, modifier = Modifier.padding(start = 2.dp, top = 10.dp, bottom = 10.dp))
+            }
+            itemsIndexed(items, key = { _, row -> row.id }) { _, row ->
+                val shape = RoundedCornerShape(10.dp)
+                Row(
+                    Modifier.fillMaxWidth().padding(bottom = 6.dp).heightIn(min = 48.dp).clip(shape).background(CARD).border(1.dp, LINE, shape)
+                        .combinedClickable(onClick = { put(items.map { x -> if (x.id == row.id) x.copy(done = !x.done) else x }) }, onLongClick = { menu = row })
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(Modifier.size(22.dp).clip(RoundedCornerShape(5.dp)).background(if (row.done) C.accent else Color.Transparent)
+                        .border(1.5.dp, if (row.done) C.accent else SUB, RoundedCornerShape(5.dp)), contentAlignment = Alignment.Center) {
+                        if (row.done) Text("✓", color = C.onAccent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Text(row.text, color = if (row.done) SUB else INK, fontSize = 13.5.sp, modifier = Modifier.weight(1f).padding(horizontal = 10.dp))
+                    if (row.missable) Text("MISSABLE", color = Color(0xFFFF8A7A), fontSize = 8.5.sp, letterSpacing = 1.sp,
+                        modifier = Modifier.border(1.dp, Color(0x73FF8A7A), RoundedCornerShape(4.dp)).padding(horizontal = 5.dp, vertical = 1.dp))
+                }
+            }
+            item { Column {
+                Row(Modifier.padding(top = 4.dp)) {
+                    HubPill("＋ Add item", gold = true) { adding = true }
+                    Spacer(Modifier.width(8.dp))
+                    HubPill("Import from a guide") { if (guides.isEmpty()) note = "Save a guide first (Guides → open one → Save). Its section titles can then be added here." else importing = true }
+                }
+                Text("Tap to tick. Hold an item to mark it missable or delete it.", color = SUB, fontSize = 11.sp,
+                    modifier = Modifier.padding(top = 10.dp, start = 2.dp, bottom = 16.dp))
+            } }
+        }
+        menu?.let { row ->
+            HubSheet(row.text, null, onDismiss = { menu = null }) {
+                Row {
+                    HubPill(if (row.missable) "Not missable" else "Missable") { put(items.map { x -> if (x.id == row.id) x.copy(missable = !x.missable) else x }); menu = null }
+                    Spacer(Modifier.width(8.dp))
+                    HubPill("Delete") { put(items.filter { x -> x.id != row.id }); menu = null }
+                    Spacer(Modifier.width(8.dp))
+                    HubPill("Cancel") { menu = null }
+                }
+            }
+        }
+        if (importing) HubSheet("Import from a guide", "Adds the guide's section titles as items.", onDismiss = { importing = false }) {
+            Column {
+                guides.take(6).forEach { s ->
+                    HubRow("TXT", 0xFF5A4A1A, s.title, s.source, trailing = "＋") {
+                        importing = false
+                        scope.launch {
+                            val more = withContext(Dispatchers.IO) { CompanionData.fromGuide(s, items) }
+                            if (more.isEmpty()) note = "No section titles were found in that guide." else put(items + more)
+                        }
+                    }
+                }
+                HubPill("Cancel", modifier = Modifier.align(Alignment.End)) { importing = false }
+            }
+        }
+        note?.let { n -> SoonPopup("Checklist", n) { note = null } }
+        if (adding) HubInput("Add to the checklist", "Heart piece in the graveyard…", "Add", onCancel = { adding = false }) { t ->
+            adding = false
+            put(items + CompanionData.Item(System.currentTimeMillis(), t))
+        }
+    }
+}
+
+// ---------------------------------------------------------------- Trophies tab
+
+/** The game's RetroAchievements: what's left (missable ones first), or everything. */
+@Composable
+private fun TrophiesTab(p: RaProgress?, loaded: Boolean) {
+    var show by remember { mutableStateOf("Locked") }
+    if (p == null || p.total == 0) {
+        Text(if (!loaded) "Asking RetroAchievements…" else "No achievements to show. Sign in to RetroAchievements under Settings → Connections; games it doesn't know have none.",
+            color = SUB, fontSize = 12.sp, modifier = Modifier.padding(16.dp))
+        return
+    }
+    val missable = remember(p) { p.achievements.count { !it.earned && it.type == "missable" } }
+    val list = remember(p, show) {
+        when (show) {
+            "Missable" -> p.achievements.filter { !it.earned && it.type == "missable" }
+            "Locked" -> p.achievements.filter { !it.earned }.sortedByDescending { it.type == "missable" }
+            else -> p.achievements
+        }
+    }
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) {
+        item { Column {
+            SectionLabel("${p.earned} of ${p.total} · ${p.earned * 100 / p.total}%")
+            Box(Modifier.padding(bottom = 8.dp).fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color(0x1AFFFFFF))) {
+                Box(Modifier.fillMaxWidth(p.earned.toFloat() / p.total).fillMaxHeight().background(C.accent))
+            }
+            Row(Modifier.padding(bottom = 8.dp)) {
+                listOf("Locked", "Missable", "All").forEach { f ->
+                    HubPill(if (f == "Missable" && missable > 0) "Missable $missable" else f, gold = show == f) { show = f }
+                    Spacer(Modifier.width(6.dp))
+                }
+            }
+        } }
+        if (list.isEmpty()) item {
+            Text(if (show == "Missable") "Nothing missable left." else "Every achievement is unlocked.", color = SUB, fontSize = 12.sp, modifier = Modifier.padding(4.dp))
+        }
+        itemsIndexed(list, key = { _, a -> a.id }) { _, a ->
+            val shape = RoundedCornerShape(10.dp)
+            Row(Modifier.fillMaxWidth().padding(bottom = 6.dp).heightIn(min = 52.dp).clip(shape).background(CARD).border(1.dp, LINE, shape)
+                .padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                coil.compose.AsyncImage(RetroAch.badgeUrl(a.badge), null, Modifier.size(36.dp).clip(RoundedCornerShape(7.dp)), alpha = if (a.earned) 1f else 0.45f)
+                Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(a.title, color = if (a.earned) SUB else INK, fontSize = 13.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                        if (a.type == "missable" && !a.earned) Text("MISSABLE", color = Color(0xFFFF8A7A), fontSize = 8.5.sp, letterSpacing = 1.sp,
+                            modifier = Modifier.padding(start = 6.dp).border(1.dp, Color(0x73FF8A7A), RoundedCornerShape(4.dp)).padding(horizontal = 5.dp, vertical = 1.dp))
+                    }
+                    Text(if (a.earned) "Unlocked" + (a.date?.let { " · " + it.take(10) } ?: "") else a.description, color = SUB, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+                Text(if (a.earned) "✓" else "${a.points}", color = if (a.earned) C.accent else SUB, fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------- Maps tab
+
+/** Maps kept for the game: pictures saved from a web page, or a screenshot of the top screen. Open one to zoom and pin. */
+@Composable
+private fun MapsTab(g: Game, root: File, tick: Int, open: (Guides.Site) -> Unit, view: (CompanionData.GameMap) -> Unit, changed: () -> Unit) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var maps by remember { mutableStateOf<List<CompanionData.GameMap>>(emptyList()) }
+    LaunchedEffect(g.id, tick) { maps = withContext(Dispatchers.IO) { CompanionData.maps(root, g.id) } }
+    var deleting by remember { mutableStateOf<CompanionData.GameMap?>(null) }
+    var status by remember { mutableStateOf<String?>(null) }
+    val site = remember(g.platform) { Guides.mapSite(g.platform) }
+
+    fun screenshot() {
+        status = "Taking a picture of the top screen…"
+        val started = com.eclipse.launcher.media.ScreenshotService.capture(ctx, g.name) { r ->
+            val uri = (r as? com.eclipse.launcher.media.ScreenshotService.Companion.Result.Saved)?.uri
+            if (uri == null) { status = "The screenshot couldn't be kept as a map"; return@capture }
+            scope.launch {
+                val ok = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val f = CompanionData.newMapFile(root, g.id)
+                        ctx.contentResolver.openInputStream(uri)!!.use { i -> f.outputStream().use { o -> i.copyTo(o) } }
+                        val stamp = java.text.SimpleDateFormat("d MMM, HH:mm", java.util.Locale.US).format(java.util.Date())
+                        CompanionData.addMap(root, g.id, f, "Screenshot · $stamp")
+                    }.isSuccess
+                }
+                status = if (ok) null else "The screenshot couldn't be kept as a map"
+                if (ok) changed()
+            }
+        }
+        if (!started) status = "Screenshots need Eclipse's accessibility service turned on (Settings)"
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) {
+            if (maps.isNotEmpty()) {
+                item { SectionLabel("On this device") }
+                itemsIndexed(maps, key = { _, m -> m.file.name }) { _, m ->
+                    HubRow("MAP", 0xFF3A5A2C, m.name, (if (m.markers.isEmpty()) "No markers" else "${m.markers.size} marker${if (m.markers.size == 1) "" else "s"}") + " · hold to delete",
+                        trailing = "›", onLongClick = { deleting = m }) { view(m) }
+                }
+            }
+            item { SectionLabel("Add a map") }
+            item { HubRow("📷", 0xFF444444, "Screenshot the top screen", "Keeps what the game is showing now (its own map screen, say)", trailing = "＋") { screenshot() } }
+            item { HubRow(site.badge, site.color, site.name, site.note, trailing = "↗") { open(site) } }
+            status?.let { s -> item { Text(s, color = C.accent, fontSize = 12.sp, modifier = Modifier.padding(4.dp)) } }
+            item {
+                Text("On any page in the Companion's browser, Map keeps the biggest picture on it here. Open a map to pinch, drag, and hold to drop a marker.",
+                    color = SUB, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp, start = 2.dp, end = 2.dp, bottom = 16.dp))
+            }
+        }
+        deleting?.let { m ->
+            HubSheet("Delete this map?", m.name, onDismiss = { deleting = null }) {
+                Row {
+                    HubPill("Cancel") { deleting = null }
+                    Spacer(Modifier.width(8.dp))
+                    HubPill("Delete", gold = true) {
+                        deleting = null
+                        scope.launch { withContext(Dispatchers.IO) { CompanionData.deleteMap(root, g.id, m) }; changed() }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** One map: pinch to zoom, drag to move, hold to drop a marker, tap a marker to remove it. Markers are kept. */
+@Composable
+private fun MapViewer(g: Game, root: File, map0: CompanionData.GameMap, onBack: () -> Unit) {
+    BackHandler { onBack() }
+    val scope = rememberCoroutineScope()
+    var map by remember { mutableStateOf(map0) }
+    var bmp by remember { mutableStateOf<Bitmap?>(null) }
+    var failed by remember { mutableStateOf(false) }
+    LaunchedEffect(map0.file) {
+        bmp = withContext(Dispatchers.IO) {
+            runCatching {
+                // big atlas maps are read at a size the screen can hold
+                val o = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                android.graphics.BitmapFactory.decodeFile(map0.file.path, o)
+                var sample = 1
+                while (maxOf(o.outWidth, o.outHeight) / sample > 4096) sample *= 2
+                android.graphics.BitmapFactory.decodeFile(map0.file.path, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
+            }.getOrNull()
+        }
+        failed = bmp == null
+    }
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+    var pending by remember { mutableStateOf<Offset?>(null) }   // a new marker's place (0..1), waiting for its label
+    var picked by remember { mutableStateOf<CompanionData.Marker?>(null) }
+    fun keep(m: CompanionData.GameMap) {
+        map = m
+        scope.launch { withContext(Dispatchers.IO) { CompanionData.updateMap(root, g.id, m) } }
+    }
+
+    Column(Modifier.fillMaxSize().background(C.bg)) {
+        Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            HubPill("‹ Maps", onClick = onBack)
+            Text(map.name, color = INK, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).padding(horizontal = 10.dp))
+            Text("Hold to add a marker", color = SUB, fontSize = 11.sp, modifier = Modifier.padding(end = 6.dp))
+            HubPill("1:1", enabled = scale != 1f) { scale = 1f; offset = Offset.Zero }
+        }
+        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f).padding(8.dp).clip(RoundedCornerShape(8.dp)).background(Color.Black)) {
+            val b = bmp
+            val boxW = constraints.maxWidth.toFloat()
+            val boxH = constraints.maxHeight.toFloat()
+            if (b == null) {
+                Text(if (failed) "This picture can't be opened." else "Opening…", color = SUB, fontSize = 13.sp, modifier = Modifier.align(Alignment.Center))
+            } else {
+                // where the picture sits when it's fitted into the box (before zooming)
+                val fit = minOf(boxW / b.width, boxH / b.height)
+                val w = b.width * fit
+                val h = b.height * fit
+                val left = (boxW - w) / 2f
+                val top = (boxH - h) / 2f
+                val cx = boxW / 2f
+                val cy = boxH / 2f
+                Image(b.asImageBitmap(), null, contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize()
+                        .pointerInput(b) {
+                            detectTransformGestures { _, pan, zoom, _ ->
+                                scale = (scale * zoom).coerceIn(1f, 10f)
+                                offset = if (scale > 1f) {
+                                    val mx = boxW * (scale - 1f) / 2f
+                                    val my = boxH * (scale - 1f) / 2f
+                                    Offset((offset.x + pan.x).coerceIn(-mx, mx), (offset.y + pan.y).coerceIn(-my, my))
+                                } else Offset.Zero
+                            }
+                        }
+                        .pointerInput(b) {
+                            detectTapGestures(onLongPress = { pos ->
+                                // the finger's place on the picture, 0..1 across and down
+                                val fx = cx + (pos.x - offset.x - cx) / scale
+                                val fy = cy + (pos.y - offset.y - cy) / scale
+                                val nx = (fx - left) / w
+                                val ny = (fy - top) / h
+                                if (nx in 0f..1f && ny in 0f..1f) pending = Offset(nx, ny)
+                            })
+                        }
+                        .graphicsLayer { scaleX = scale; scaleY = scale; translationX = offset.x; translationY = offset.y })
+                val dot = with(LocalDensity.current) { 9.dp.toPx() }
+                map.markers.forEach { m ->
+                    val sx = cx + (left + m.x * w - cx) * scale + offset.x
+                    val sy = cy + (top + m.y * h - cy) * scale + offset.y
+                    if (sx >= 0f && sx <= boxW && sy >= 0f && sy <= boxH) {
+                        Row(
+                            Modifier.offset { androidx.compose.ui.unit.IntOffset((sx - dot).toInt(), (sy - dot).toInt()) }.clickable { picked = m },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(Modifier.size(18.dp).clip(CircleShape).background(C.accent).border(2.dp, Color.Black, CircleShape))
+                            if (m.label.isNotBlank()) Text(m.label, color = Color.White, fontSize = 11.sp, maxLines = 1,
+                                modifier = Modifier.padding(start = 4.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xCC000000)).padding(horizontal = 7.dp, vertical = 2.dp))
+                        }
+                    }
+                }
+            }
+        }
+    }
+    picked?.let { m ->
+        HubSheet(m.label.ifBlank { "Marker" }, null, onDismiss = { picked = null }) {
+            Row {
+                HubPill("Remove marker") { keep(map.copy(markers = map.markers.filter { it !== m })); picked = null }
+                Spacer(Modifier.width(8.dp))
+                HubPill("Cancel") { picked = null }
+            }
+        }
+    }
+    pending?.let { at ->
+        HubInput("Marker", "What's here? (heart piece, locked door…)", "Add", onCancel = { pending = null }) { label ->
+            pending = null
+            keep(map.copy(markers = map.markers + CompanionData.Marker(at.x, at.y, label)))
         }
     }
 }

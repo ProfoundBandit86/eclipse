@@ -218,6 +218,8 @@ class SecondaryPresentation(
         setCanceledOnTouchOutside(false)
         // Touch-only surface by default (the controller stays on the main screen); see [applyFocusMode]
         applyFocusMode()
+        // (drawn by the graphics chip, like the main window: a web page scrolled without it crawls)
+        window?.addFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED)
         savedState.performRestore(null)
         registry.currentState = Lifecycle.State.CREATED
         val decor = window!!.decorView

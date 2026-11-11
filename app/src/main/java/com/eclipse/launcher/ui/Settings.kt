@@ -954,7 +954,7 @@ private fun ToolsTab(vm: EclipseVM) {
                 vm.chdJob != null -> "Converting ${vm.chdJob!!.index + 1} of ${vm.chdJob!!.total}\u2026"
                 chd == null -> "Looking for games to compress\u2026"
                 chd == 0 -> "Everything is already compressed."
-                else -> "$chd game${if (chd == 1) "" else "s"} not compressed yet. Smaller files, same games: discs to CHD (GameCube / Wii to RVZ, Xbox to XISO, Xbox 360 to ZAR), cartridges to ZIP, 3DS to Z3DS for Azahar."
+                else -> "$chd game${if (chd == 1) "" else "s"} not compressed yet. Smaller files, same games: discs to CHD (GameCube / Wii to RVZ, Xbox to XISO, Xbox 360 to ZAR), cartridges to ZIP, 3DS to Z3DS for Azahar, Wii U to WUX / WUA."
             }
         ) { open(0) }
         DropSection("Multi-disc games")

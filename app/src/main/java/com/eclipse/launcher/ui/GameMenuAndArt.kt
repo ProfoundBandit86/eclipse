@@ -308,6 +308,8 @@ fun GameMenu(vm: EclipseVM, g: Game) = Glass {
                         if (vm.isRommEntry(g)) PagePill("↓  Install", gold = true, fr = playFocus) { close(); vm.rommOpen(g, "download") }
                         else PagePill("▶  Play", gold = true, fr = playFocus) { close(); vm.play(g) }
                         if (!g.id.startsWith("rm:")) PagePill(if (vm.isFavGame(g)) "♥  Favourite" else "♡  Favourite", on = vm.isFavGame(g)) { vm.toggleFavGame(g) }
+                        // guides and manuals for this game (on the bottom screen when it's showing)
+                        if (g.platform != "android") PagePill("\uD83D\uDCD6  Companion") { vm.openCompanion(g) }
                     }
                     Box(Modifier.fillMaxSize().padding(start = btnW + 14.dp, top = midTop, bottom = if (p != null) 58.dp else 0.dp)) {
                         if (fields[5].isNotBlank()) DescriptionPreview(fields[5], Modifier.fillMaxSize()) { descOpen = true }
@@ -431,7 +433,7 @@ fun GameMenu(vm: EclipseVM, g: Game) = Glass {
                             val j = vm.chdJobFor(g)
                             val saved = vm.chdSavedFor[g.id]
                             val label = when (fmt) {
-                                "ZIP", "ZAR" -> "Compress to $fmt"
+                                "ZIP", "ZAR", "WUX", "WUA" -> "Compress to $fmt"
                                 "Z3DS" -> "Compress for Azahar"
                                 "XISO" -> "Make XISO"
                                 else -> "Convert to $fmt"
@@ -440,7 +442,7 @@ fun GameMenu(vm: EclipseVM, g: Game) = Glass {
                                 j != null -> OptRow(label, "${j.phase} ${(j.progress * 100).toInt()}%") { }
                                 saved != null -> OptRow(label, "Saved ${vm.fmtBytes(saved)}") { }
                                 vm.canConvertToChd(g) -> OptRow(label, "\u203A") { vm.convertGameToChd(g) }
-                                else -> OptRow(label, when (fmt) { "Z3DS" -> "Already compressed, or not a .cci / .cxi / .3dsx / .cia"; "ZIP", "ZAR", "XISO" -> "Already compressed"; else -> "Not a disc game" }, muted = true) { }
+                                else -> OptRow(label, when (fmt) { "Z3DS" -> "Already compressed, or not a .cci / .cxi / .3dsx / .cia"; "WUX" -> "Already compressed, or not a .wud"; "WUA" -> "Already compressed, or not a Wii U game folder"; "ZIP", "ZAR", "XISO" -> "Already compressed"; else -> "Not a disc game" }, muted = true) { }
                             }
                         }
                         run { val f = first(); fOpts += { OptRow("Rescrape", "\u203A", fr = f) { vm.rescrapeGame(g) } } }
