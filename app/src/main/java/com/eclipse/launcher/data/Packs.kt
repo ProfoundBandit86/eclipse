@@ -14,6 +14,8 @@ import java.util.zip.ZipInputStream
 object Packs {
     const val ICONS = "icons"
     const val BACKDROPS = "backdrops"
+    /** system logos: wide pictures with the system's name (snes.png …), shown where Eclipse writes a system's name */
+    const val LOGOS = "logos"
 
     data class Pack(val id: String, val kind: String, val name: String, val dir: File, val images: Map<String, File>)
 
@@ -110,7 +112,9 @@ object Packs {
                 ThemeConvert.system(f.nameWithoutExtension)?.let { id -> m.putIfAbsent(id, f) }
             }
             if (m.isEmpty()) null
-            else ThemeConvert.FolderChoice(d.relativeTo(src).path.ifEmpty { "(top of the zip)" }, d, m, guesses[d.canonicalPath] ?: ThemeConvert.SKIP)
+            else ThemeConvert.FolderChoice(d.relativeTo(src).path.ifEmpty { "(top of the zip)" }, d, m, guesses[d.canonicalPath] ?: ThemeConvert.SKIP,
+                // the pictures of systems Eclipse doesn't have yet come along (only from a real folder of system pictures)
+                if (m.size >= 5) ThemeConvert.othersIn(d, m) else emptyMap())
         }.sortedByDescending { it.files.size }.toList()
     }
 
@@ -133,6 +137,11 @@ object Packs {
         dest.deleteRecursively() // importing the same pack again replaces it
         dest.mkdirs()
         for ((sys, f) in folder.files) f.copyTo(File(dest, "$sys.${f.extension.lowercase()}"), overwrite = true)
+        // every other picture too, under its own name: used once Eclipse has a system by that name
+        for ((name, f) in folder.others) {
+            val out = File(dest, "$name.${f.extension.lowercase()}")
+            if (!out.exists()) f.copyTo(out)
+        }
         File(dest, "pack.json").writeText(JSONObject().put("name", name).toString())
         return load(dest, kind)?.let { Step.Done(it) } ?: Step.Failed("Nothing usable in that folder")
     }

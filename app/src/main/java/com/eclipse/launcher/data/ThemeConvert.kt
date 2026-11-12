@@ -92,7 +92,22 @@ object ThemeConvert {
     }
 
     /** A folder of pictures named after systems, as offered on the import screen, with Eclipse's guess at its role. */
-    data class FolderChoice(val rel: String, val dir: File, val files: Map<String, File>, val guess: String)
+    /**
+     * [files]: pictures of systems Eclipse has (by its id). [others]: the folder's other pictures, for systems Eclipse
+     * doesn't have yet (by [otherSystem] name): imported too, unused until such a system exists.
+     */
+    data class FolderChoice(val rel: String, val dir: File, val files: Map<String, File>, val guess: String, val others: Map<String, File> = emptyMap())
+
+    /** The other pictures in [dir] (see [FolderChoice.others]): every picture not already among [known]. */
+    fun othersIn(dir: File, known: Map<String, File>): Map<String, File> {
+        val used = known.values.toHashSet()
+        val m = LinkedHashMap<String, File>()
+        dir.listFiles()?.filter { it.isFile && it.extension.lowercase() in imageExts && it !in used && system(it.nameWithoutExtension) == null }
+            ?.sortedBy { it.name.lowercase() }?.forEach { f ->
+                otherSystem(f.nameWithoutExtension)?.let { k -> if (k !in known) m.putIfAbsent(k, f) }
+            }
+        return m
+    }
 
     /** The roles a folder can play: platform icons, logos (drawn onto icons), system backdrops, or left out. */
     const val ICONS = "icons"; const val LOGOS = "logos"; const val BACKDROPS = "backdrops"; const val SKIP = "skip"
@@ -120,7 +135,7 @@ object ThemeConvert {
             .maxByOrNull { it.files.size + bonus(words(it), "logo", "wheel") }
         return folders.map { f ->
             val guess = when (f) { cardDir -> ICONS; bgDir -> BACKDROPS; logoDir -> LOGOS; else -> SKIP }
-            FolderChoice(f.dir.relativeTo(src).path.ifEmpty { "(top of the zip)" }, f.dir, f.files, guess)
+            FolderChoice(f.dir.relativeTo(src).path.ifEmpty { "(top of the zip)" }, f.dir, f.files, guess, othersIn(f.dir, f.files))
         }.sortedWith(compareBy({ it.guess == SKIP }, { it.rel.lowercase() }))
     }
 
@@ -130,7 +145,10 @@ object ThemeConvert {
         val kind = if (src.walkTopDown().maxDepth(2).any { it.name.equals("theme.xml", true) || it.name.equals("capabilities.xml", true) }) "ES-DE" else "a frontend theme"
         fun merged(role: String): Map<String, File> {
             val m = LinkedHashMap<String, File>()
-            folders.filter { (roles[it.rel] ?: it.guess) == role }.forEach { f -> f.files.forEach { (id, file) -> m.putIfAbsent(id, file) } }
+            val picked = folders.filter { (roles[it.rel] ?: it.guess) == role }
+            picked.forEach { f -> f.files.forEach { (id, file) -> m.putIfAbsent(id, file) } }
+            // and the pictures of systems Eclipse doesn't have yet, kept under their own names
+            picked.forEach { f -> f.others.forEach { (k, file) -> m.putIfAbsent(k, file) } }
             return m
         }
         val bgFolders = folders.filter { (roles[it.rel] ?: it.guess) == BACKDROPS }
@@ -259,7 +277,39 @@ object ThemeConvert {
         if (bare in FAV_NAMES) return Platforms.FAVORITES
         if (bare in ALL_NAMES) return Platforms.ALL
         if (n.startsWith("_") || n.startsWith("auto-") || n.endsWith("_collection")) return null
+        ART_ALIASES[bare]?.let { return it }
         return (Platforms.byId(n) ?: Platforms.matchFolder(n))?.id ?: if (n == "android") "android" else null
+    }
+
+    /**
+     * Names other frontends give their pictures for systems Eclipse files under one name (ES-DE's Android apps and
+     * games, its Windows 3.x / 9x). Pictures only: these don't change which folders are scanned for games.
+     */
+    private val ART_ALIASES = mapOf(
+        "androidapps" to "android", "androidgames" to "android",
+        "windows3x" to "windows", "windows9x" to "windows",
+    )
+
+    /** Pictures of other frontends' own screens and collections, not systems: never kept. */
+    private val NOT_SYSTEMS = setOf(
+        "completed", "nowplaying", "customcollections", "collections", "desktop", "emulators", "tools", "settings",
+        "default", "global", "all", "background", "wallpaper", "logo", "icon", "folder", "space", "placeholder", "unknown",
+    )
+
+    /**
+     * A picture in a folder of system pictures whose name isn't a system Eclipse has (yet): ES-DE themes carry
+     * art for ~200 systems. It's kept under its own name (lowercase, letters and digits, "-" and "_"), so the day
+     * Eclipse adds that system, or you name a system of your own after it, the picture is already there. Null for
+     * names that are clearly not systems.
+     */
+    fun otherSystem(name: String): String? {
+        val n = name.lowercase().trim()
+        if (n.startsWith("_") || n.startsWith("auto-") || n.startsWith(".") || n.endsWith("_collection")) return null
+        val bare = n.replace(Regex("[^a-z0-9]"), "")
+        if (bare.length < 2 || bare in NOT_SYSTEMS) return null
+        // theme screen parts (badge-favorite, icon-battery …): not systems
+        if (Regex("^(badge|icon|help|button|background|bg|frame|overlay|controller|logo)[-_ ]").containsMatchIn(n)) return null
+        return n.replace(Regex("[^a-z0-9_-]"), "")
     }
 
     private val FAV_NAMES = setOf("favorites", "favourites", "favorite", "favourite", "favs", "eclipsefavorites")
@@ -279,16 +329,24 @@ object ThemeConvert {
     ): Result? {
         val pDir = File(out, "icons").apply { mkdirs() }
         val bDir = File(out, "backdrops").apply { mkdirs() }
+        // the logos themselves too: shown where Eclipse writes a system's name (Look & Feel → Logos)
+        if (logos.isNotEmpty()) {
+            val lDir = File(out, "logos").apply { mkdirs() }
+            for ((id, f) in logos) f.copyTo(File(lDir, "$id.${f.extension.lowercase()}"), overwrite = true)
+        }
         var nCards = 0
         var nBgs = 0
-        for ((id, f) in cards) { f.copyTo(File(pDir, "$id.${f.extension.lowercase()}"), overwrite = true); nCards++ }
+        // pictures kept for systems Eclipse doesn't have yet (counted apart: they don't show anywhere until it does)
+        val later = HashSet<String>()
+        fun isLater(id: String) = system(id) == null
+        for ((id, f) in cards) { f.copyTo(File(pDir, "$id.${f.extension.lowercase()}"), overwrite = true); if (isLater(id)) later += id else nCards++ }
         // systems with a logo but no card: draw one (logo over its background, or over a plain colour)
         for ((id, logo) in logos) {
             if (id in cards) continue
-            if (drawCard(logo, backgrounds[id], File(pDir, "$id.png"))) nCards++
+            if (drawCard(logo, backgrounds[id], File(pDir, "$id.png"))) { if (isLater(id)) later += id else nCards++ }
         }
-        for ((id, f) in backgrounds) { f.copyTo(File(bDir, "$id.${f.extension.lowercase()}"), overwrite = true); nBgs++ }
-        if (nCards == 0 && nBgs == 0 && wallpaper == null) return null
+        for ((id, f) in backgrounds) { f.copyTo(File(bDir, "$id.${f.extension.lowercase()}"), overwrite = true); if (isLater(id)) later += id else nBgs++ }
+        if (nCards == 0 && nBgs == 0 && wallpaper == null && later.isEmpty()) return null
 
         val j = JSONObject().put("name", name).put("author", author.ifBlank { "Converted from $kind" }).put("wallpaperMode", "fallback")
         wallpaper?.let { it.copyTo(File(out, "wallpaper.${it.extension.lowercase()}"), overwrite = true); j.put("wallpaper", "wallpaper.${it.extension.lowercase()}") }
@@ -298,6 +356,8 @@ object ThemeConvert {
         val parts = listOfNotNull(
             "$nCards platform cards",
             nBgs.takeIf { it > 0 }?.let { "$it system backgrounds" },
+            logos.keys.count { !isLater(it) }.takeIf { it > 0 }?.let { "$it logos" },
+            later.size.takeIf { it > 0 }?.let { "pictures for $it more systems (kept for when Eclipse has them)" },
             wallpaper?.let { "a wallpaper" },
             font?.let { "its font" }
         )

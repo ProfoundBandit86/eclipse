@@ -1023,7 +1023,7 @@ private fun CustomPlatformsView(vm: EclipseVM, spec: com.eclipse.launcher.data.V
             val n = counts[p.id] ?: 0
             SlotInfo(
                 p.name, "$n ${if (n == 1) "game" else "games"}",
-                com.eclipse.launcher.data.SystemArt.logo(p.id, "dark") ?: vm.platLogo[p.id],
+                vm.systemLogo(p.id, "dark"),
                 vm.platformBackdrop(p.id) ?: vm.wallpaperTop()
             )
         },
@@ -1091,7 +1091,7 @@ private fun SystemCardFace(vm: EclipseVM, p: PlatformDef, modifier: Modifier) {
     ))
     val ink = if (light) Color(0xFF111111) else Color(0xFFF2EFE8)
     val icon = vm.platformCardIcon(p.id)
-    val logo = com.eclipse.launcher.data.SystemArt.logo(p.id, look)
+    val logo = vm.systemLogo(p.id, look)
     // Style → Icon: the picture alone, at its own shape (not stretched to the card's), with Corners → Icons rounding
     if (vm.platStyle == "icon") {
         Box(modifier, contentAlignment = Alignment.Center) {
@@ -1145,8 +1145,8 @@ private fun CardIcon(p: PlatformDef, icon: String?, modifier: Modifier) {
 /** A system's name: its logo when it has one (picked or fetched), else the name in text. */
 @Composable
 fun PlatformTitle(vm: EclipseVM, p: PlatformDef, size: androidx.compose.ui.unit.TextUnit, logoHeight: Dp, center: Boolean = false) {
-    // Eclipse's own logo for the system (white, these sit on dark pictures), else one fetched or picked for it
-    val logo = com.eclipse.launcher.data.SystemArt.logo(p.id, "dark") ?: vm.platLogo[p.id]
+    // one picked for the system, else the logo pack's / theme's, else Eclipse's own (white: these sit on dark pictures)
+    val logo = vm.systemLogo(p.id, "dark")
     var failed by remember(logo) { mutableStateOf(false) }
     if (logo != null && !failed) AsyncImage(
         model = logo, contentDescription = p.name, contentScale = ContentScale.Fit,
@@ -1174,12 +1174,13 @@ fun PlatformMenu(vm: EclipseVM, id: String, pickImage: () -> Unit) {
         // card image, icon, logo and backdrop (Favourites / All games: card image only, the picker limits them)
         val special = id == Platforms.FAVORITES || id == Platforms.ALL
         MenuRow("Platform artwork") { vm.platformMenu = null; vm.platKindStart = if (special) PlatKind.CARD else PlatKind.ICON; vm.platArtScreen = id }
-        // Scan: look for this system's games again (All games: every system). Scrape: artwork for the ones missing it.
+        // Scan: look for this system's games again, then get artwork for its games missing it (All games: every
+        // system, artwork for the new ones). Favourites has nothing to scan: Scrape gets its missing artwork.
         if (id != Platforms.FAVORITES) MenuRow("Scan") {
             vm.platformMenu = null
-            if (id == Platforms.ALL) vm.rescan() else vm.rescanSystem(id, scrapeAfter = false)
+            if (id == Platforms.ALL) vm.rescan() else vm.rescanSystem(id, scrapeAfter = true)
         }
-        MenuRow("Scrape") {
+        if (id == Platforms.FAVORITES) MenuRow("Scrape") {
             vm.platformMenu = null
             vm.scrapeGames(when (id) {
                 Platforms.ALL -> vm.games

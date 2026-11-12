@@ -260,7 +260,7 @@ fun GameMenu(vm: EclipseVM, g: Game) = Glass {
             }
             Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 // the system's logo, black / white / colour like the platform cards (its name when it has none)
-                val pLogo = com.eclipse.launcher.data.SystemArt.logo(g.platform, cardLook(vm))
+                val pLogo = vm.systemLogo(g.platform, cardLook(vm))
                 var logoFailed by remember(pLogo) { mutableStateOf(false) }
                 if (pLogo != null && !logoFailed) AsyncImage(
                     pLogo, Platforms.byId(g.platform)?.name, Modifier.height(24.dp).widthIn(max = 130.dp),

@@ -31,7 +31,8 @@ object EclipseHome {
     fun themes(ctx: Context): File = (if (usable()) File(dir(), "Themes") else File(ctx.filesDir, "themes")).apply { mkdirs() }
 
     fun packs(ctx: Context, kind: String): File =
-        (if (usable()) File(dir(), if (kind == Packs.ICONS) "Icon packs" else "Backdrop packs") else File(ctx.filesDir, "packs/$kind")).apply { mkdirs() }
+        (if (usable()) File(dir(), when (kind) { Packs.ICONS -> "Icon packs"; Packs.LOGOS -> "Logo packs"; else -> "Backdrop packs" })
+        else File(ctx.filesDir, "packs/$kind")).apply { mkdirs() }
 
     @Volatile private var done = false
 
@@ -46,6 +47,7 @@ object EclipseHome {
         move(File(ctx.filesDir, "themes"), File(home, "Themes"))
         move(File(ctx.filesDir, "packs/${Packs.ICONS}"), File(home, "Icon packs"))
         move(File(ctx.filesDir, "packs/${Packs.BACKDROPS}"), File(home, "Backdrop packs"))
+        move(File(ctx.filesDir, "packs/${Packs.LOGOS}"), File(home, "Logo packs"))
         File(home, "Themes").listFiles()?.filter { it.isDirectory }?.forEach { t ->
             rename(File(t, "platforms"), File(t, "icons"))
             rename(File(t, "backgrounds"), File(t, "backdrops"))
@@ -86,11 +88,13 @@ object EclipseHome {
         Themes/<theme name>/
           icons/        each system's icon (tile), named after the system: snes.png, psx.jpg, megadrive.webp ...
           backdrops/    each system's backdrop, named the same way: snes.jpg ...
+          logos/        each system's logo, named the same way: snes.png ...
           dock/         dock icons: home.png, games.png, romm.png, apps.png, settings.png
           wallpaper.jpg, bottom.jpg, a font, and theme.json (name, colours, wallpaper settings)
 
         Icon packs/<pack name>/       icons, one picture per system (snes.png ...)
         Backdrop packs/<pack name>/   backdrops, one picture per system (snes.jpg ...)
+        Logo packs/<pack name>/       logos, one picture per system (snes.png ...)
 
         Names: Eclipse's own system names (snes, psx, megadrive, n64, gba ...) and the folder names other frontends
         use both work. Pictures can be .png, .jpg, .webp or .gif. Icons look best square (about 512 x 512),

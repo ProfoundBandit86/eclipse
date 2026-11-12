@@ -57,23 +57,29 @@ fun AppearancePicker(vm: EclipseVM, kind: String) = Glass {
         "theme" -> listOf(LookEntry("", "Eclipse", "Eclipse's own black and gold", false)) +
             vm.themes.map { LookEntry(it.id, it.name, it.author.ifBlank { if (it.builtIn) "Comes with Eclipse" else "" }, !it.builtIn) }
         else -> {
-            val packs = if (kind == "icons") vm.iconPacks else vm.backdropPacks
-            val fromThemes = vm.themes.filter { if (kind == "icons") it.platforms.isNotEmpty() else it.backgrounds.isNotEmpty() }
-            (if (kind == "icons") emptyList() else listOf(LookEntry("", "The theme's own", "Whatever the current theme has", false))) +
+            val packs = when (kind) { "icons" -> vm.iconPacks; "logos" -> vm.logoPacks; else -> vm.backdropPacks }
+            fun ofTheme(t: com.eclipse.launcher.data.Themes.Theme) = when (kind) { "icons" -> t.platforms; "logos" -> t.logos; else -> t.backgrounds }
+            val fromThemes = vm.themes.filter { ofTheme(it).isNotEmpty() }
+            (when (kind) {
+                "icons" -> emptyList()
+                "logos" -> listOf(LookEntry("", "The theme's own", "The current theme's logos, else the ones that come with Eclipse", false))
+                else -> listOf(LookEntry("", "The theme's own", "Whatever the current theme has", false))
+            }) +
                 packs.map { LookEntry("pack:${it.id}", it.name, if (it.id == com.eclipse.launcher.data.StockPack.COLORGRADE) "Comes with Eclipse · by grvceless · ${it.images.size} systems" else "Pack · ${it.images.size} systems", it.id != com.eclipse.launcher.data.StockPack.COLORGRADE) } +
-                fromThemes.map { t -> LookEntry("theme:${t.id}", t.name, "From the theme · ${(if (kind == "icons") t.platforms else t.backgrounds).size} systems", false) }
+                fromThemes.map { t -> LookEntry("theme:${t.id}", t.name, "From the theme · ${ofTheme(t).size} systems", false) }
         }
     }
-    val current = when (kind) { "theme" -> vm.theme?.id ?: ""; "icons" -> vm.iconChoice.ifEmpty { vm.defaultIconPack()?.let { "pack:${it.id}" } ?: "" }; else -> vm.backdropChoice }
+    val current = when (kind) { "theme" -> vm.theme?.id ?: ""; "icons" -> vm.iconChoice.ifEmpty { vm.defaultIconPack()?.let { "pack:${it.id}" } ?: "" }; "logos" -> vm.logoChoice; else -> vm.backdropChoice }
     var shown by remember(kind) { mutableStateOf(current) }
     fun use(id: String) {
         when (kind) {
             "theme" -> vm.useTheme(vm.themes.firstOrNull { it.id == id })
             "icons" -> vm.chooseIcons(id)
+            "logos" -> vm.chooseLogos(id)
             else -> vm.chooseBackdrops(id)
         }
     }
-    val title = when (kind) { "theme" -> "Themes"; "icons" -> "Icons"; else -> "Backdrops" }
+    val title = when (kind) { "theme" -> "Themes"; "icons" -> "Icons"; "logos" -> "Logos"; else -> "Backdrops" }
 
     // the controller goes to the list, and keeps trying for a few frames (the rows may not be laid out on the first)
     val first = remember { FocusRequester() }
@@ -114,6 +120,7 @@ fun AppearancePicker(vm: EclipseVM, kind: String) = Glass {
                             when (kind) {
                                 "theme" -> Pickers.theme()
                                 "icons" -> Pickers.pack(Packs.ICONS)
+                                "logos" -> Pickers.pack(Packs.LOGOS)
                                 else -> Pickers.pack(Packs.BACKDROPS)
                             }
                         }
@@ -122,6 +129,7 @@ fun AppearancePicker(vm: EclipseVM, kind: String) = Glass {
                             when (kind) {
                                 "theme" -> "Eclipse themes, or any zipped theme. I'll try, but no promises."
                                 "icons" -> "Any zip with pictures named after systems (snes.png, psx.jpg…). If it has several folders of them, you choose which one."
+                                "logos" -> "Any zip with system logos named after systems (snes.png, psx.svg…), like an ES-DE theme's logos folder. Logos show where Eclipse writes a system's name."
                                 else -> "Any zip with wide pictures named after systems. If it has several folders of them, you choose which one."
                             }
                         )
@@ -150,7 +158,7 @@ fun AppearancePicker(vm: EclipseVM, kind: String) = Glass {
                             }
                             if (e.deletable) Pill("Delete", Modifier.padding(start = 8.dp).width(96.dp)) {
                                 if (kind == "theme") vm.themes.firstOrNull { it.id == e.id }?.let { vm.deleteTheme(it) }
-                                else (if (kind == "icons") vm.iconPacks else vm.backdropPacks).firstOrNull { "pack:${it.id}" == e.id }?.let { vm.deletePack(it) }
+                                else (when (kind) { "icons" -> vm.iconPacks; "logos" -> vm.logoPacks; else -> vm.backdropPacks }).firstOrNull { "pack:${it.id}" == e.id }?.let { vm.deletePack(it) }
                                 shown = current
                             }
                             Pill(if (e.id == current) "In use" else "Use", Modifier.padding(start = 8.dp).width(110.dp), primary = e.id != current) { use(e.id) }
@@ -230,7 +238,9 @@ private fun LookAction(label: String, note: String, key: String, onClick: () -> 
 /** What one choice brings: wallpaper, icons, backdrops, dock icons and the two colours. */
 private class LookParts(
     val wallpaper: Any?, val icons: Map<String, File>?, val backdrops: Map<String, File>?,
-    val dock: Map<String, File>, val accent: Color, val focus: Color
+    val dock: Map<String, File>, val accent: Color, val focus: Color,
+    /** the highlighted system's logo, by system id ("" key = none chosen: Eclipse's own) */
+    val logo: ((String) -> Any?)? = null,
 )
 
 @Composable
@@ -244,6 +254,15 @@ private fun lookParts(vm: EclipseVM, kind: String, id: String): LookParts {
                 t?.platforms, t?.backgrounds, t?.dock.orEmpty(),
                 t?.accent?.let { Color(it) } ?: ThemeColors.DefaultAccent, t?.focus?.let { Color(it) } ?: ThemeColors.DefaultFocus
             )
+        }
+        "logos" -> {
+            val logos = when {
+                id.startsWith("pack:") -> vm.logoPacks.firstOrNull { "pack:${it.id}" == id }?.images
+                id.startsWith("theme:") -> vm.themes.firstOrNull { "theme:${it.id}" == id }?.logos
+                else -> vm.theme?.logos?.takeIf { it.isNotEmpty() }
+            }
+            LookParts(curWall, vm.iconSource(), vm.backdropSource(), vm.theme?.dock.orEmpty(), C.accent, C.focus,
+                logo = { sys -> logos?.get(sys) ?: com.eclipse.launcher.data.SystemArt.logo(sys, "dark") })
         }
         "icons" -> {
             val icons = when {
@@ -303,7 +322,10 @@ private fun LookPreview(vm: EclipseVM, kind: String, id: String) {
             }
             // the highlighted system
             Column(Modifier.padding(start = 86.dp, top = 30.dp)) {
-                Text((hero?.name ?: "Super Nintendo"), color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                // the logos picker shows the system's logo here, as Home's title does
+                val heroLogo = hero?.let { h -> parts.logo?.invoke(h.id) }
+                if (heroLogo != null) AsyncImage(heroLogo, hero.name, Modifier.height(48.dp).widthIn(max = 360.dp), contentScale = ContentScale.Fit, alignment = Alignment.CenterStart)
+                else Text((hero?.name ?: "Super Nintendo"), color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                 val n = hero?.let { counts[it.id] } ?: 0
                 Text(if (n > 0) "$n GAMES" else "SYSTEMS", color = Color(0xFFD6D2C9), fontSize = 10.sp, letterSpacing = 1.8.sp, modifier = Modifier.padding(top = 4.dp))
             }

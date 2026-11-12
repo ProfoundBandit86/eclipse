@@ -45,7 +45,7 @@ private val ROLES = listOf(
 
 private fun roleAbout(role: String): String = when (role) {
     ThemeConvert.ICONS -> "Icons: shown as each system's tile on Home and in the system lists."
-    ThemeConvert.LOGOS -> "Logos: for systems without an icon, Eclipse draws a tile with the logo over that system's backdrop."
+    ThemeConvert.LOGOS -> "Logos: shown where Eclipse writes a system's name (Look & Feel → Logos), and drawn onto a tile for systems without an icon."
     ThemeConvert.BACKDROPS -> "Backdrops: shown behind a system's games, full screen."
     else -> "Skip: this folder isn't used."
 }
@@ -192,7 +192,7 @@ private fun RoleMenu(current: String, onPick: (String) -> Unit) {
 
 /*
  * Importing an icon or backdrop pack from a zip with several folders of pictures named after systems (a theme made
- * for another frontend, say). Left: every such folder, A to pick it, and whether it goes in as icons or backdrops.
+ * for another frontend, say). Left: every such folder, A to pick it, and whether it goes in as icons, backdrops or logos.
  * Right: the highlighted folder's pictures. Import makes a pack of the picked folder; B cancels.
  */
 @Composable
@@ -200,7 +200,7 @@ fun PackImportScreen(vm: EclipseVM, p: com.eclipse.launcher.data.Packs.Pending) 
     BackHandler { vm.cancelPackImport() }
     // start on the folder that suits what you're importing (the theme import's guess), else the fullest
     val start = remember(p) {
-        val want = if (p.kind == com.eclipse.launcher.data.Packs.ICONS) ThemeConvert.ICONS else ThemeConvert.BACKDROPS
+        val want = when (p.kind) { com.eclipse.launcher.data.Packs.ICONS -> ThemeConvert.ICONS; com.eclipse.launcher.data.Packs.LOGOS -> ThemeConvert.LOGOS; else -> ThemeConvert.BACKDROPS }
         p.folders.firstOrNull { it.guess == want } ?: p.folders.first()
     }
     var picked by remember(p) { mutableStateOf(start) }
@@ -214,7 +214,7 @@ fun PackImportScreen(vm: EclipseVM, p: com.eclipse.launcher.data.Packs.Pending) 
         Row(Modifier.fillMaxSize().padding(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             GlassPanel(Modifier.width(330.dp).fillMaxHeight()) {
                 Column(Modifier.fillMaxSize().padding(14.dp)) {
-                    Text(if (p.kind == com.eclipse.launcher.data.Packs.ICONS) "IMPORT ICONS" else "IMPORT BACKDROPS", color = C.sub, fontSize = 8.5.sp, letterSpacing = 1.8.sp)
+                    Text(when (kind) { com.eclipse.launcher.data.Packs.ICONS -> "IMPORT ICONS"; com.eclipse.launcher.data.Packs.LOGOS -> "IMPORT LOGOS"; else -> "IMPORT BACKDROPS" }, color = C.sub, fontSize = 8.5.sp, letterSpacing = 1.8.sp)
                     Text(p.name, color = C.ink, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
                         "This zip has ${p.folders.size} folders of pictures named after systems. Pick the one to import.",
@@ -229,6 +229,7 @@ fun PackImportScreen(vm: EclipseVM, p: com.eclipse.launcher.data.Packs.Pending) 
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Pill("Icons", Modifier.weight(1f), primary = kind == com.eclipse.launcher.data.Packs.ICONS) { kind = com.eclipse.launcher.data.Packs.ICONS }
                             Pill("Backdrops", Modifier.weight(1f), primary = kind == com.eclipse.launcher.data.Packs.BACKDROPS) { kind = com.eclipse.launcher.data.Packs.BACKDROPS }
+                            Pill("Logos", Modifier.weight(1f), primary = kind == com.eclipse.launcher.data.Packs.LOGOS) { kind = com.eclipse.launcher.data.Packs.LOGOS }
                         }
                     }
                     Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -242,18 +243,19 @@ fun PackImportScreen(vm: EclipseVM, p: com.eclipse.launcher.data.Packs.Pending) 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(shown.rel.uppercase(), color = C.accent, fontSize = 8.5.sp, letterSpacing = 1.6.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                         Box(Modifier.padding(horizontal = 8.dp).weight(1f).height(1.dp).background(C.x(0x1AFFFFFFL)))
-                        Text("${shown.files.size} SYSTEMS", color = C.sub, fontSize = 8.5.sp, letterSpacing = 1.4.sp)
+                        Text("${shown.files.size} SYSTEMS" + if (shown.others.isNotEmpty()) " + ${shown.others.size} FOR LATER" else "", color = C.sub, fontSize = 8.5.sp, letterSpacing = 1.4.sp)
                     }
                     val wide = kind == com.eclipse.launcher.data.Packs.BACKDROPS
+                    val logo = kind == com.eclipse.launcher.data.Packs.LOGOS
                     LazyVerticalGrid(
-                        GridCells.Fixed(if (wide) 3 else 5), Modifier.padding(top = 8.dp).weight(1f).fillMaxWidth(),
+                        GridCells.Fixed(if (wide || logo) 3 else 5), Modifier.padding(top = 8.dp).weight(1f).fillMaxWidth(),
                         contentPadding = PaddingValues(bottom = 40.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(shown.files.entries.toList().sortedBy { it.key }, key = { it.key }) { (id, file) ->
                             Column {
                                 Box(
-                                    Modifier.fillMaxWidth().aspectRatio(if (wide) 16f / 9f else 1f).clip(RoundedCornerShape(8.dp))
+                                    Modifier.fillMaxWidth().aspectRatio(if (wide) 16f / 9f else if (logo) 2.4f else 1f).clip(RoundedCornerShape(8.dp))
                                         .background(C.x(0x14FFFFFFL)).border(1.dp, C.x(0x14FFFFFFL), RoundedCornerShape(8.dp))
                                 ) { AsyncImage(file, null, Modifier.fillMaxSize(), contentScale = if (wide) ContentScale.Crop else ContentScale.Fit) }
                                 Text(

@@ -524,7 +524,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         endStaleSession()
         scanRaCores()
         if (System.currentTimeMillis() - lastAppsLoad > APPS_SAFETY_REFRESH_MS) refreshApps()
-        if (flag("scrape_new", false)) rescan(full = false, quiet = true)
+        if (scrapeNew()) rescan(full = false, quiet = true)
     }
 
     fun onPause() {
@@ -1412,7 +1412,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
                 delay(60_000)
                 runCatching { autoChdTick() }
                 // "Scrape new games automatically": every few minutes (and on coming back), a quiet look for new games
-                if (++n % 3 == 0 && resumed && flag("scrape_new", false) && session == null) runCatching { rescan(full = false, quiet = true) }
+                if (++n % 3 == 0 && resumed && scrapeNew() && session == null) runCatching { rescan(full = false, quiet = true) }
             }
         }
     }
@@ -1495,6 +1495,20 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         else -> "${b / 1024} KB"
     }
 
+    /**
+     * Settings → Scrape → "Scrape new games automatically" (on unless you turn it off): every scan, automatic or by
+     * hand, gets artwork for the games it just found, each once. Games already there are left alone (Scrape missing /
+     * Re-scrape all do those), so scanning never spends lookups on the same unmatched games again and again.
+     */
+    fun scrapeNew(): Boolean = flag("scrape_new", true)
+
+    /** After a scan: artwork for [fresh] (games it just found), when that's turned on. */
+    private fun scrapeFresh(fresh: Collection<String>) {
+        if (fresh.isEmpty() || !scrapeNew() || artProviders().isEmpty()) return
+        val ids = fresh.toHashSet()
+        scrapeGames(games.filter { it.path in ids }, false)
+    }
+
     fun rescan(full: Boolean = true, quiet: Boolean = false) {
         if (romFolders().isEmpty() && sysFolders.isEmpty()) { if (!quiet) message = "Choose a ROM folder first"; return }
         if (!hasAllFiles()) { if (!quiet) message = "Allow all-files access first"; return }
@@ -1505,22 +1519,20 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
             withContext(Dispatchers.Main) {
                 val apps = games.filter { it.platform == "android" && it.id.startsWith("a_") }
                 if (full) {
+                    val had = games.map { it.path }.toHashSet()
                     games = withoutRemoved(found + apps)
                     message = "Found ${found.size} games"
+                    // games this scan found for the first time get their artwork too
+                    val fresh = games.map { it.path }.filter { it !in had }
+                    lbCatchUp { scrapeFresh(fresh) }
                 } else {
                     val have = games.map { it.path }.toSet()
                     val fresh = found.filter { it.path !in have }
                     games = withoutRemoved(games + fresh)
                     if (!quiet || fresh.isNotEmpty()) message = if (fresh.isEmpty()) "No new games found" else "Added ${fresh.size} new ${if (fresh.size == 1) "game" else "games"}"
                     // new games: looked up in the kept LaunchBox file first, then they get their artwork, when that's turned on
-                    if (fresh.isNotEmpty()) lbCatchUp {
-                        if (flag("scrape_new", false) && artProviders().isNotEmpty()) {
-                            val ids = fresh.map { it.path }.toSet()
-                            scrapeGames(games.filter { it.path in ids }, false)
-                        }
-                    }
+                    if (fresh.isNotEmpty()) lbCatchUp { scrapeFresh(fresh.map { it.path }) }
                 }
-                if (full) lbCatchUp()
                 scanning = false
                 persistGames()
                 pico8Art()
@@ -1553,7 +1565,10 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Scans again for one system only, then (with [scrapeAfter]) fetches artwork for its games that have none. */
+    /**
+     * Scans again for one system only, then (with [scrapeAfter]: the system menu's Scan) fetches artwork for its games
+     * that have none; without it, only for the games it just found (when "Scrape new games automatically" is on).
+     */
     fun rescanSystem(platformId: String, scrapeAfter: Boolean = true) {
         if (!hasAllFiles()) { message = "Allow all-files access first"; return }
         if (scanningSys != null || scanning) return
@@ -1561,12 +1576,16 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) {
             val found = scanAll().filter { it.platform == platformId }
             withContext(Dispatchers.Main) {
+                val had = games.map { it.path }.toHashSet()
                 games = withoutRemoved(games.filter { it.platform != platformId } + found)
                 persistGames()
                 scanningSys = null
                 val name = Platforms.byId(platformId)?.name ?: platformId
                 message = "$name: ${found.size} ${if (found.size == 1) "game" else "games"}"
-                lbCatchUp { if (scrapeAfter && artProviders().isNotEmpty()) scrapeGames(games.filter { it.platform == platformId }, false) }
+                lbCatchUp {
+                    if (scrapeAfter && artProviders().isNotEmpty()) scrapeGames(games.filter { it.platform == platformId }, false)
+                    else scrapeFresh(found.map { it.path }.filter { it !in had })
+                }
             }
         }
     }
@@ -2367,13 +2386,31 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     // ---- icon packs and backdrop packs (mix and match, whatever the theme) ----
     var iconPacks by mutableStateOf<List<Packs.Pack>>(emptyList())
     var backdropPacks by mutableStateOf<List<Packs.Pack>>(emptyList())
+    var logoPacks by mutableStateOf<List<Packs.Pack>>(emptyList())
     /** "" = Stock (the pack that comes with Eclipse), "pack:<id>" = an installed pack, "theme:<id>" = an installed theme's */
     var iconChoice by mutableStateOf(store.str("icon_pack"))
     var backdropChoice by mutableStateOf(store.str("backdrop_pack"))
+    /** Logos: "" = the current theme's (if it has any) else Eclipse's own, "pack:<id>" = a logo pack, "theme:<id>" = a theme's */
+    var logoChoice by mutableStateOf(store.str("logo_pack"))
     var pendingPackKind: String? = null // zip picker target
 
     fun chooseIcons(v: String) { iconChoice = v; store.putStr("icon_pack", v) }
     fun chooseBackdrops(v: String) { backdropChoice = v; store.putStr("backdrop_pack", v) }
+    fun chooseLogos(v: String) { logoChoice = v; store.putStr("logo_pack", v) }
+
+    /** The logos in use: the chosen logo pack or theme's, else the current theme's, else none (Eclipse's own are used). */
+    fun logoSource(): Map<String, File>? = when {
+        logoChoice.startsWith("pack:") -> logoPacks.firstOrNull { it.id == logoChoice.removePrefix("pack:") }?.images
+        logoChoice.startsWith("theme:") -> themes.firstOrNull { it.id == logoChoice.removePrefix("theme:") }?.logos
+        else -> theme?.logos?.takeIf { it.isNotEmpty() }
+    }
+
+    /**
+     * A system's logo wherever Eclipse shows one: one you picked for that system (Platform artwork), else the chosen
+     * logo pack's or theme's, else Eclipse's own for the card [look] ("dark" = white, "light" = black, "color").
+     */
+    fun systemLogo(id: String, look: String = "dark"): Any? =
+        platLogo[id] ?: logoSource()?.get(id) ?: com.eclipse.launcher.data.SystemArt.logo(id, look)
 
     /** The platform pictures in use: the chosen pack or theme, else the Stock pack that comes with Eclipse. */
     fun iconSource(): Map<String, File>? = when {
@@ -2412,15 +2449,16 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
 
     private fun loadPacks() {
         viewModelScope.launch {
-            val (i, b) = withContext(Dispatchers.IO) {
+            val (i, b, l) = withContext(Dispatchers.IO) {
                 com.eclipse.launcher.data.EclipseHome.setUp(ctx)
                 // ColorGrade comes with Eclipse (also removes the old Stock pack's folder)
                 com.eclipse.launcher.data.StockPack.install(ctx)
-                Packs.list(ctx, Packs.ICONS) to Packs.list(ctx, Packs.BACKDROPS)
+                Triple(Packs.list(ctx, Packs.ICONS), Packs.list(ctx, Packs.BACKDROPS), Packs.list(ctx, Packs.LOGOS))
             }
             homeInUse = com.eclipse.launcher.data.EclipseHome.usable()
             iconPacks = i
             backdropPacks = b
+            logoPacks = l
         }
     }
 
@@ -2459,7 +2497,11 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
             is Packs.Step.Done -> {
                 val p = step.pack
                 val all = withContext(Dispatchers.IO) { Packs.list(ctx, p.kind) }
-                if (p.kind == Packs.ICONS) { iconPacks = all; chooseIcons("pack:${p.id}") } else { backdropPacks = all; chooseBackdrops("pack:${p.id}") }
+                when (p.kind) {
+                    Packs.ICONS -> { iconPacks = all; chooseIcons("pack:${p.id}") }
+                    Packs.LOGOS -> { logoPacks = all; chooseLogos("pack:${p.id}") }
+                    else -> { backdropPacks = all; chooseBackdrops("pack:${p.id}") }
+                }
                 message = "\"${p.name}\": ${p.images.size} systems, now in use"
             }
         }
@@ -2470,8 +2512,8 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val (t, i, b) = withContext(Dispatchers.IO) {
                 com.eclipse.launcher.data.EclipseHome.setUp(ctx)
-                Triple(Themes.list(ctx), Packs.list(ctx, Packs.ICONS), Packs.list(ctx, Packs.BACKDROPS))
-            }
+                Triple(Themes.list(ctx), Packs.list(ctx, Packs.ICONS), Packs.list(ctx, Packs.BACKDROPS)) to Packs.list(ctx, Packs.LOGOS)
+            }.let { (tib, l) -> logoPacks = l; tib }
             homeInUse = com.eclipse.launcher.data.EclipseHome.usable()
             themes = t; iconPacks = i; backdropPacks = b
         }
@@ -2480,10 +2522,13 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     fun deletePack(p: Packs.Pack) {
         if (p.kind == Packs.ICONS && iconChoice == "pack:${p.id}") chooseIcons("")
         if (p.kind == Packs.BACKDROPS && backdropChoice == "pack:${p.id}") chooseBackdrops("")
+        if (p.kind == Packs.LOGOS && logoChoice == "pack:${p.id}") chooseLogos("")
         viewModelScope.launch {
             val all = withContext(Dispatchers.IO) { Packs.delete(p); Packs.list(ctx, p.kind) }
             if (p.kind == Packs.ICONS) {
                 iconPacks = all
+            } else if (p.kind == Packs.LOGOS) {
+                logoPacks = all
             } else {
                 backdropPacks = all
             }

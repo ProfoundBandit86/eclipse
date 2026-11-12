@@ -38,6 +38,8 @@ object Themes {
         val font: File? = null,
         /** a background per system (backgrounds/snes.jpg …), shown behind the platforms while that system is highlighted */
         val backgrounds: Map<String, File> = emptyMap(),
+        /** a logo per system (logos/snes.png …), shown where Eclipse writes a system's name */
+        val logos: Map<String, File> = emptyMap(),
         /** comes with Eclipse (can't be deleted; it's put back on the next start anyway) */
         val builtIn: Boolean = false,
         /** a line or two about the theme ("description" in theme.json), shown in the theme picker */
@@ -118,14 +120,17 @@ object Themes {
         val platforms = HashMap<String, File>()
         // icons/ and backdrops/ (older themes: platforms/ and backgrounds/)
         (File(dir, "icons").takeIf { it.isDirectory } ?: File(dir, "platforms")).listFiles()?.filter { it.isFile && it.extension.lowercase() in imageExts }?.forEach { f ->
-            // file named after a system id, or any folder name Eclipse recognises for that system
-            val p = Platforms.byId(f.nameWithoutExtension.lowercase()) ?: Platforms.matchFolder(f.nameWithoutExtension)
-            if (p != null) platforms.putIfAbsent(p.id, f)
+            // file named after a system id, or any name Eclipse recognises for that system (pictures of systems it
+            // doesn't have yet are kept in the folder and picked up once it does)
+            ThemeConvert.system(f.nameWithoutExtension)?.let { platforms.putIfAbsent(it, f) }
         }
         val backgrounds = HashMap<String, File>()
         (File(dir, "backdrops").takeIf { it.isDirectory } ?: File(dir, "backgrounds")).listFiles()?.filter { it.isFile && it.extension.lowercase() in imageExts }?.forEach { f ->
-            val p = Platforms.byId(f.nameWithoutExtension.lowercase()) ?: Platforms.matchFolder(f.nameWithoutExtension)
-            if (p != null) backgrounds.putIfAbsent(p.id, f)
+            ThemeConvert.system(f.nameWithoutExtension)?.let { backgrounds.putIfAbsent(it, f) }
+        }
+        val logos = HashMap<String, File>()
+        File(dir, "logos").listFiles()?.filter { it.isFile && it.extension.lowercase() in imageExts }?.forEach { f ->
+            ThemeConvert.system(f.nameWithoutExtension)?.let { logos.putIfAbsent(it, f) }
         }
         val dock = HashMap<String, File>()
         val dockDir = File(dir, "dock")
@@ -149,6 +154,7 @@ object Themes {
             font = o.optString("font").takeIf { it.isNotBlank() }?.let { File(dir, it) }
                 ?.takeIf { it.isFile && it.extension.lowercase() in fontExts && it.canonicalPath.startsWith(dir.canonicalPath) },
             backgrounds = backgrounds,
+            logos = logos,
             builtIn = File(dir, "builtin.json").isFile,
             text = color(o.optString("text")),
             labels = color(o.optString("labels")),

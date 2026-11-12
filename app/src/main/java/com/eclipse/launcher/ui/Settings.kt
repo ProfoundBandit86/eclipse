@@ -1412,7 +1412,7 @@ private fun ScrapeSection(vm: EclipseVM) {
             Pill("Re-scrape all", Modifier.weight(1f)) { vm.scrapeAll(true) }
         }
     }
-    ToggleRow("Scrape new games automatically", "As soon as they're added to a system folder.", vm.flag("scrape_new", false)) { vm.setFlag("scrape_new", it) }
+    ToggleRow("Scrape new games automatically", "Every scan gets artwork for the games it just found, once each.", vm.scrapeNew()) { vm.setFlag("scrape_new", it) }
     // off by default: new PNG artwork is re-saved as lossless WebP (same pixels, smaller), JPEGs are left as they are
     ToggleRow(
         "Fill missing disc, cartridge and 3D box art",
@@ -1887,6 +1887,8 @@ private fun AppearanceTab(vm: EclipseVM) {
                 }
             }
             DropRow("Backdrops", packLabel(vm, vm.backdropChoice, vm.backdropPacks), "ap:backdrops", opens = true) { vm.appearancePicker = "backdrops" }
+            // system logos (where Eclipse writes a system's name): Eclipse's own, a logo pack or a theme's
+            DropRow("Logos", packLabel(vm, vm.logoChoice, vm.logoPacks), "ap:logos", opens = true) { vm.appearancePicker = "logos" }
             // every theme's and pack's pictures are plain files in the Eclipse folder: tweak them, then reload
             DropRow("Reload images", if (vm.homeInUse) "Eclipse folder" else "Eclipse storage", "ap:reload", opens = true) { vm.reloadImages() }
 
@@ -2068,7 +2070,7 @@ private fun DropChoice(
 private fun packLabel(vm: EclipseVM, choice: String, packs: List<com.eclipse.launcher.data.Packs.Pack>): String = when {
     choice.startsWith("pack:") -> packs.firstOrNull { it.id == choice.removePrefix("pack:") }?.name ?: "From the theme"
     choice.startsWith("theme:") -> vm.themes.firstOrNull { it.id == choice.removePrefix("theme:") }?.name ?: "From the theme"
-    else -> if (packs === vm.iconPacks) (vm.defaultIconPack()?.name ?: "None") else "From the theme"
+    else -> if (packs === vm.iconPacks) (vm.defaultIconPack()?.name ?: "None") else if (packs === vm.logoPacks) (if (vm.theme?.logos?.isNotEmpty() == true) "From the theme" else "Eclipse's own") else "From the theme"
 }
 
 
