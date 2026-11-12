@@ -215,6 +215,20 @@ fun CompanionHub(vm: EclipseVM, g: Game, close: () -> Unit) {
     var soon by remember { mutableStateOf(false) }
     var signIn by remember { mutableStateOf(false) }
     var savedTick by remember { mutableIntStateOf(0) } // bumps when a guide is saved / deleted: lists reload
+    // saved from the browser window (ui/GuideBrowserActivity.kt): the lists load again
+    val outside = CompanionData.changes.intValue
+    LaunchedEffect(outside) { if (outside > 0) savedTick++ }
+    /**
+     * A page opens in the browser window, on the screen the Companion is on: an ordinary window scrolls and flings
+     * like any browser, where the one drawn inside the bottom screen's overlay couldn't. The old built-in browser is
+     * only used if Android won't open the window.
+     */
+    fun openSite(site: Guides.Site) {
+        val pres = com.eclipse.launcher.media.SecondaryPresentation.current
+        val onBottom = pres != null && vm.companionBottom?.id == g.id
+        val display = if (onBottom) pres?.display?.displayId else null
+        if (!GuideBrowserActivity.open(ctx, site, g.id, display, onBottom) { browser = site }) browser = site
+    }
     var mapView by remember { mutableStateOf<CompanionData.GameMap?>(null) }
     // what the tabs say beside their names: maps kept, checklist ticked / total, achievements earned
     var mapCount by remember { mutableIntStateOf(0) }
@@ -291,11 +305,11 @@ fun CompanionHub(vm: EclipseVM, g: Game, close: () -> Unit) {
             Box(Modifier.fillMaxWidth().height(1.dp).background(LINE))
             HorizontalPager(pager, Modifier.fillMaxWidth().weight(1f)) { p ->
                 when (p) {
-                    0 -> GuidesTab(g, root, savedTick, open = { browser = it }, read = { reading = it }, changed = { savedTick++ })
-                    2 -> MapsTab(g, root, savedTick, open = { browser = it }, view = { mapView = it }, changed = { savedTick++ })
+                    0 -> GuidesTab(g, root, savedTick, open = { openSite(it) }, read = { reading = it }, changed = { savedTick++ })
+                    2 -> MapsTab(g, root, savedTick, open = { openSite(it) }, view = { mapView = it }, changed = { savedTick++ })
                     3 -> ChecklistTab(g, root, savedTick, changed = { savedTick++ })
                     4 -> TrophiesTab(ra, raLoaded)
-                    5 -> AskTab(vm, g, root, open = { browser = it }, changed = { savedTick++ })
+                    5 -> AskTab(vm, g, root, open = { openSite(it) }, changed = { savedTick++ })
                     else -> ManualTab(vm, g, root, open = { manual = it }, soon = { if (vm.ssBuilt) signIn = true else soon = true })
                 }
             }
@@ -321,7 +335,7 @@ fun CompanionHub(vm: EclipseVM, g: Game, close: () -> Unit) {
         manual?.let { f -> ManualViewer(f) { manual = null } }
         if (searching) HubSearch(g, onCancel = { searching = false }) { q ->
             searching = false
-            browser = Guides.Site("Search", q, Guides.searchUrl(g.name, q), "⌕", 0xFF444444)
+            openSite(Guides.Site("Search", q, Guides.searchUrl(g.name, q), "⌕", 0xFF444444))
         }
         if (soon) SoonPopup { soon = false }
         if (signIn) SoonPopup("Sign in to ScreenScraper",

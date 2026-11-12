@@ -308,6 +308,10 @@ object SecondScreenHost {
 
     var hideForApp: ((pkg: String, displayId: Int) -> Unit)? = null
 
+    /** The Companion's browser window is opening on the bottom screen: the overlay steps aside until [guideClosed]. */
+    var hideForGuide: (() -> Unit)? = null
+    var guideClosed: (() -> Unit)? = null
+
     /** Closes the bottom-screen overlay until Eclipse is opened again (the button on the bottom screen). */
     var close: (() -> Unit)? = null
 

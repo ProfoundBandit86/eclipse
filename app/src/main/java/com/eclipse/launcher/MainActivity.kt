@@ -36,6 +36,8 @@ class MainActivity : ComponentActivity() {
     // second-screen launcher can't cover it (that's what happened with a regular activity on the AYN Thor).
     private var presentation: SecondaryPresentation? = null
     private var hiddenForApp = false
+    /** The Companion's browser window is open on the bottom screen (the overlay is hidden until it closes). */
+    private var guideOpen = false
     /** The second screen's display is off, so its window is hidden until it's back on. */
     private var offHidden = false
     private val handler = Handler(Looper.getMainLooper())
@@ -169,6 +171,18 @@ class MainActivity : ComponentActivity() {
         (getSystemService(DISPLAY_SERVICE) as DisplayManager).registerDisplayListener(displayListener, null)
         SecondScreenHost.owner = this
         SecondScreenHost.hideForApp = { pkg, displayId -> hideForApp(pkg, displayId) }
+        SecondScreenHost.hideForGuide = {
+            handler.post {
+                presentation?.let { if (it.isShowing) runCatching { it.hide() } }
+                hiddenForApp = true
+                guideOpen = true
+            }
+        }
+        SecondScreenHost.guideClosed = {
+            handler.post {
+                if (guideOpen) { guideOpen = false; hiddenForApp = true; restoreAfterApp() }
+            }
+        }
         SecondScreenHost.close = { handler.post { closeSecondScreen() } }
         SecondScreenHost.restart = { handler.post { restartEclipse() } }
         SecondScreenHost.show = { handler.post { syncSecondScreen() } }
@@ -203,6 +217,7 @@ class MainActivity : ComponentActivity() {
         presentation?.dismiss()
         presentation = null
         hiddenForApp = false
+        guideOpen = false
     }
 
     /**
@@ -256,7 +271,7 @@ class MainActivity : ComponentActivity() {
         vm.onResume()
         // Eclipse coming back on the top screen doesn't mean the app on the bottom screen closed: while the helper
         // is still watching that app, leave the bottom screen to it (it comes back when the app closes)
-        if (!(hiddenForApp && ScreenshotService.watching)) restoreAfterApp()
+        if (!(hiddenForApp && (ScreenshotService.watching || guideOpen))) restoreAfterApp()
         syncSecondScreen()
     }
 

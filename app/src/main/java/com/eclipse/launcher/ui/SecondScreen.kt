@@ -129,6 +129,12 @@ fun SecondaryContent(vm: EclipseVM, displayId: Int) {
         var mirrorPicking by remember { mutableStateOf(false) }
         val pagerScope = rememberCoroutineScope()
         var browser by remember { mutableStateOf<String?>(null) }
+        // a web page from Now Playing (hold the Companion button): the browser window on this screen, like the
+        // Companion's; the old built-in one only if Android won't open the window
+        val openWeb: (String) -> Unit = { url ->
+            val site = com.eclipse.launcher.data.Guides.Site("Web", url, url, "WEB", 0xFF444444)
+            if (!GuideBrowserActivity.open(ctxMain, site, vm.session?.game?.id ?: "web", displayId, true) { browser = url }) browser = url
+        }
         var walkGame by remember { mutableStateOf<Game?>(null) }
         // the Companion (ui/Companion.kt) open for this game
         // (kept in the view model, so a game's page on the top screen can open it here too)
@@ -162,7 +168,7 @@ fun SecondaryContent(vm: EclipseVM, displayId: Int) {
                         }) else null,
                         editWalk = { walkGame = it },
                         openCompanion = { vm.companionBottom = it }
-                    ) { browser = it }
+                    ) { openWeb(it) }
                 }
             }
             if (dockOn && pager.currentPage == 0) {
@@ -230,7 +236,7 @@ fun SecondaryContent(vm: EclipseVM, displayId: Int) {
                     )
                 }
             }
-            walkGame?.let { g -> WalkSheet(vm, g, { browser = it }) { walkGame = null } }
+            walkGame?.let { g -> WalkSheet(vm, g, { openWeb(it) }) { walkGame = null } }
             companion?.let { g -> CompanionHub(vm, g) { vm.companionBottom = null } }
             browser?.let { url -> BrowserOverlay(url) { browser = null } }
         }

@@ -10,6 +10,10 @@ import java.io.File
  */
 object CompanionData {
 
+    /** Bumped when something is saved from outside the Companion (its browser window): its lists load again. */
+    val changes = androidx.compose.runtime.mutableIntStateOf(0)
+    fun changed() { changes.intValue++ }
+
     // ---------------------------------------------------------------- checklist
 
     data class Item(val id: Long, val text: String, val done: Boolean = false, val missable: Boolean = false)

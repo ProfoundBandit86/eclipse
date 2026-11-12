@@ -83,6 +83,16 @@
             android:name=".media.MirrorService"
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
+        <!-- The Companion's browser: an ordinary window on the screen the Companion is on (ui/GuideBrowserActivity.kt) -->
+        <activity
+            android:name=".ui.GuideBrowserActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity="com.eclipse.launcher.guide"
+            android:resizeableActivity="true"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+            android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|smallestScreenSize|density" />
+
         <activity
             android:name=".media.MirrorPermissionActivity"
             android:exported="false"
