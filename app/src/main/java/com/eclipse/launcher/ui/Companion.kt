@@ -411,22 +411,56 @@ internal fun WebView.smoothScrolling() {
 }
 
 /**
- * Quick swipes ("flings") that the page drops. On the bottom screen a fast swipe often did nothing while a slow drag
- * worked: the browser saw too few touch points to treat it as a fling. The swipe's speed is measured here from every
- * touch point (each carries its own time, so late-arriving ones still count), and when the page is standing still
- * right after a fast swipe, it's flung by hand. Taps, pinches and the browser's own flings are left alone.
+ * Quick swipes ("flings") on the bottom screen. A slow drag scrolled but a fast swipe did nothing, even with the page
+ * flung by hand (0.1.22): a drag moves the page once per touch point, but a fling is an animation the browser runs on
+ * its own, and on the bottom screen's window that animation doesn't seem to run. So the fling is run here instead,
+ * one step per screen frame on the app's own clock, each step moving the page the way a drag does.
+ *
+ * The swipe's speed is measured from every touch point. If the browser's own fling does get going (the page keeps
+ * moving after the finger is lifted) this one stays out of the way. Taps, pinches and sideways swipes are left alone,
+ * and touching the page stops a fling.
  */
 @android.annotation.SuppressLint("ClickableViewAccessibility")
 private fun WebView.keepFlings() {
     var tracker: android.view.VelocityTracker? = null
     var multi = false
     val cfg = android.view.ViewConfiguration.get(context)
-    val minFling = cfg.scaledMinimumFlingVelocity * 3f
+    val minFling = cfg.scaledMinimumFlingVelocity * 2f
     val maxFling = cfg.scaledMaximumFlingVelocity.toFloat()
-    setOnTouchListener { v, e ->
-        val w = v as WebView
+    val scroller = android.widget.OverScroller(context)
+    var flinging = false
+    var lastY = 0
+
+    val step = object : Runnable {
+        override fun run() {
+            if (!flinging || !isAttachedToWindow) { flinging = false; return }
+            // the page moved by something else (the browser's own fling, a link opening): stop
+            if (scrollY != lastY) { flinging = false; scroller.forceFinished(true); return }
+            if (!scroller.computeScrollOffset()) { flinging = false; return }
+            scrollTo(scrollX, scroller.currY)
+            lastY = scrollY
+            // hit the top or the bottom: nothing more to do
+            if (scrollY != scroller.currY) { flinging = false; scroller.forceFinished(true); return }
+            postOnAnimation(this)
+        }
+    }
+
+    fun fling(vy: Float) {
+        @Suppress("DEPRECATION")
+        val bottom = ((contentHeight * scale).toInt() - height).coerceAtLeast(0)
+        if (bottom == 0) return
+        scroller.forceFinished(true)
+        scroller.fling(0, scrollY, 0, (-vy).toInt(), 0, 0, 0, bottom)
+        lastY = scrollY
+        flinging = true
+        postOnAnimation(step)
+    }
+
+    setOnTouchListener { _, e ->
         when (e.actionMasked) {
             android.view.MotionEvent.ACTION_DOWN -> {
+                // a touch stops a fling, as it would anywhere else
+                if (flinging) { flinging = false; scroller.forceFinished(true) }
                 tracker?.recycle(); tracker = android.view.VelocityTracker.obtain().also { it.addMovement(e) }; multi = false
             }
             android.view.MotionEvent.ACTION_POINTER_DOWN -> multi = true
@@ -438,12 +472,10 @@ private fun WebView.keepFlings() {
                     t.computeCurrentVelocity(1000, maxFling)
                     val vy = t.yVelocity
                     val vx = t.xVelocity
-                    if (kotlin.math.abs(vy) > minFling && kotlin.math.abs(vy) > kotlin.math.abs(vx)) {
-                        val y0 = w.scrollY
-                        // give the browser a moment to start its own fling; only if the page hasn't moved, fling it
-                        w.postDelayed({
-                            if (w.isAttachedToWindow && w.scrollY == y0) runCatching { w.flingScroll(0, (-vy).toInt()) }
-                        }, 60)
+                    if (kotlin.math.abs(vy) > minFling && kotlin.math.abs(vy) > kotlin.math.abs(vx) * 1.2f) {
+                        // two frames for the browser's own fling to show itself; if the page is still, fling it here
+                        val y0 = scrollY
+                        postDelayed({ if (isAttachedToWindow && scrollY == y0) fling(vy) }, 34)
                     }
                 }
                 tracker?.recycle(); tracker = null
