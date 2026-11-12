@@ -2409,8 +2409,8 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
      * A system's logo wherever Eclipse shows one: one you picked for that system (Platform artwork), else the chosen
      * logo pack's or theme's, else Eclipse's own for the card [look] ("dark" = white, "light" = black, "color").
      */
-    fun systemLogo(id: String, look: String = "dark"): Any? =
-        platLogo[id] ?: logoSource()?.get(id) ?: com.eclipse.launcher.data.SystemArt.logo(id, look)
+    fun systemLogo(id: String, look: String = "dark"): String? =
+        platLogo[id] ?: logoSource()?.get(id)?.let { Uri.fromFile(it).toString() } ?: com.eclipse.launcher.data.SystemArt.logo(id, look)
 
     /** The platform pictures in use: the chosen pack or theme, else the Stock pack that comes with Eclipse. */
     fun iconSource(): Map<String, File>? = when {
