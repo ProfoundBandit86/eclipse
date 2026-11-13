@@ -45,7 +45,7 @@ private val ROLES = listOf(
 
 private fun roleAbout(role: String): String = when (role) {
     ThemeConvert.ICONS -> "Icons: shown as each system's tile on Home and in the system lists."
-    ThemeConvert.LOGOS -> "Logos: shown where Eclipse writes a system's name (Look & Feel → Logos), and drawn onto a tile for systems without an icon."
+    ThemeConvert.LOGOS -> "Logos: shown where Eclipse writes a system's name (Settings → Look → Logos), and drawn onto a tile for systems without an icon."
     ThemeConvert.BACKDROPS -> "Backdrops: shown behind a system's games, full screen."
     else -> "Skip: this folder isn't used."
 }

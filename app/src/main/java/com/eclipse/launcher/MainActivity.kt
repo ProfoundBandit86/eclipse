@@ -305,7 +305,7 @@ class MainActivity : ComponentActivity() {
         if (now - movedAt < 6_000) {
             // reopened on the other display a moment ago and Android put it back here: don't loop
             gaveUpOn = want
-            vm.message = "Android didn't let Eclipse open on the other screen. Settings \u2192 Dual screen \u2192 Main screen."
+            vm.message = "Android didn't let Eclipse open on the other screen. Settings \u2192 Screens \u2192 Main."
             return false
         }
         movedAt = now

@@ -366,7 +366,7 @@ private fun PreviewSettings() {
         }
         GlassPanel(Modifier.weight(1f).fillMaxHeight()) {
             Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                Text("Look & Feel", color = C.ink, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text("Look", color = C.ink, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Text("Mode, theme, colours, font and images.", color = C.sub, fontSize = 12.sp)
                 Spacer(Modifier.height(6.dp))
                 Text("LOOK", color = C.accent, fontSize = 9.sp, letterSpacing = 2.sp)

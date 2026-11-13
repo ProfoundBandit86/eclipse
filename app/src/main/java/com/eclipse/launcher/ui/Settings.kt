@@ -63,29 +63,28 @@ import com.eclipse.launcher.media.ScreenshotService
 /** Settings tabs: name, icon and the one-line description under the page heading. */
 private data class SettingsTab(val name: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val desc: String)
 private val TABS = listOf(
-    SettingsTab("Theme", androidx.compose.material.icons.Icons.Filled.Palette, "Theme, colours, icons, font and wallpapers."),
-    SettingsTab("Views", androidx.compose.material.icons.Icons.Filled.ViewCarousel, "Which ways of showing a games list are offered, and new ones to install."),
+    SettingsTab("Look", androidx.compose.material.icons.Icons.Filled.Palette, "Theme, colours, pictures, text, sounds and views."),
     SettingsTab("Library", androidx.compose.material.icons.Icons.Filled.VideoLibrary, "Your game folders, the systems found in them and their emulators."),
-    SettingsTab("Tools", androidx.compose.material.icons.Icons.Filled.Handyman, "Compress games (CHD / RVZ / ZIP), make playlists, send games to RomM, shrink artwork."),
     SettingsTab("Scrape", androidx.compose.material.icons.Icons.Filled.ImageSearch, "Artwork, descriptions and details, and where they come from."),
-    SettingsTab("General", androidx.compose.material.icons.Icons.Filled.Tune, "Clock, dock, home screen and crash reports."),
-    SettingsTab("Connections", androidx.compose.material.icons.Icons.Filled.Cloud, "RomM, artwork scrapers and RetroAchievements."),
-    SettingsTab("Dual screen", androidx.compose.material.icons.Icons.Filled.Devices, "What the second screen shows on dual-screen handhelds."),
-    SettingsTab("Credits", androidx.compose.material.icons.Icons.Filled.Info, "Who made what Eclipse uses, and under which licence.")
+    SettingsTab("Tools", androidx.compose.material.icons.Icons.Filled.Handyman, "Compress games, make playlists, send games to RomM, shrink artwork."),
+    SettingsTab("Connections", androidx.compose.material.icons.Icons.Filled.Cloud, "RomM, RetroAchievements and the Ask helper."),
+    SettingsTab("Screens", androidx.compose.material.icons.Icons.Filled.Devices, "Both screens, the docks and the clock."),
+    SettingsTab("System", androidx.compose.material.icons.Icons.Filled.Tune, "Updates, permissions, buttons, help and credits.")
 )
 
 /** The tabs' numbers (their place in [TABS]), for opening Settings on one: `vm.settingsTab = SettingsTabs.LIBRARY`. */
 object SettingsTabs {
-    const val THEME = 0
-    const val VIEWS = 1
-    const val LIBRARY = 2
+    const val THEME = 0 // Look
+    const val LIBRARY = 1
+    const val SCRAPE = 2
     const val TOOLS = 3
-    const val SCRAPE = 4
-    const val GENERAL = 5
-    const val CONNECTIONS = 6
-    const val DUAL_SCREEN = 7
-    const val CREDITS = 8
+    const val CONNECTIONS = 4
+    const val SCREENS = 5
+    const val SYSTEM = 6
 }
+
+/** The highlighted row's explanation, shown next to the page's title (rows keep theirs out of sight). */
+object SettingsHint { var text by mutableStateOf<String?>(null) }
 
 /** System file pickers that live in the activity (set up in MainActivity). */
 object Pickers {
@@ -199,11 +198,20 @@ fun SettingsScreen(vm: EclipseVM, pickFolder: () -> Unit, interactive: Boolean =
                 if (query.isNotBlank()) {
                     SettingsSearchResults(query, Modifier.weight(1f)) { i -> vm.settingsTab = i; query = "" }
                 } else {
-                val crashOpen = tab == SettingsTabs.GENERAL && vm.crashPage
-                LaunchedEffect(tab) { if (tab != SettingsTabs.GENERAL) vm.crashPage = false }
+                val crashOpen = tab == SettingsTabs.SYSTEM && vm.crashPage
+                LaunchedEffect(tab) { if (tab != SettingsTabs.SYSTEM) vm.crashPage = false; vm.settingsSub = null; SettingsHint.text = null }
+                // a page inside a page (Look › Views, System › Credits): B goes back to its row
+                val sub = vm.settingsSub
+                if (sub != null) androidx.activity.compose.BackHandler { vm.settingsSub = null; GamepadFocus.restoreKey = "sub:$sub" }
+                val subTitle = when (sub) { "views" -> "Views"; "credits" -> "Credits"; else -> null }
                 Row(Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (crashOpen) Text(TABS[tab].name.uppercase() + "  \u203A  ", color = C.sub, fontSize = 12.sp, letterSpacing = 1.6.sp)
-                    Text(if (crashOpen) "Crash reports" else TABS[tab].name, color = C.ink, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    if (crashOpen || subTitle != null) Text(TABS[tab].name.uppercase() + "  \u203A  ", color = C.sub, fontSize = 12.sp, letterSpacing = 1.6.sp)
+                    Text(if (crashOpen) "Crash reports" else subTitle ?: TABS[tab].name, color = C.ink, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    // what the highlighted row does (else what the page is for)
+                    if (!crashOpen) Text(
+                        SettingsHint.text ?: TABS[tab].desc, color = C.sub, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(start = 14.dp).weight(1f)
+                    )
                 }
                 Box(Modifier.fillMaxWidth().height(1.dp).background(C.x(0x14FFFFFFL)))
                 if (crashOpen) CrashReportsPage(vm, Modifier.weight(1f).fillMaxWidth()) else {
@@ -215,16 +223,16 @@ fun SettingsScreen(vm: EclipseVM, pickFolder: () -> Unit, interactive: Boolean =
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     CompositionLocalProvider(LocalBigRows provides true) {
-                    when (tab) {
-                        SettingsTabs.THEME -> AppearanceTab(vm)
-                        SettingsTabs.VIEWS -> ViewsTab(vm)
-                        SettingsTabs.LIBRARY -> Library(vm, pickFolder)
-                        SettingsTabs.TOOLS -> ToolsTab(vm)
-                        SettingsTabs.SCRAPE -> ScrapeTab(vm)
-                        SettingsTabs.GENERAL -> General(vm)
-                        SettingsTabs.CONNECTIONS -> Connections(vm, showTitle = false)
-                        SettingsTabs.DUAL_SCREEN -> DualScreen(vm)
-                        else -> Credits(vm) // SettingsTabs.CREDITS
+                    when {
+                        sub == "views" -> ViewsTab(vm)
+                        sub == "credits" -> Credits(vm)
+                        tab == SettingsTabs.THEME -> AppearanceTab(vm)
+                        tab == SettingsTabs.LIBRARY -> Library(vm, pickFolder)
+                        tab == SettingsTabs.TOOLS -> ToolsTab(vm)
+                        tab == SettingsTabs.SCRAPE -> ScrapeTab(vm)
+                        tab == SettingsTabs.CONNECTIONS -> Connections(vm, showTitle = false)
+                        tab == SettingsTabs.SCREENS -> DualScreen(vm)
+                        else -> General(vm) // SettingsTabs.SYSTEM
                     }
                     }
                 }
@@ -240,27 +248,27 @@ fun SettingsScreen(vm: EclipseVM, pickFolder: () -> Unit, interactive: Boolean =
 
 /** Every setting's name (and words people might search for), with the tab it's on. */
 private val SETTINGS_INDEX: List<Triple<String, Int, String>> = listOf(
-    Triple("Crash reports", 5, "crash error log report bug"), Triple("Background colour", 0, "overlay shading backdrop color"),
+    Triple("Crash reports", 6, "crash error log report bug"), Triple("Background colour", 0, "overlay shading backdrop color"),
     Triple("Theme", 0, "import themes"), Triple("Logos", 0, "system logo pack colour black white card"), Triple("Glass effect", 0, "frosted blur battery"), Triple("Corners", 0, "rounded corners radius art cards"), Triple("Colours", 0, "accent highlight glass text labels dim color"),
     Triple("Font", 0, "typeface import"), Triple("Text size", 0, "bigger smaller scale"), Triple("Icons", 0, "icon pack platform"),
     Triple("Backdrops", 0, "backdrop pack background"), Triple("Sound", 0, "click volume sounds"), Triple("Export theme", 0, "share save zip template"), Triple("Reload images", 0, "refresh eclipse folder"), Triple("Android wallpaper", 0, "live wallpaper system"),
     Triple("Wallpaper (top / bottom screen)", 0, "background picture"),
-    Triple("Scan for new games", 2, "rescan library roms"), Triple("Views", 1, "view types slide cover flow grid list install custom turn off"), Triple("Tools", 3, "chd convert m3u playlists multi disc romm upload send bulk"), Triple("ROM folders", 2, "add folder path"),
-    Triple("Systems and emulators", 2, "platform emulator core edit"), Triple("Scraping", 4, "artwork box art descriptions scrape"),
-    Triple("Installed apps", 2, "emulators android games scan"), Triple("RetroArch cores", 2, "cores"),
+    Triple("Scan for new games", 1, "rescan library roms"), Triple("Views", 0, "view types slide cover flow grid list install custom turn off"), Triple("Tools", 3, "chd convert m3u playlists multi disc romm upload send bulk"), Triple("ROM folders", 1, "add folder path"),
+    Triple("Systems and emulators", 1, "platform emulator core edit"), Triple("Scraping", 2, "artwork box art descriptions scrape"),
+    Triple("Installed apps", 1, "emulators android games scan"), Triple("RetroArch cores", 1, "cores"),
     Triple("24-hour clock", 5, "time"), Triple("Auto-hide dock", 5, "left dock"), Triple("Compact dock", 5, "icons only"), Triple("Pages", 5, "left dock order hide move search recent systems apps scopes"),
     Triple("Clock panel", 5, "time wifi corner"),
-    Triple("Default launcher", 5, "home app"), Triple("Daily test builds", 5, "update channel stable daily beta pre-release"), Triple("Run setup again", 5, "wizard first run"),
-    Triple("Use second screen", 7, "dual bottom display"), Triple("Media controls page", 7, "music playback"), Triple("Screen mirror page", 7, "mirror"), Triple("Transfers page", 7, "romm download upload chd progress"), Triple("Show finished transfers", 7, "romm history done"),
-    Triple("Dock on second screen", 7, "bottom dock"), Triple("Where apps open", 7, "which screen"), Triple("Now Playing buttons", 7, "screenshot walkthrough"),
-    Triple("Show Now Playing", 7, "bottom screen game running"),
-    Triple("LaunchBox", 4, "artwork database scraper"), Triple("Save artwork as WebP", 4, "webp lossless png space compress images"), Triple("Fill missing disc, cartridge and 3D box art", 4, "generate draw media physical cart 3d box missing"),
-    Triple("SteamGridDB", 4, "api key art scraper"), Triple("IGDB", 4, "twitch client scraper"), Triple("RetroAchievements", 6, "achievements cheevos"),
-    Triple("RomM server", 6, "server sync saves romm"), Triple("RomM library share", 6, "upload smb folder"), Triple("Transfers", 6, "uploads downloads history romm"),
+    Triple("Default launcher", 6, "home app"), Triple("Daily test builds", 6, "update channel stable daily beta pre-release"), Triple("Run setup again", 6, "wizard first run"),
+    Triple("Use second screen", 5, "dual bottom display"), Triple("Media controls page", 5, "music playback"), Triple("Screen mirror page", 5, "mirror"), Triple("Transfers page", 5, "romm download upload chd progress"), Triple("Show finished transfers", 5, "romm history done"),
+    Triple("Dock on second screen", 5, "bottom dock"), Triple("Where apps open", 5, "which screen"), Triple("Now Playing buttons", 5, "screenshot walkthrough"),
+    Triple("Show Now Playing", 5, "bottom screen game running"),
+    Triple("LaunchBox", 2, "artwork database scraper"), Triple("Save artwork as WebP", 2, "webp lossless png space compress images"), Triple("Fill missing disc, cartridge and 3D box art", 2, "generate draw media physical cart 3d box missing"),
+    Triple("SteamGridDB", 2, "api key art scraper"), Triple("IGDB", 2, "twitch client scraper"), Triple("RetroAchievements", 4, "achievements cheevos"),
+    Triple("RomM server", 4, "server sync saves romm"), Triple("RomM library share", 4, "upload smb folder"), Triple("Transfers", 4, "uploads downloads history romm"),
     Triple("Compress games", 3, "iso bin cue compress disc rvz gamecube wii dolphin zip rom cartridge chd"), Triple("Shrink artwork", 3, "webp lossless png space compress images"), Triple("Playlists for multi-disc games", 3, "m3u discs"),
-    Triple("Credits", 8, "licences about version"),
-    Triple("Permissions", 5, "access allow"), Triple("All-files access", 5, "storage permission"), Triple("Notification access", 5, "permission"),
-    Triple("Eclipse helper", 5, "accessibility screenshot permission"), Triple("No battery limits", 5, "battery optimisation permission")
+    Triple("Credits", 6, "licences about version"), Triple("Ask helper", 4, "ai gemini claude key spoilers companion"),
+    Triple("Permissions", 6, "access allow"), Triple("All-files access", 6, "storage permission"), Triple("Notification access", 6, "permission"),
+    Triple("Eclipse helper", 6, "accessibility screenshot permission"), Triple("No battery limits", 6, "battery optimisation permission")
 )
 
 /** Settings whose name (or search words) match [query]; picking one opens its tab. */
@@ -282,21 +290,9 @@ private fun SettingsSearchResults(query: String, modifier: Modifier, open: (Int)
 }
 
 @Composable
+/** Settings → System (was General, with Credits; the left dock and clock moved to Screens). */
 private fun General(vm: EclipseVM) {
     TwoColumns({
-        DropSection("Clock")
-        ToggleRow("24-hour clock", null, vm.flag("h24", false)) { vm.setFlag("h24", it) }
-        ToggleRow("Clock panel", "The time and Wi-Fi on a black panel in the top-right corner, so they stand out over artwork.", vm.flag("clock_panel", true)) { vm.setFlag("clock_panel", it) }
-        DropSection("Left dock")
-        ToggleRow("Auto-hide dock", "Slides away when you move into a screen; press left at the edge to bring it back.", vm.flag("dock_autohide")) { vm.setFlag("dock_autohide", it) }
-        ToggleRow("Compact dock", "Icons only, no names.", vm.flag("dock_compact", false)) { vm.setFlag("dock_compact", it) }
-        ScopesDrop(vm)
-    }, {
-        DropSection("Home")
-        StatusRow("Default launcher", if (vm.isDefaultHome()) "Eclipse" else "Not Eclipse", if (vm.isDefaultHome()) Dot.OK else Dot.OFF) { vm.openHomeSettings() }
-        ActionRow("Run setup again", "Permissions, ROM folder and connections.") { vm.runSetupAgain() }
-        ToggleRow("Opening animation", "The eclipse rising when Eclipse starts. Any button skips it.", vm.flag("splash", true)) { vm.setFlag("splash", it) }
-        ActionRow("Show the tutorial again", "The short tour of Home, the dock and the settings panel.") { vm.restartTutorial() }
         DropSection("Updates")
         ToggleRow("Check for updates at start", "Looks for a newer Eclipse on GitHub when Eclipse opens, and asks before installing it.", vm.flag("update_check", true)) { vm.setFlag("update_check", it) }
         // Stable: the releases everyone gets. Daily: also the test builds from the daily branch (pre-releases)
@@ -304,14 +300,23 @@ private fun General(vm: EclipseVM) {
             vm.setFlag("update_daily", it); vm.checkForUpdate(manual = true)
         }
         ActionRow("Check for updates", vm.updateStatus ?: "You have ${vm.appVersion()}") { vm.checkForUpdate(manual = true) }
-        DropSection("Crash reports")
+        DropSection("Access")
+        PermissionsDrop(vm)
+        StatusRow("Default launcher", if (vm.isDefaultHome()) "Eclipse" else "Not Eclipse", if (vm.isDefaultHome()) Dot.OK else Dot.OFF) { vm.openHomeSettings() }
+        DropSection("App switcher")
+        AppSwitcherRows(vm)
+    }, {
+        DropSection("Help")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(Modifier.weight(1f)) { ActionRow("Setup", "Run setup again: permissions, ROM folder and connections.") { vm.runSetupAgain() } }
+            Box(Modifier.weight(1f)) { ActionRow("Tutorial", "Show the short tour of Home, the dock and the settings panel again.") { vm.restartTutorial() } }
+        }
+        ToggleRow("Opening animation", "The eclipse rising when Eclipse starts. Any button skips it.", vm.flag("splash", true)) { vm.setFlag("splash", it) }
         val ctxNow = androidx.compose.ui.platform.LocalContext.current
         val crashes = remember { CrashReports.list(ctxNow) }
         StatusRow("Crash reports", if (crashes.isEmpty()) "None" else "${crashes.size} kept", if (crashes.isEmpty()) Dot.OK else Dot.ERROR) { vm.crashPage = true }
-        DropSection("App switcher")
-        AppSwitcherRows(vm)
-        DropSection("Access")
-        PermissionsDrop(vm)
+        DropSection("About")
+        DropRow("Credits and licences", vm.appVersion(), "sub:credits", opens = true) { vm.settingsSub = "credits" }
     })
 }
 
@@ -446,96 +451,121 @@ private fun PermRow(title: String, why: String, on: Boolean, open: () -> Unit) {
 
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
+/**
+ * Settings → Screens: the second screen and the clock on the left; which display is which and the left dock on the
+ * right. Lists of switches (bottom-screen pages, Now Playing buttons) are one row each that opens under itself.
+ */
 private fun DualScreen(vm: EclipseVM) {
-    // the main switch, across both columns; everything else greys out (and can't be reached) while it's off
-    ToggleRow("Use second screen", "Now Playing, media and the dock on the bottom display.", vm.flag("dual")) { vm.setFlag("dual", it) }
+    var open by remember { mutableStateOf<String?>(null) }
+    fun toggle(id: String) { open = if (open == id) null else id }
     val on = vm.flag("dual")
-    Box(
-        Modifier.fillMaxWidth().padding(top = 6.dp).alpha(if (on) 1f else 0.38f)
-            .focusProperties { enter = { if (on) FocusRequester.Default else FocusRequester.Cancel } }
-            .focusGroup()
-    ) {
     TwoColumns({
-        DropSection("Bottom screen")
-        ToggleRow("Media controls page", "Swipe to playback controls.", vm.flag("media")) { vm.setFlag("media", it) }
-        ToggleRow("Recently played page", "A grid of your recent games; tap one to play.", vm.flag("recent_page", false)) { vm.setFlag("recent_page", it) }
-        ToggleRow("Screen mirror page", "The top screen, or a zoomed-in part of it. Only there while the mirror is on: start it with Mirror on Now Playing.", vm.flag("mirror_page", true)) { vm.setFlag("mirror_page", it) }
-        ToggleRow("Transfers page", "RomM downloads, uploads and CHD conversion; only there while one is running.", vm.flag("tx_page", true)) { vm.setFlag("tx_page", it) }
-        if (vm.flag("tx_page", true)) ToggleRow("Go to Transfers when a download starts", "The bottom screen switches to it when a RomM download begins.", vm.flag("tx_follow", true)) { vm.setFlag("tx_follow", it) }
-        if (vm.flag("tx_page", true)) ToggleRow("Show finished transfers", "The last few results under the live ones.", vm.flag("tx_done", true)) { vm.setFlag("tx_done", it) }
-        ToggleRow("Dock on second screen", "Long-press an app in its drawer to pin it.", vm.flag("dock2")) { vm.setFlag("dock2", it) }
-        if (vm.flag("dock2")) {
-            // the dock's look and icon size
-            var dockOpen by remember { mutableStateOf<String?>(null) }
-            val styles = listOf("glass" to "Glass", "solid" to "Solid", "clear" to "Floating icons", "bar" to "Full-width bar")
-            DropRow("Dock style", styles.firstOrNull { it.first == vm.dock2Style }?.second ?: "Glass", "ds:dockstyle", dockOpen == "style") { dockOpen = if (dockOpen == "style") null else "style" }
-            AnimatedVisibility(dockOpen == "style") {
-                DropMenu { styles.forEach { (id, label) -> DropChoice(label, id == vm.dock2Style, null, "ds:dockstyle:$id") { vm.chooseDock2Style(id); dockOpen = null } } }
-            }
-            val sizes = listOf("small" to "Small", "medium" to "Medium", "large" to "Large")
-            DropRow("Dock icons", sizes.firstOrNull { it.first == vm.dock2Size }?.second ?: "Medium", "ds:docksize", dockOpen == "size") { dockOpen = if (dockOpen == "size") null else "size" }
-            AnimatedVisibility(dockOpen == "size") {
-                DropMenu { sizes.forEach { (id, label) -> DropChoice(label, id == vm.dock2Size, null, "ds:docksize:$id") { vm.chooseDock2Size(id); dockOpen = null } } }
-            }
-        }
-        DropSection("Apps")
-        DropRow(
-            "Where apps open", if (vm.appScreen.isEmpty()) "Ask" else "${vm.appScreen.size} remembered", "ds:where", opens = true
-        ) { vm.resetAppScreens() }
-    }, {
-        DropSection("Now Playing")
-        ToggleRow("Show Now Playing", "Cover, play time and achievements while a game runs.", vm.flag("np_show", true)) { vm.setFlag("np_show", it) }
-        ToggleRow("Screenshot button", "Saves to Pictures/Eclipse.", vm.flag("npb_shot")) { vm.setFlag("npb_shot", it) }
-        ToggleRow("Companion button", "Guides, manuals and more for the game you're playing. Hold it to open a web address.", vm.flag("npb_walk")) { vm.setFlag("npb_walk", it) }
-    })
-    // while it's off: taps on the greyed part do nothing
-    if (!on) Box(Modifier.matchParentSize().pointerInput(Unit) { detectTapGestures { } })
-    }
-    // which display is which (always reachable: it matters even with the second screen off)
-    DropSection("Screens")
-    var scrOpen by remember { mutableStateOf<String?>(null) }
-    val dctx = androidx.compose.ui.platform.LocalContext.current
-    val others = remember(scrOpen) { com.eclipse.launcher.media.Screens.candidates(dctx, android.view.Display.DEFAULT_DISPLAY) }
-    TwoColumns({
-        // Auto swaps only for a 4:3 handheld wearing a widescreen clip-on screen (its built-in screen is the bottom one)
-        val roles = listOf("auto" to "Auto", "standard" to "Android's main display", "swapped" to "The other display")
-        DropRow("Main screen", roles.firstOrNull { it.first == vm.screenRoles }?.second ?: "Auto", "ds:roles", scrOpen == "roles") {
-            scrOpen = if (scrOpen == "roles") null else "roles"
-        }
-        AnimatedVisibility(scrOpen == "roles") {
-            DropMenu { roles.forEach { (id, label) -> DropChoice(label, id == vm.screenRoles, null, "ds:roles:$id") { vm.chooseScreenRoles(id); scrOpen = null } } }
-        }
-        // more than one possible second screen (a TV on DisplayPort, say): pick the real one
-        if (others.size > 1) {
-            val cur = others.firstOrNull { it.name == vm.secondName }
-            DropRow("Second screen", cur?.let { com.eclipse.launcher.media.Screens.label(it) } ?: "Automatic", "ds:which", scrOpen == "which") {
-                scrOpen = if (scrOpen == "which") null else "which"
-            }
-            AnimatedVisibility(scrOpen == "which") {
+        DropSection("Second screen")
+        ToggleRow("Use second screen", "Now Playing, media and the dock on the bottom display.", on) { vm.setFlag("dual", it) }
+        // everything else here greys out (and can't be reached) while it's off
+        Box(Modifier.fillMaxWidth()) {
+        Column(
+            Modifier.fillMaxWidth().alpha(if (on) 1f else 0.38f)
+                .focusProperties { enter = { if (on) FocusRequester.Default else FocusRequester.Cancel } }
+                .focusGroup(),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            val pages = listOf(vm.flag("media"), vm.flag("recent_page", false), vm.flag("mirror_page", true), vm.flag("tx_page", true))
+            DropRow("Bottom pages", "${pages.count { it } + 1} of 5", "ds:pages", open == "pages") { toggle("pages") }
+            AnimatedVisibility(open == "pages") {
                 DropMenu {
-                    DropChoice("Automatic", cur == null, null, "ds:which:auto") { vm.chooseSecondDisplay(""); scrOpen = null }
-                    others.forEachIndexed { i, d ->
-                        DropChoice(com.eclipse.launcher.media.Screens.label(d), d.name == vm.secondName, null, "ds:which:$i") { vm.chooseSecondDisplay(d.name ?: ""); scrOpen = null }
+                    DropChoice("Now Playing", true, "always", "ds:p:np", radio = false, checked = true) { }
+                    DropChoice("Media controls", vm.flag("media"), null, "ds:p:media", radio = false, checked = vm.flag("media")) { vm.setFlag("media", !vm.flag("media")) }
+                    DropChoice("Recently played", vm.flag("recent_page", false), null, "ds:p:recent", radio = false, checked = vm.flag("recent_page", false)) { vm.setFlag("recent_page", !vm.flag("recent_page", false)) }
+                    DropChoice("Screen mirror", vm.flag("mirror_page", true), null, "ds:p:mirror", radio = false, checked = vm.flag("mirror_page", true)) { vm.setFlag("mirror_page", !vm.flag("mirror_page", true)) }
+                    DropChoice("Transfers", vm.flag("tx_page", true), null, "ds:p:tx", radio = false, checked = vm.flag("tx_page", true)) { vm.setFlag("tx_page", !vm.flag("tx_page", true)) }
+                    if (vm.flag("tx_page", true)) {
+                        DropChoice("Open Transfers on download", vm.flag("tx_follow", true), null, "ds:p:txf", radio = false, checked = vm.flag("tx_follow", true)) { vm.setFlag("tx_follow", !vm.flag("tx_follow", true)) }
+                        DropChoice("Show finished transfers", vm.flag("tx_done", true), null, "ds:p:txd", radio = false, checked = vm.flag("tx_done", true)) { vm.setFlag("tx_done", !vm.flag("tx_done", true)) }
                     }
                 }
             }
+            val npBits = listOf(vm.flag("npb_shot"), vm.flag("npb_walk")).count { it }
+            DropRow("Now Playing", if (!vm.flag("np_show", true)) "Off" else "On \u00b7 $npBits buttons", "ds:np", open == "np") { toggle("np") }
+            AnimatedVisibility(open == "np") {
+                DropMenu {
+                    DropChoice("Show Now Playing", vm.flag("np_show", true), null, "ds:np:show", radio = false, checked = vm.flag("np_show", true)) { vm.setFlag("np_show", !vm.flag("np_show", true)) }
+                    DropChoice("Screenshot button", vm.flag("npb_shot"), null, "ds:np:shot", radio = false, checked = vm.flag("npb_shot")) { vm.setFlag("npb_shot", !vm.flag("npb_shot")) }
+                    DropChoice("Companion button", vm.flag("npb_walk"), null, "ds:np:walk", radio = false, checked = vm.flag("npb_walk")) { vm.setFlag("npb_walk", !vm.flag("npb_walk")) }
+                }
+            }
+            ToggleRow("Dock on second screen", "Long-press an app in its drawer to pin it.", vm.flag("dock2")) { vm.setFlag("dock2", it) }
+            if (vm.flag("dock2")) {
+                val styles = listOf("glass" to "Glass", "solid" to "Solid", "clear" to "Floating", "bar" to "Bar")
+                val sizes = listOf("small" to "S", "medium" to "M", "large" to "L")
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Box(Modifier.weight(1f)) { DropRow("Style", styles.firstOrNull { it.first == vm.dock2Style }?.second ?: "Glass", "ds:dockstyle", open == "style") { toggle("style") } }
+                    Box(Modifier.weight(1f)) { DropRow("Icons", sizes.firstOrNull { it.first == vm.dock2Size }?.second ?: "M", "ds:docksize", open == "size") { toggle("size") } }
+                }
+                AnimatedVisibility(open == "style") {
+                    DropMenu { styles.forEach { (id, label) -> DropChoice(label, id == vm.dock2Style, null, "ds:dockstyle:$id") { vm.chooseDock2Style(id); open = null } } }
+                }
+                AnimatedVisibility(open == "size") {
+                    DropMenu { listOf("small" to "Small", "medium" to "Medium", "large" to "Large").forEach { (id, label) -> DropChoice(label, id == vm.dock2Size, null, "ds:docksize:$id") { vm.chooseDock2Size(id); open = null } } }
+                }
+            }
+        }
+        // while it's off: taps on the greyed part do nothing
+        if (!on) Box(Modifier.matchParentSize().pointerInput(Unit) { detectTapGestures { } })
+        }
+        DropSection("Clock")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(Modifier.weight(1f)) { ToggleRow("24-hour", "The clock shows 24-hour time.", vm.flag("h24", false)) { vm.setFlag("h24", it) } }
+            Box(Modifier.weight(1f)) { ToggleRow("Panel", "The time and Wi-Fi on a dark panel in the top-right corner, so they stand out over artwork.", vm.flag("clock_panel", true)) { vm.setFlag("clock_panel", it) } }
         }
     }, {
-        ToggleRow(
-            "Controller on the bottom screen",
-            "Your device's switch-screen key or a tap moves it there; B gives it back.",
-            vm.bottomFocusOn()
-        ) { vm.setBottomFocus(it) }
+        // which display is which (always reachable: it matters even with the second screen off)
+        DropSection("Screens")
+        val dctx = androidx.compose.ui.platform.LocalContext.current
+        val others = remember(open) { com.eclipse.launcher.media.Screens.candidates(dctx, android.view.Display.DEFAULT_DISPLAY) }
+        // Auto swaps only for a 4:3 handheld wearing a widescreen clip-on screen (its built-in screen is the bottom one)
+        val roles = listOf("auto" to "Auto", "standard" to "Android's", "swapped" to "Other")
+        val cur = others.firstOrNull { it.name == vm.secondName }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(Modifier.weight(1f)) { DropRow("Main", roles.firstOrNull { it.first == vm.screenRoles }?.second ?: "Auto", "ds:roles", open == "roles") { toggle("roles") } }
+            // more than one possible second screen (a TV on DisplayPort, say): pick the real one
+            if (others.size > 1) Box(Modifier.weight(1f)) { DropRow("Second", if (cur == null) "Auto" else "Chosen", "ds:which", open == "which") { toggle("which") } }
+        }
+        AnimatedVisibility(open == "roles") {
+            DropMenu {
+                listOf("auto" to "Auto", "standard" to "Android's main display", "swapped" to "The other display").forEach { (id, label) ->
+                    DropChoice(label, id == vm.screenRoles, null, "ds:roles:$id") { vm.chooseScreenRoles(id); open = null }
+                }
+            }
+        }
+        AnimatedVisibility(open == "which") {
+            DropMenu {
+                DropChoice("Automatic", cur == null, null, "ds:which:auto") { vm.chooseSecondDisplay(""); open = null }
+                others.forEachIndexed { i, d ->
+                    DropChoice(com.eclipse.launcher.media.Screens.label(d), d.name == vm.secondName, null, "ds:which:$i") { vm.chooseSecondDisplay(d.name ?: ""); open = null }
+                }
+            }
+        }
+        ToggleRow("Controller on bottom screen", "Your device's switch-screen key or a tap moves the controller there; B gives it back.", vm.bottomFocusOn()) { vm.setBottomFocus(it) }
+        DropRow("Where apps open", if (vm.appScreen.isEmpty()) "Ask" else "${vm.appScreen.size} saved", "ds:where", opens = true) { vm.resetAppScreens() }
+        DropSection("Left dock")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(Modifier.weight(1f)) { ToggleRow("Auto-hide", "The left dock slides away when you move into a screen; press left at the edge to bring it back.", vm.flag("dock_autohide")) { vm.setFlag("dock_autohide", it) } }
+            Box(Modifier.weight(1f)) { ToggleRow("Compact", "The left dock shows icons only, no names.", vm.flag("dock_compact", false)) { vm.setFlag("dock_compact", it) } }
+        }
+        ScopesDrop(vm)
     })
-    // what the bottom screen needs from Android (always reachable)
-    DropSection("Needs")
-    TwoColumns({
-        val helper = ScreenshotService.ready.value
-        StatusRow("Eclipse helper", if (helper) "On" else "Turn on", if (helper) Dot.OK else Dot.OFF) { vm.requestScreenshotAccess() }
-    }, {
-        val notif = vm.notifAccessOn()
-        StatusRow("Notification access", if (notif) "On" else "Turn on", if (notif) Dot.OK else Dot.OFF) { vm.requestNotifAccess() }
-    })
+    // what the bottom screen needs from Android, when it isn't there yet
+    val helper = ScreenshotService.ready.value
+    val notif = vm.notifAccessOn()
+    if (!helper || !notif) {
+        DropSection("Needs")
+        TwoColumns({
+            StatusRow("Eclipse helper", if (helper) "On" else "Turn on", if (helper) Dot.OK else Dot.OFF) { vm.requestScreenshotAccess() }
+        }, {
+            StatusRow("Notification access", if (notif) "On" else "Turn on", if (notif) Dot.OK else Dot.OFF) { vm.requestNotifAccess() }
+        })
+    }
 }
 
 @Composable
@@ -555,8 +585,8 @@ private fun Connections(vm: EclipseVM, showTitle: Boolean = true, withRomm: Bool
     if (withRomm) RommPanel(vm, openR, toggleR)
 
     // ---- RetroAchievements: your progress, in game menus and on the bottom screen
-    DropSection("RetroAchievements")
     TwoColumns({
+    DropSection("RetroAchievements")
     val (raDot, raText) = statusOf(vm, "ra", "Not set up")
     ServiceCard("RetroAchievements", raText, raDot, openL == "ra", { toggleL("ra") }) {
         FieldGroup {
@@ -567,7 +597,27 @@ private fun Connections(vm: EclipseVM, showTitle: Boolean = true, withRomm: Bool
         InfoRow("Where to find the key", "retroachievements.org → your profile → Settings → Keys → Web API Key.")
     }
     }, {
-        Note("Achievements show on a game's page and, while it runs, on the bottom screen's Now Playing.")
+        DropSection("Ask helper")
+        // AI helper: the Companion's Ask tab, with your own Claude or Gemini key
+        val (aiDot, aiText) = statusOf(vm, "ai", "Not set up")
+        ServiceCard("AI helper", aiText, aiDot, openR == "ai", { toggleR("ai") }) {
+            val gem = vm.aiProvider == com.eclipse.launcher.data.AiHelper.GEMINI
+            SlimRow("Which one", vm.aiName(), valueColor = C.accent, focusKey = "ai:which") {
+                vm.chooseAi(if (gem) com.eclipse.launcher.data.AiHelper.CLAUDE else com.eclipse.launcher.data.AiHelper.GEMINI)
+            }
+            FieldGroup {
+                FieldRow("Claude API key", vm.key("ai_claude"), secret = true) { vm.setKey("ai_claude", it.trim()); vm.checkConnection("ai") }
+                FieldRow("Gemini API key", vm.key("ai_gemini"), secret = true) { vm.setKey("ai_gemini", it.trim()); vm.checkConnection("ai") }
+            }
+            ToggleRow("No spoilers", "A hint first; the full answer when you ask for it.", vm.flag("ai_nospoil")) { vm.setFlag("ai_nospoil", it) }
+            ToggleRow("Use what's in the Companion", "Your saved guide, checklist and achievements go with each question.", vm.flag("ai_context")) { vm.setFlag("ai_context", it) }
+            FieldRow("Model", vm.aiModel(), hint = if (gem) com.eclipse.launcher.data.AiHelper.GEMINI_MODEL else com.eclipse.launcher.data.AiHelper.CLAUDE_MODEL) {
+                vm.setKey(if (gem) "ai_gemini_model" else "ai_claude_model", it.trim()); vm.checkConnection("ai")
+            }
+            if (vm.aiReady()) ActionRow("Test the key", aiText) { vm.checkConnection("ai") }
+            InfoRow("Where to get a key", "Gemini: aistudio.google.com \u2192 Get API key (has a free tier). Claude: console.anthropic.com \u2192 API keys (paid by use). Keys stay encrypted on this device and are only sent to the service you pick.")
+            InfoRow("Where it's used", "Companion \u2192 Ask, on the bottom screen while you play or from a game's page. Answers come from the web and can be wrong: each lists its sources.")
+        }
     })
 }
 
@@ -1374,26 +1424,6 @@ private fun ScrapeTab(vm: EclipseVM) {
             vm.showNotice(EclipseVM.Notice("Coming soon", "ScreenScraper", "Manuals, artwork and game info from ScreenScraper will be added in a future update..... Hopefully"))
         }) {}
     }
-    // AI helper: the Companion's Ask tab, with your own Claude or Gemini key
-    val (aiDot, aiText) = statusOf(vm, "ai", "Not set up")
-    ServiceCard("AI helper", aiText, aiDot, openR == "ai", { toggleR("ai") }) {
-        val gem = vm.aiProvider == com.eclipse.launcher.data.AiHelper.GEMINI
-        SlimRow("Which one", vm.aiName(), valueColor = C.accent, focusKey = "ai:which") {
-            vm.chooseAi(if (gem) com.eclipse.launcher.data.AiHelper.CLAUDE else com.eclipse.launcher.data.AiHelper.GEMINI)
-        }
-        FieldGroup {
-            FieldRow("Claude API key", vm.key("ai_claude"), secret = true) { vm.setKey("ai_claude", it.trim()); vm.checkConnection("ai") }
-            FieldRow("Gemini API key", vm.key("ai_gemini"), secret = true) { vm.setKey("ai_gemini", it.trim()); vm.checkConnection("ai") }
-        }
-        ToggleRow("No spoilers", "A hint first; the full answer when you ask for it.", vm.flag("ai_nospoil")) { vm.setFlag("ai_nospoil", it) }
-        ToggleRow("Use what's in the Companion", "Your saved guide, checklist and achievements go with each question.", vm.flag("ai_context")) { vm.setFlag("ai_context", it) }
-        FieldRow("Model", vm.aiModel(), hint = if (gem) com.eclipse.launcher.data.AiHelper.GEMINI_MODEL else com.eclipse.launcher.data.AiHelper.CLAUDE_MODEL) {
-            vm.setKey(if (gem) "ai_gemini_model" else "ai_claude_model", it.trim()); vm.checkConnection("ai")
-        }
-        if (vm.aiReady()) ActionRow("Test the key", aiText) { vm.checkConnection("ai") }
-        InfoRow("Where to get a key", "Gemini: aistudio.google.com \u2192 Get API key (has a free tier). Claude: console.anthropic.com \u2192 API keys (paid by use). Keys stay encrypted on this device and are only sent to the service you pick.")
-        InfoRow("Where it's used", "Companion \u2192 Ask, on the bottom screen while you play or from a game's page. Answers come from the web and can be wrong: each lists its sources.")
-    }
     })
 
 }
@@ -1482,7 +1512,9 @@ fun SetRow(focusKey: String? = null, onClick: () -> Unit, content: @Composable R
         FocusBox(
             Modifier.fillMaxWidth(), shape = shape, onClick = onClick, focusKey = focusKey, focusRequester = fr,
             onLongClick = { if (help.value != null) showHelp = true },
-            onSelect = { if (help.value != null) showHelp = true }
+            onSelect = { if (help.value != null) showHelp = true },
+            // its description goes next to the page's title while it's highlighted
+            onFocusChange = { f -> if (f) SettingsHint.text = help.value?.second }
         ) { focused ->
             CompositionLocalProvider(LocalRowFocused provides focused, LocalRowHelp provides help) {
                 Row(
@@ -1854,17 +1886,20 @@ private fun AppearanceTab(vm: EclipseVM) {
     ) + vm.importedFonts.map { f -> (if (f == "custom.ttf") "custom" else "file:$f") to vm.fontLabel(f) }
     val usingFile = vm.fontChoice.removePrefix("file:").takeIf { vm.fontChoice.startsWith("file:") } ?: if (vm.fontChoice == "custom") "custom.ttf" else null
 
-    // ---- General | Images, then Text and Wallpaper | Sounds (the order of the sketch, 0.1.26)
+    // ---- Look, sized for the Thor's top screen: General + Text | Images + Sounds. Anything with several choices
+    // (wallpaper, views) is one row that opens.
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-        Column(Modifier.weight(1f).focusGroup(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Column(Modifier.weight(1f).focusGroup(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             DropSection("General")
             DropRow("Theme", vm.theme?.name ?: "Eclipse", "ap:theme", opens = true) { vm.appearancePicker = "theme" }
             // glass, accent, highlight, text, labels, glass strength and dim: their own screen with a live preview
             val custom = listOf(vm.colorGlass, vm.colorAccent, vm.colorFocus, vm.colorText, vm.colorLabels).any { it.isNotBlank() } || vm.glassStrength >= 0 || vm.bgDim >= 0
             DropRow("Colours", if (custom) "Your own" else "Theme's", "ap:colours", opens = true, swatch = C.accent) { vm.appearancePicker = "colours" }
-            // Glass effect: frosted panels over a blurred picture (off: plain tinted panels, lighter on the battery)
-            ToggleRow("Glass effect", "Frosted panels and blur. Off is lighter on the battery.", !vm.lowPowerOn()) { vm.chooseLowPower(!it) }
-            DropRow("Corners", "Art ${vm.cornerArt}% \u00b7 Cards ${vm.cornerCard}% \u00b7 Icons ${vm.cornerIcon}%", "ap:corners", open == "corners") { toggle("corners") }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                // Glass effect: frosted panels over a blurred picture (off: plain tinted panels, lighter on the battery)
+                Box(Modifier.weight(1f)) { ToggleRow("Glass", "Frosted panels and blur. Off is lighter on the battery.", !vm.lowPowerOn()) { vm.chooseLowPower(!it) } }
+                Box(Modifier.weight(1f)) { DropRow("Corners", "${vm.cornerArt}%", "ap:corners", open == "corners") { toggle("corners") } }
+            }
             AnimatedVisibility(open == "corners") {
                 DropMenu {
                     Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1877,19 +1912,29 @@ private fun AppearanceTab(vm: EclipseVM) {
                     }
                 }
             }
-        }
-        Column(Modifier.weight(1f).focusGroup(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            DropSection("Images")
-            DropRow("Icons", packLabel(vm, vm.iconChoice, vm.iconPacks), "ap:icons", opens = true) { vm.appearancePicker = "icons" }
-            DropRow("Backdrops", packLabel(vm, vm.backdropChoice, vm.backdropPacks), "ap:backdrops", opens = true) { vm.appearancePicker = "backdrops" }
-            // system logos (where Eclipse writes a system's name): Eclipse's own (black / white or colour), a logo pack or a theme's
-            DropRow("Logos", packLabel(vm, vm.logoChoice, vm.logoPacks), "ap:logos", opens = true) { vm.appearancePicker = "logos" }
-            // every theme's and pack's pictures are plain files in the Eclipse folder: tweak them, then reload
-            DropRow("Reload images", if (vm.homeInUse) "Eclipse folder" else "Eclipse storage", "ap:reload", opens = true) { vm.reloadImages() }
-        }
-    }
-    Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-        Column(Modifier.weight(1f).focusGroup(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            // wallpaper: one row; its choices open under it
+            val wallLabel = when {
+                vm.sysWall -> "Android's"
+                vm.wallTop.isNotEmpty() || vm.wallBottom.isNotEmpty() -> "Your picture"
+                vm.theme?.wallpaper != null -> "Theme's"
+                else -> "Eclipse"
+            }
+            DropRow("Wallpaper", wallLabel, "ap:wall", open == "wall") { toggle("wall") }
+            AnimatedVisibility(open == "wall") {
+                DropMenu {
+                    DropChoice("Use Android's wallpaper", vm.sysWall, "live ones too", "ap:syswall:on", radio = false, checked = vm.sysWall) { vm.chooseSysWall(!vm.sysWall) }
+                    if (vm.sysWall) DropChoice("Choose Android wallpaper\u2026", false, null, "ap:syswall:pick", radio = false) { open = null; vm.openWallpaperChooser() }
+                    else {
+                        DropChoice("Top screen: choose a picture\u2026", false, if (vm.wallTop.isEmpty()) (if (vm.theme?.wallpaper != null) "now the theme's" else "now Eclipse's") else "now yours", "ap:wtop:pick", radio = false) { open = null; Pickers.wallpaper("top") }
+                        if (vm.wallTop.isNotEmpty()) DropChoice("Top screen: remove my picture", false, "back to the theme's", "ap:wtop:clear", radio = false) { vm.clearWallpaper("top") }
+                        DropChoice("Bottom screen: choose a picture\u2026", false, if (vm.wallBottom.isNotEmpty()) "now yours" else "now the same as the top", "ap:wbottom:pick", radio = false) { open = null; Pickers.wallpaper("bottom") }
+                        if (vm.wallBottom.isNotEmpty()) DropChoice("Bottom screen: remove my picture", false, "same as the top again", "ap:wbottom:clear", radio = false) { vm.clearWallpaper("bottom") }
+                        listOf("" to "Show it as the theme says", "fallback" to "Show it if a game has no backdrop", "always" to "Always show it").forEach { (id, label) ->
+                            DropChoice(label, id == vm.wallMode, null, "ap:wm:$id") { vm.chooseWallMode(id) }
+                        }
+                    }
+                }
+            }
             DropSection("Text")
             DropRow("Font", fonts.firstOrNull { it.first == vm.fontChoice }?.second ?: "Default", "ap:font", open == "font") { toggle("font") }
             AnimatedVisibility(open == "font") {
@@ -1912,42 +1957,20 @@ private fun AppearanceTab(vm: EclipseVM) {
                 }
                 Text("${vm.textSize}%", color = C.ink, fontSize = 11.sp, modifier = Modifier.padding(start = 8.dp))
             }
-            DropSection("Wallpaper")
-            DropRow("Android wallpaper", if (vm.sysWall) "On" else "Off", "ap:syswall", open == "syswall") { toggle("syswall") }
-            AnimatedVisibility(open == "syswall") {
-                DropMenu {
-                    DropChoice("Use Eclipse's wallpaper", !vm.sysWall, null, "ap:syswall:off") { vm.chooseSysWall(false); open = null }
-                    DropChoice("Use Android's wallpaper", vm.sysWall, "live ones too", "ap:syswall:on") { vm.chooseSysWall(true) }
-                    DropChoice("Choose Android wallpaper\u2026", false, null, "ap:syswall:pick", radio = false) { vm.chooseSysWall(true); open = null; vm.openWallpaperChooser() }
-                }
-            }
-            if (!vm.sysWall) {
-            val topLabel = if (vm.wallTop.isEmpty()) (if (vm.theme?.wallpaper != null) "Theme's" else "Eclipse") else "Your picture"
-            DropRow("Top screen", topLabel, "ap:wtop", open == "wtop") { toggle("wtop") }
-            AnimatedVisibility(open == "wtop") {
-                DropMenu {
-                    DropChoice("Choose a picture\u2026", false, null, "ap:wtop:pick", radio = false) { open = null; Pickers.wallpaper("top") }
-                    if (vm.wallTop.isNotEmpty()) DropChoice("Remove my picture", false, "back to the theme's", "ap:wtop:clear", radio = false) { vm.clearWallpaper("top"); open = null }
-                }
-            }
-            val bottomLabel = if (vm.wallBottom.isNotEmpty()) "Your picture" else if (vm.wallTop.isEmpty() && vm.theme?.wallpaper == null) "Eclipse" else "Same as top"
-            DropRow("Bottom screen", bottomLabel, "ap:wbottom", open == "wbottom") { toggle("wbottom") }
-            AnimatedVisibility(open == "wbottom") {
-                DropMenu {
-                    DropChoice("Choose a picture\u2026", false, null, "ap:wbottom:pick", radio = false) { open = null; Pickers.wallpaper("bottom") }
-                    if (vm.wallBottom.isNotEmpty()) DropChoice("Remove my picture", false, "same as the top again", "ap:wbottom:clear", radio = false) { vm.clearWallpaper("bottom"); open = null }
-                }
-            }
-            val wallModes = listOf("" to "As the theme says", "fallback" to "If no game backdrop", "always" to "Always")
-            DropRow("Show it", wallModes.firstOrNull { it.first == vm.wallMode }?.second ?: "As the theme says", "ap:wm", open == "wm") { toggle("wm") }
-            AnimatedVisibility(open == "wm") {
-                DropMenu {
-                    wallModes.forEach { (id, label) -> DropChoice(label, id == vm.wallMode, null, "ap:wm:$id") { vm.chooseWallMode(id); open = null } }
-                }
-            }
-            }
         }
-        Column(Modifier.weight(1f).focusGroup(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Column(Modifier.weight(1f).focusGroup(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            DropSection("Images")
+            DropRow("Icons", packLabel(vm, vm.iconChoice, vm.iconPacks), "ap:icons", opens = true) { vm.appearancePicker = "icons" }
+            DropRow("Backdrops", packLabel(vm, vm.backdropChoice, vm.backdropPacks), "ap:backdrops", opens = true) { vm.appearancePicker = "backdrops" }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                // system logos (where Eclipse writes a system's name): Eclipse's own (black / white or colour), a logo pack or a theme's
+                Box(Modifier.weight(1f)) { DropRow("Logos", if (vm.logoChoice.isEmpty()) (if (vm.cardMode == "color") "Colour" else "B / W") else "Pack", "ap:logos", opens = true) { vm.appearancePicker = "logos" } }
+                // every theme's and pack's pictures are plain files in the Eclipse folder: tweak them, then reload
+                Box(Modifier.weight(1f)) { DropRow("Reload", "Images", "ap:reload", opens = true) { vm.reloadImages() } }
+            }
+            // view types (slide, cover flow, grid … and installed ones): their own page
+            val views = vm.builtinViews.map { it.first } + rememberCustomViews().map { "view:" + it.id }
+            DropRow("Views", "${views.count { vm.viewOn(it) }} of ${views.size} on", "sub:views", opens = true) { vm.settingsSub = "views" }
             DropSection("Sounds")
             val builtIn = com.eclipse.launcher.media.UiSound.BUILT_IN
             val soundLabel = builtIn.firstOrNull { it.first == vm.uiSoundPick }?.second ?: vm.uiSoundPick.removePrefix("file:").substringBeforeLast('.')
@@ -1995,7 +2018,10 @@ private fun DropRow(label: String, value: String, focusKey: String, expanded: Bo
     val fr = remember { FocusRequester() }
     // the drop-down composed right after this row takes it as the place B goes back to
     if (expanded) LastDropHeader.fr = fr
-    FocusBox(Modifier.fillMaxWidth().heightIn(min = rowH), shape = shape, onClick = onClick, focusKey = focusKey, focusRequester = fr) {
+    FocusBox(
+        Modifier.fillMaxWidth().heightIn(min = rowH), shape = shape, onClick = onClick, focusKey = focusKey, focusRequester = fr,
+        onFocusChange = { f -> if (f) SettingsHint.text = null }
+    ) {
         Row(
             Modifier.fillMaxWidth().heightIn(min = rowH)
                 .background(if (expanded) C.accent.copy(alpha = if (light) 0.14f else 0.10f) else if (light) Color.White else C.x(0x0FFFFFFFL))

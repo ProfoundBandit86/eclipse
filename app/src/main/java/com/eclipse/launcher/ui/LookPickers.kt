@@ -101,7 +101,7 @@ fun AppearancePicker(vm: EclipseVM, kind: String) = Glass {
             // ---- left: what's installed ----
             GlassPanel(Modifier.width(270.dp).fillMaxHeight()) {
                 Column(Modifier.fillMaxSize().padding(start = 14.dp, end = 14.dp, top = 14.dp)) {
-                    Text("LOOK & FEEL ›", color = C.sub, fontSize = 8.5.sp, letterSpacing = 1.8.sp)
+                    Text("LOOK ›", color = C.sub, fontSize = 8.5.sp, letterSpacing = 1.8.sp)
                     Text(title, color = C.ink, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 6.dp))
                     Column(
                         Modifier.weight(1f).fillMaxWidth().onFocusChanged { listFocused = it.hasFocus }.menuScroll().stayInside()

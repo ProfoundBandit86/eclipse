@@ -515,6 +515,8 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     }
     /** Settings → General → Crash reports is open (it replaces the General page). */
     var crashPage by mutableStateOf(false)
+    /** A page opened from inside a Settings page: "views" (Look › Views) or "credits" (System › Credits), else null. */
+    var settingsSub by mutableStateOf<String?>(null)
 
     fun onResume() {
         resumed = true
@@ -2620,7 +2622,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
      * icons / backdrops / logos / font you tick) zipped as an Eclipse theme into Eclipse/export.
      */
     fun exportTheme(name: String, author: String, icons: Boolean, backdrops: Boolean, logos: Boolean, font: Boolean) {
-        if (!hasAllFiles()) { message = "Allow all-files access first (Settings → General → Permissions)"; return }
+        if (!hasAllFiles()) { message = "Allow all-files access first (Settings → System → Permissions)"; return }
         val t = theme
         fun hex(c: Color) = String.format("#%06X", c.toArgb() and 0xFFFFFF)
         val colours = LinkedHashMap<String, Any>()
@@ -3402,7 +3404,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     fun rommDownload(rom: RomM.Rom, playWhenDone: Boolean = false) {
         val c = rommConn() ?: run { message = "Connect to RomM first (Settings → Connections)"; return }
         if (romPath.isBlank()) { message = "Choose a ROM folder first (Settings → Library)"; return }
-        if (!hasAllFiles()) { message = "Allow all-files access first (Settings → General → Permissions)"; return }
+        if (!hasAllFiles()) { message = "Allow all-files access first (Settings → System → Permissions)"; return }
         installedRom(rom.id)?.let { g -> if (playWhenDone) play(g); return }
         PermissionAsk.notifications?.invoke()
         RommDownloads.enqueue(ctx, c, rom, systemFolder(rom.bp), playWhenDone)

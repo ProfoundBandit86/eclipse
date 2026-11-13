@@ -1031,7 +1031,7 @@ fun PlatformArtScreen(vm: EclipseVM, id: String, pickImage: () -> Unit) = Glass 
     val ratio = when (kind) { PlatKind.CARD, PlatKind.ICON -> 1f; PlatKind.LOGO -> 2f; PlatKind.BACKDROP -> 16f / 9f }
     // card images and backdrops fill their box; icons and logos sit inside it
     val fill = kind == PlatKind.CARD || kind == PlatKind.BACKDROP
-    val noPacks = "No installed icon pack has ${p.name}. Add packs in Settings \u2192 Look & Feel."
+    val noPacks = "No installed icon pack has ${p.name}. Add packs in Settings \u2192 Look."
 
     Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { } }.focusTrap()) {
         GlassScreenBackdrop(vm)
@@ -1094,8 +1094,8 @@ fun PlatformArtScreen(vm: EclipseVM, id: String, pickImage: () -> Unit) = Glass 
                                     color = C.ink, fontWeight = FontWeight.Bold, fontSize = 12.sp
                                 )
                                 if (kind == PlatKind.CARD) {
-                                    Text("Upload a picture, or add packs in Look & Feel.", color = C.sub, fontSize = 11.sp)
-                                    Pill("Open Look & Feel", primary = true) { vm.platArtScreen = null; vm.settingsTab = SettingsTabs.THEME; vm.go(Screen.SETTINGS) }
+                                    Text("Upload a picture, or add packs in Settings → Look.", color = C.sub, fontSize = 11.sp)
+                                    Pill("Open Look", primary = true) { vm.platArtScreen = null; vm.settingsTab = SettingsTabs.THEME; vm.go(Screen.SETTINGS) }
                                 } else Pill("Open Scrape settings", primary = true) { vm.platArtScreen = null; vm.settingsTab = SettingsTabs.SCRAPE; vm.go(Screen.SETTINGS) }
                             }
                             list == null -> Text("Searching ${provs.joinToString { it.second }}\u2026", color = C.sub, fontSize = 11.sp, modifier = Modifier.align(Alignment.Center))

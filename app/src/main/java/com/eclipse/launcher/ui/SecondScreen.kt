@@ -521,7 +521,7 @@ private fun ScreenBubble(vm: EclipseVM, app: AppEntry, onPick: (String, Boolean)
         MenuRow("Bottom screen", value = "\u25BC") { onPick("bottom", rememberIt) }
         MenuRow("Remember my choice", value = if (rememberIt) "On" else "Off", selected = rememberIt) { rememberIt = !rememberIt }
         if (rememberIt) Text(
-            "Reset it in Settings \u2192 Dual screen \u2192 Where apps open.",
+            "Reset it in Settings \u2192 Screens \u2192 Where apps open.",
             color = C.sub, fontSize = 10.sp, lineHeight = 13.sp, modifier = Modifier.padding(horizontal = 2.dp)
         )
         MenuRow("Cancel") { onCancel() }

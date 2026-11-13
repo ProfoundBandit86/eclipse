@@ -332,7 +332,7 @@ fun NotificationsSection(vm: EclipseVM) {
         if (expanded && items.size > 1) SmallLink("Show less", Icons.Filled.ExpandLess, Modifier.align(Alignment.End)) { expanded = false }
         media?.takeIf { it.active }?.let { m -> NowPlayingCard(vm, m) }
         when {
-            !access -> Text("Turn on notification access (Settings → General → Permissions) to see them here.", color = C.sub, fontSize = 10.sp)
+            !access -> Text("Turn on notification access (Settings → System → Permissions) to see them here.", color = C.sub, fontSize = 10.sp)
             items.isEmpty() -> Text("No notifications", color = C.sub, fontSize = 10.sp)
             else -> {
                 (if (expanded) items else items.take(1)).forEach { n -> NotifCard(n) }
