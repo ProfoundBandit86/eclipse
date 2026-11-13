@@ -4074,7 +4074,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    // ---- the Companion's Ask tab: Claude or Gemini with your own key (data/AiHelper.kt; Settings → Connections → AI helper) ----
+    // ---- the Companion's Ask tab: Claude or Gemini with your own key (data/AiHelper.kt; Settings → Connections → Assistant) ----
     /** "claude" or "gemini": the one chosen, else the one that has a key. */
     val aiProvider: String get() = key("ai_provider").ifBlank {
         if (key("ai_claude").isBlank() && key("ai_gemini").isNotBlank()) com.eclipse.launcher.data.AiHelper.GEMINI else com.eclipse.launcher.data.AiHelper.CLAUDE

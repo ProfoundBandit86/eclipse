@@ -1507,7 +1507,7 @@ private fun SourceChip(text: String, label: String? = null, onClick: () -> Unit)
 }
 
 /**
- * Ask: questions about the game for Claude or Gemini (your own key, Settings → Connections → AI helper). They search
+ * Ask: questions about the game for Claude or Gemini (your own key, Settings → Connections → Assistant). They search
  * the web first; each answer lists its sources (tap one to open it in the Companion's browser). 📷 sends a picture of
  * the top screen with the question; 🎤 fills the box by voice. With "No spoilers" on, a hint comes first.
  */
@@ -1553,7 +1553,7 @@ private fun AskTab(vm: EclipseVM, g: Game, root: File, open: (Guides.Site) -> Un
         val q = q0.trim()
         val img = shot
         if (busy || (q.isEmpty() && img == null)) return
-        if (!vm.aiReady()) { status = "Add a key under Settings → Connections → AI helper first"; return }
+        if (!vm.aiReady()) { status = "Add a key under Settings → Connections → Assistant first"; return }
         typing = false; input = ""; shot = null; shotPic = null
         busy = true
         scope.launch {
@@ -1643,7 +1643,7 @@ private fun AskTab(vm: EclipseVM, g: Game, root: File, open: (Guides.Site) -> Un
                 if (!vm.aiReady()) item {
                     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(11.dp)).background(CARD).border(1.dp, LINE, RoundedCornerShape(11.dp)).padding(14.dp)) {
                         Text("Ask Claude or Gemini about this game", color = INK, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                        Text("Add your own key under Settings → Connections → AI helper (on the top screen). Gemini's comes with a free tier at aistudio.google.com; Claude's is paid by use at console.anthropic.com.",
+                        Text("Add your own key under Settings → Connections → Assistant (on the top screen). Gemini's comes with a free tier at aistudio.google.com; Claude's is paid by use at console.anthropic.com.",
                             color = SUB, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
                     }
                 }

@@ -65,9 +65,8 @@ private data class SettingsTab(val name: String, val icon: androidx.compose.ui.g
 private val TABS = listOf(
     SettingsTab("Look", androidx.compose.material.icons.Icons.Filled.Palette, "Theme, colours, pictures, text, sounds and views."),
     SettingsTab("Library", androidx.compose.material.icons.Icons.Filled.VideoLibrary, "Your game folders, the systems found in them and their emulators."),
-    SettingsTab("Scrape", androidx.compose.material.icons.Icons.Filled.ImageSearch, "Artwork, descriptions and details, and where they come from."),
     SettingsTab("Tools", androidx.compose.material.icons.Icons.Filled.Handyman, "Compress games, make playlists, send games to RomM, shrink artwork."),
-    SettingsTab("Connections", androidx.compose.material.icons.Icons.Filled.Cloud, "RomM, RetroAchievements and the Ask helper."),
+    SettingsTab("Connections", androidx.compose.material.icons.Icons.Filled.Cloud, "Scrapers, RetroAchievements, the Assistant and RomM."),
     SettingsTab("Screens", androidx.compose.material.icons.Icons.Filled.Devices, "Both screens, the docks and the clock."),
     SettingsTab("System", androidx.compose.material.icons.Icons.Filled.Tune, "Updates, permissions, buttons, help and credits.")
 )
@@ -76,11 +75,12 @@ private val TABS = listOf(
 object SettingsTabs {
     const val THEME = 0 // Look
     const val LIBRARY = 1
-    const val SCRAPE = 2
-    const val TOOLS = 3
-    const val CONNECTIONS = 4
-    const val SCREENS = 5
-    const val SYSTEM = 6
+    const val TOOLS = 2
+    const val CONNECTIONS = 3
+    /** where the scrapers are (the scrape options themselves are in Library) */
+    const val SCRAPE = CONNECTIONS
+    const val SCREENS = 4
+    const val SYSTEM = 5
 }
 
 /** The highlighted row's explanation, shown next to the page's title (rows keep theirs out of sight). */
@@ -229,7 +229,6 @@ fun SettingsScreen(vm: EclipseVM, pickFolder: () -> Unit, interactive: Boolean =
                         tab == SettingsTabs.THEME -> AppearanceTab(vm)
                         tab == SettingsTabs.LIBRARY -> Library(vm, pickFolder)
                         tab == SettingsTabs.TOOLS -> ToolsTab(vm)
-                        tab == SettingsTabs.SCRAPE -> ScrapeTab(vm)
                         tab == SettingsTabs.CONNECTIONS -> Connections(vm, showTitle = false)
                         tab == SettingsTabs.SCREENS -> DualScreen(vm)
                         else -> General(vm) // SettingsTabs.SYSTEM
@@ -248,27 +247,27 @@ fun SettingsScreen(vm: EclipseVM, pickFolder: () -> Unit, interactive: Boolean =
 
 /** Every setting's name (and words people might search for), with the tab it's on. */
 private val SETTINGS_INDEX: List<Triple<String, Int, String>> = listOf(
-    Triple("Crash reports", 6, "crash error log report bug"), Triple("Background colour", 0, "overlay shading backdrop color"),
+    Triple("Crash reports", 5, "crash error log report bug"), Triple("Background colour", 0, "overlay shading backdrop color"),
     Triple("Theme", 0, "import themes"), Triple("Logos", 0, "system logo pack colour black white card"), Triple("Glass effect", 0, "frosted blur battery"), Triple("Corners", 0, "rounded corners radius art cards"), Triple("Colours", 0, "accent highlight glass text labels dim color"),
     Triple("Font", 0, "typeface import"), Triple("Text size", 0, "bigger smaller scale"), Triple("Icons", 0, "icon pack platform"),
     Triple("Backdrops", 0, "backdrop pack background"), Triple("Sound", 0, "click volume sounds"), Triple("Export theme", 0, "share save zip template"), Triple("Reload images", 0, "refresh eclipse folder"), Triple("Android wallpaper", 0, "live wallpaper system"),
     Triple("Wallpaper (top / bottom screen)", 0, "background picture"),
-    Triple("Scan for new games", 1, "rescan library roms"), Triple("Views", 0, "view types slide cover flow grid list install custom turn off"), Triple("Tools", 3, "chd convert m3u playlists multi disc romm upload send bulk"), Triple("ROM folders", 1, "add folder path"),
-    Triple("Systems and emulators", 1, "platform emulator core edit"), Triple("Scraping", 2, "artwork box art descriptions scrape"),
+    Triple("Scan for new games", 1, "rescan library roms"), Triple("Views", 0, "view types slide cover flow grid list install custom turn off"), Triple("Tools", 2, "chd convert m3u playlists multi disc romm upload send bulk"), Triple("ROM folders", 1, "add folder path"),
+    Triple("Systems and emulators", 1, "platform emulator core edit"), Triple("Scraping", 1, "artwork box art descriptions scrape"), Triple("Scrape automatically", 1, "scrape new games scan"),
     Triple("Installed apps", 1, "emulators android games scan"), Triple("RetroArch cores", 1, "cores"),
-    Triple("24-hour clock", 5, "time"), Triple("Auto-hide dock", 5, "left dock"), Triple("Compact dock", 5, "icons only"), Triple("Pages", 5, "left dock order hide move search recent systems apps scopes"),
-    Triple("Clock panel", 5, "time wifi corner"),
-    Triple("Default launcher", 6, "home app"), Triple("Daily test builds", 6, "update channel stable daily beta pre-release"), Triple("Run setup again", 6, "wizard first run"),
-    Triple("Use second screen", 5, "dual bottom display"), Triple("Media controls page", 5, "music playback"), Triple("Screen mirror page", 5, "mirror"), Triple("Transfers page", 5, "romm download upload chd progress"), Triple("Show finished transfers", 5, "romm history done"),
-    Triple("Dock on second screen", 5, "bottom dock"), Triple("Where apps open", 5, "which screen"), Triple("Now Playing buttons", 5, "screenshot walkthrough"),
-    Triple("Show Now Playing", 5, "bottom screen game running"),
-    Triple("LaunchBox", 2, "artwork database scraper"), Triple("Save artwork as WebP", 2, "webp lossless png space compress images"), Triple("Fill missing disc, cartridge and 3D box art", 2, "generate draw media physical cart 3d box missing"),
-    Triple("SteamGridDB", 2, "api key art scraper"), Triple("IGDB", 2, "twitch client scraper"), Triple("RetroAchievements", 4, "achievements cheevos"),
-    Triple("RomM server", 4, "server sync saves romm"), Triple("RomM library share", 4, "upload smb folder"), Triple("Transfers", 4, "uploads downloads history romm"),
-    Triple("Compress games", 3, "iso bin cue compress disc rvz gamecube wii dolphin zip rom cartridge chd"), Triple("Shrink artwork", 3, "webp lossless png space compress images"), Triple("Playlists for multi-disc games", 3, "m3u discs"),
-    Triple("Credits", 6, "licences about version"), Triple("Ask helper", 4, "ai gemini claude key spoilers companion"),
-    Triple("Permissions", 6, "access allow"), Triple("All-files access", 6, "storage permission"), Triple("Notification access", 6, "permission"),
-    Triple("Eclipse helper", 6, "accessibility screenshot permission"), Triple("No battery limits", 6, "battery optimisation permission")
+    Triple("24-hour clock", 4, "time"), Triple("Auto-hide dock", 4, "left dock"), Triple("Compact dock", 4, "icons only"), Triple("Pages", 4, "left dock order hide move search recent systems apps scopes"),
+    Triple("Clock panel", 4, "time wifi corner"),
+    Triple("Default launcher", 5, "home app"), Triple("Daily test builds", 5, "update channel stable daily beta pre-release"), Triple("Run setup again", 5, "wizard first run"),
+    Triple("Use second screen", 4, "dual bottom display"), Triple("Media controls page", 4, "music playback"), Triple("Screen mirror page", 4, "mirror"), Triple("Transfers page", 4, "romm download upload chd progress"), Triple("Show finished transfers", 4, "romm history done"),
+    Triple("Dock on second screen", 4, "bottom dock"), Triple("Where apps open", 4, "which screen"), Triple("Now Playing buttons", 4, "screenshot walkthrough"),
+    Triple("Show Now Playing", 4, "bottom screen game running"),
+    Triple("LaunchBox", 3, "artwork database scraper"), Triple("Save as WebP", 1, "webp lossless png space compress images"), Triple("Generate missing art", 1, "generate draw media physical cart 3d box missing"),
+    Triple("SteamGridDB", 3, "api key art scraper"), Triple("IGDB", 3, "twitch client scraper"), Triple("RetroAchievements", 3, "achievements cheevos"),
+    Triple("RomM server", 3, "server sync saves romm"), Triple("RomM library share", 3, "upload smb folder"), Triple("Transfers", 3, "uploads downloads history romm"),
+    Triple("Compress games", 2, "iso bin cue compress disc rvz gamecube wii dolphin zip rom cartridge chd"), Triple("Shrink artwork", 2, "webp lossless png space compress images"), Triple("Playlists for multi-disc games", 2, "m3u discs"),
+    Triple("Credits", 5, "licences about version"), Triple("Assistant", 3, "ai gemini claude key spoilers companion"),
+    Triple("Permissions", 5, "access allow"), Triple("All-files access", 5, "storage permission"), Triple("Notification access", 5, "permission"),
+    Triple("Eclipse helper", 5, "accessibility screenshot permission"), Triple("No battery limits", 5, "battery optimisation permission")
 )
 
 /** Settings whose name (or search words) match [query]; picking one opens its tab. */
@@ -580,11 +579,10 @@ private fun Connections(vm: EclipseVM, showTitle: Boolean = true, withRomm: Bool
 
     if (showTitle) Text("Connections", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = C.ink)
 
-    // ---- RomM: one box across both columns: its status on top, the server and library share side by side, and
-    // what's going up and down under them
-    if (withRomm) RommPanel(vm, openR, toggleR)
+    // ---- the scrapers: where artwork and descriptions come from
+    ScrapeSources(vm)
 
-    // ---- RetroAchievements: your progress, in game menus and on the bottom screen
+    // ---- RetroAchievements: your progress, in game menus and on the bottom screen; the Assistant beside it
     TwoColumns({
     DropSection("RetroAchievements")
     val (raDot, raText) = statusOf(vm, "ra", "Not set up")
@@ -597,10 +595,10 @@ private fun Connections(vm: EclipseVM, showTitle: Boolean = true, withRomm: Bool
         InfoRow("Where to find the key", "retroachievements.org → your profile → Settings → Keys → Web API Key.")
     }
     }, {
-        DropSection("Ask helper")
-        // AI helper: the Companion's Ask tab, with your own Claude or Gemini key
+        DropSection("Assistant")
+        // the Assistant: the Companion's Ask tab, with your own Claude or Gemini key
         val (aiDot, aiText) = statusOf(vm, "ai", "Not set up")
-        ServiceCard("AI helper", aiText, aiDot, openR == "ai", { toggleR("ai") }) {
+        ServiceCard("Assistant", aiText, aiDot, openR == "ai", { toggleR("ai") }) {
             val gem = vm.aiProvider == com.eclipse.launcher.data.AiHelper.GEMINI
             SlimRow("Which one", vm.aiName(), valueColor = C.accent, focusKey = "ai:which") {
                 vm.chooseAi(if (gem) com.eclipse.launcher.data.AiHelper.CLAUDE else com.eclipse.launcher.data.AiHelper.GEMINI)
@@ -619,6 +617,13 @@ private fun Connections(vm: EclipseVM, showTitle: Boolean = true, withRomm: Bool
             InfoRow("Where it's used", "Companion \u2192 Ask, on the bottom screen while you play or from a game's page. Answers come from the web and can be wrong: each lists its sources.")
         }
     })
+
+    // ---- RomM: one box across both columns: its status on top, the server and library share side by side, and
+    // what's going up and down under them
+    if (withRomm) {
+        Spacer(Modifier.height(4.dp))
+        RommPanel(vm, openR, toggleR)
+    }
 }
 
 /** "Just now", "12 min ago", "3 h ago", "yesterday", else the date. */
@@ -931,6 +936,7 @@ private fun Library(vm: EclipseVM, pickFolder: () -> Unit) {
     val counts = remember(vm.games) { vm.games.groupingBy { it.platform }.eachCount() }
     val romCount = vm.games.count { it.platform != "android" }
     TwoColumns({
+        DropSection("Scan")
         BigNumber(romCount.toString(), (if (romCount == 1) "game found" else "games found") + if (vm.scanning) " \u00b7 scanning\u2026" else "")
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Pill("Scan new", Modifier.weight(1f)) { vm.rescan(full = false) }
@@ -962,6 +968,7 @@ private fun Library(vm: EclipseVM, pickFolder: () -> Unit) {
         ActionRow("Hidden games", if (vm.hiddenGames.isEmpty()) "None. Hide a game from its page (Hide game)." else "${vm.hiddenGames.size} hidden \u00b7 open to unhide") { vm.hiddenScreen = true }
         DropSection("Built in")
     }, {
+        ScrapeSection(vm)
         DropSection("Installed apps")
         InfoRow("Emulators found", vm.detectedEmulators().joinToString(", ").ifBlank { "None found" })
         val maybe = vm.possibleEmulators()
@@ -1346,18 +1353,15 @@ fun EmuPicker(vm: EclipseVM, platformId: String) {
     }
 }
 
-/** Settings → Scrape: what is fetched for your games, and the sources it comes from. */
+/** Settings → Connections, at the top: the scrapers artwork and descriptions come from (the options are in Library). */
 @Composable
-private fun ScrapeTab(vm: EclipseVM) {
+private fun ScrapeSources(vm: EclipseVM) {
     var openL by remember { mutableStateOf<String?>(null) }
     var openR by remember { mutableStateOf<String?>(null) }
     val toggleL = { id: String -> openL = if (openL == id) null else id }
     val toggleR = { id: String -> openR = if (openR == id) null else id }
-    LaunchedEffect(Unit) { vm.checkConnections() }
-    ScrapeSection(vm)
-    // ---- scrapers: where artwork and descriptions come from
-    DropSection("Sources")
     TwoColumns({
+    DropSection("Scrape")
 
     // LaunchBox
     val lb = vm.lbStatus
@@ -1397,6 +1401,7 @@ private fun ScrapeTab(vm: EclipseVM) {
     }
 
     }, {
+    DropSection(" ")
     // IGDB
     val (igDot, igText) = statusOf(vm, "igdb", "Not set up")
     ServiceCard("IGDB", igText, igDot, openR == "igdb", { toggleR("igdb") }) {
@@ -1428,9 +1433,10 @@ private fun ScrapeTab(vm: EclipseVM) {
 
 }
 
+/** Settings → Library, right of Scan: scraping your games (where it comes from is in Connections). */
 @Composable
 private fun ScrapeSection(vm: EclipseVM) {
-    DropSection("Scraping")
+    DropSection("Scrape")
     val s = vm.scrape
     if (s != null) {
         BigNumber("${s.done}", "of ${s.total} \u00b7 scraping")
@@ -1440,25 +1446,27 @@ private fun ScrapeSection(vm: EclipseVM) {
     } else {
         val pool = vm.games.filter { it.platform != "android" }
         val withArt = pool.count { vm.artOf(it, com.eclipse.launcher.data.ArtKind.BOX) != null }
-        BigNumber("$withArt", "of ${pool.size} have artwork")
+        BigNumber("$withArt", "of ${pool.size} have art")
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Pill("Scrape missing", Modifier.weight(1f)) { vm.scrapeAll(false) }
             Pill("Re-scrape all", Modifier.weight(1f)) { vm.scrapeAll(true) }
         }
     }
-    ToggleRow("Scrape new games automatically", "Every scan gets artwork for the games it just found, once each.", vm.scrapeNew()) { vm.setFlag("scrape_new", it) }
-    // off by default: new PNG artwork is re-saved as lossless WebP (same pixels, smaller), JPEGs are left as they are
+    ToggleRow("Scrape automatically", "Every scan gets artwork for the games it just found, once each. Your own uploaded art is always kept.", vm.scrapeNew()) { vm.setFlag("scrape_new", it) }
     ToggleRow(
-        "Fill missing disc, cartridge and 3D box art",
-        "Drawn from the box art when no source has one, in the style of your library. A real one replaces it when found. For games already scraped: Settings \u2192 Tools.",
+        "Generate missing art",
+        "Draws a missing disc, cartridge or 3D box from the box art, in your library's style. A real one replaces it when found. For games already scraped: Tools.",
         vm.flag("fill_art", false)
     ) { vm.setFlag("fill_art", it) }
-    ToggleRow("Save artwork as WebP", "New PNG pictures are re-saved as lossless WebP when that's smaller. Pixel for pixel the same. Needs Android 10+.", vm.flag("webp_new", false)) { vm.setFlag("webp_new", it) }
-    // what to scrape: one drop-down row; its list ticks each kind on or off
+    // what to scrape: its list ticks each kind on or off
     val kinds = SCRAPE_KINDS
     var kindsOpen by remember { mutableStateOf(false) }
     val on = kinds.count { it.first in vm.scrapeKinds }
-    DropRow("What to scrape", if (on == kinds.size) "Everything" else "$on of ${kinds.size}", "lib:scrapekinds", kindsOpen) { kindsOpen = !kindsOpen }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        // off by default: new PNG artwork is re-saved as lossless WebP (same pixels, smaller), JPEGs are left as they are
+        Box(Modifier.weight(1f)) { ToggleRow("Save as WebP", "New PNG pictures are re-saved as lossless WebP when that's smaller. Pixel for pixel the same. Needs Android 10+.", vm.flag("webp_new", false)) { vm.setFlag("webp_new", it) } }
+        Box(Modifier.weight(1f)) { DropRow("What", if (on == kinds.size) "All" else "$on of ${kinds.size}", "lib:scrapekinds", kindsOpen) { kindsOpen = !kindsOpen } }
+    }
     AnimatedVisibility(kindsOpen) {
         DropMenu {
             kinds.forEach { (k, label) ->
@@ -1466,7 +1474,6 @@ private fun ScrapeSection(vm: EclipseVM) {
             }
         }
     }
-    Note("Your own uploaded art is always kept.")
 }
 
 /** What scraping can fetch (store key → name): Settings → Scrape → What to scrape, and the setup wizard's Artwork page. */
