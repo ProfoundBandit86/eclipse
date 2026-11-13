@@ -47,6 +47,8 @@ import com.eclipse.launcher.data.ArtKind
 import com.eclipse.launcher.data.Game
 import com.eclipse.launcher.data.Platforms
 import com.eclipse.launcher.data.RomM
+import com.eclipse.launcher.data.SearchQuery
+import kotlinx.coroutines.delay
 
 /**
  * Search (Up on On Deck, or the dock's search): a glass search bar, a strip of letters to type with the controller,
@@ -56,12 +58,14 @@ import com.eclipse.launcher.data.RomM
  * Voice (on by default, right dock): Up onto the bar, or Up on it, or the mic, opens Android's speech prompt; what
  * you say becomes the search and the controller moves to the top result. The letter strip is off by default.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SearchOverlay(vm: EclipseVM) = Glass {
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("all") }
     val field = remember { FocusRequester() }
     val firstResult = remember { FocusRequester() } // the top result
+    val chipFr = remember { FocusRequester() } // the first "understood" chip
     val keyboard = LocalSoftwareKeyboardController.current
     val letters = remember { FocusRequester() }
     var onLetters by remember { mutableStateOf(false) }
@@ -119,20 +123,61 @@ fun SearchOverlay(vm: EclipseVM) = Glass {
 
     val q = query.trim().lowercase()
     val src = if (!vm.rommOn()) "local" else vm.searchSource
-    // besides the name: each game's year, genre, developer and publisher (yours from scraping or your edits; RomM's
-    // from its metadata). Name matches come first, then matches on these.
+    // ---- understanding the search (data/SearchQuery.kt): systems, years, genres, players, favourites … become chips
+    // under the bar; the words left over are the title. A sentence nothing matches can go to the Assistant.
+    val parsed = remember(q) { SearchQuery.parse(q, Platforms.all) }
+    var aiChips by remember(q) { mutableStateOf<List<SearchQuery.Chip>?>(null) }
+    var asking by remember(q) { mutableStateOf(false) }
+    var removed by remember(q) { mutableStateOf(setOf<String>()) }
+    val chips = (aiChips ?: parsed.chips).filter { it.id !in removed }
+    val structured = chips.any { it.key != "title" }
+    // a plain search (just a name): the title chip's words, or what was typed
+    val tq = if (aiChips != null || removed.isNotEmpty()) chips.firstOrNull { it.key == "title" }?.value ?: "" else q
     val typing = q.isNotEmpty()
-    val localDetails = remember(vm.games, vm.gameInfo, typing) {
-        if (!typing) emptyMap() else vm.games.associate { g -> g.id to listOf("y", "g", "d", "pub").joinToString(" ") { vm.gameDetail(g, it) }.lowercase() }
+    // what each game offers to match: name, system, year, genre, players, developer, publisher, favourite, played
+    val facts = remember(vm.games, vm.gameInfo, vm.favGames, vm.playtime, typing) {
+        if (!typing) emptyMap() else vm.games.associate { g ->
+            g.id to SearchQuery.Facts(
+                g.name, g.platform, SearchQuery.yearOf(vm.gameDetail(g, "y")), vm.gameDetail(g, "g"), SearchQuery.playersOf(vm.gameDetail(g, "p")),
+                vm.gameDetail(g, "d"), vm.gameDetail(g, "pub"), vm.isFavGame(g), vm.playedSeconds(g) > 0
+            )
+        }
     }
-    val local = remember(q, vm.games, src, localDetails) {
-        if (q.isEmpty() || src == "romm") emptyList() else vm.games.filter { it.id !in vm.hiddenGames && (q in it.name.lowercase() || q in (localDetails[it.id] ?: "")) }
-            .sortedWith(compareBy<Game> { q !in it.name.lowercase() }.thenBy { !it.name.lowercase().startsWith(q) }.thenBy { it.name.lowercase() }).take(60)
+    fun romFacts(r: RomM.Rom) = SearchQuery.Facts(r.name, r.bp, r.year, r.genres.joinToString(" "), null, r.companies.joinToString(" "), r.companies.joinToString(" "), false, false)
+    fun details(f: SearchQuery.Facts) = "${f.year ?: ""} ${f.genre} ${f.developer} ${f.publisher}".lowercase()
+    val local = remember(q, vm.games, src, facts, chips, tq) {
+        when {
+            q.isEmpty() || src == "romm" -> emptyList()
+            structured -> vm.games.filter { it.id !in vm.hiddenGames && facts[it.id]?.let { f -> SearchQuery.matches(f, chips) } == true }
+                .sortedBy { it.name.lowercase() }.take(120)
+            tq.isEmpty() -> emptyList()
+            // besides the name: the year, genre, developer and publisher; name matches first
+            else -> vm.games.filter { it.id !in vm.hiddenGames && (tq in it.name.lowercase() || facts[it.id]?.let { f -> tq in details(f) } == true) }
+                .sortedWith(compareBy<Game> { tq !in it.name.lowercase() }.thenBy { !it.name.lowercase().startsWith(tq) }.thenBy { it.name.lowercase() }).take(60)
+        }
     }
-    val remote = remember(q, vm.rommCatalog, vm.rommLink, src) {
-        fun details(r: RomM.Rom) = ((r.year?.toString() ?: "") + " " + r.genres.joinToString(" ") + " " + r.companies.joinToString(" ")).lowercase()
-        if (q.isEmpty() || src == "local") emptyList() else vm.rommCatalog.filter { vm.installedRom(it.id) == null && (q in it.name.lowercase() || q in details(it)) }
-            .sortedWith(compareBy<RomM.Rom> { q !in it.name.lowercase() }.thenBy { !it.name.lowercase().startsWith(q) }.thenBy { it.name.lowercase() }).take(60)
+    val remote = remember(q, vm.rommCatalog, vm.rommLink, src, chips, tq) {
+        when {
+            q.isEmpty() || src == "local" -> emptyList()
+            structured -> vm.rommCatalog.filter { vm.installedRom(it.id) == null && SearchQuery.matches(romFacts(it), chips) }.sortedBy { it.name.lowercase() }.take(120)
+            tq.isEmpty() -> emptyList()
+            else -> vm.rommCatalog.filter { vm.installedRom(it.id) == null && (tq in it.name.lowercase() || tq in details(romFacts(it))) }
+                .sortedWith(compareBy<RomM.Rom> { tq !in it.name.lowercase() }.thenBy { !it.name.lowercase().startsWith(tq) }.thenBy { it.name.lowercase() }).take(60)
+        }
+    }
+    // a sentence (3+ words) nothing matched, with words left over and the Assistant set up: ask it for the filters
+    val noneFound = local.isEmpty() && remote.isEmpty()
+    LaunchedEffect(q, noneFound) {
+        if (aiChips != null || !noneFound || parsed.words < 3 || parsed.leftover.isBlank() || !vm.aiReady()) return@LaunchedEffect
+        delay(700) // still typing?
+        asking = true
+        val ans = runCatching {
+            com.eclipse.launcher.data.AiHelper.plain(vm.aiProvider, vm.aiKey(), vm.aiModel(), SearchQuery.aiSystem(Platforms.all), query.trim())
+        }
+        asking = false
+        val got = ans.getOrNull()?.let { SearchQuery.fromAi(it, Platforms.all) }
+        if (!got.isNullOrEmpty()) { aiChips = got; removed = emptySet() }
+        else if (ans.isFailure) vm.message = "The Assistant couldn't read that search: ${ans.exceptionOrNull()?.message ?: "no answer"}"
     }
     val apps = remember(q, vm.apps, vm.renames, src) {
         if (q.isEmpty() || src == "romm") emptyList() else vm.apps.filter { q in vm.nameOf(it).lowercase() }
@@ -265,6 +310,20 @@ fun SearchOverlay(vm: EclipseVM) = Glass {
             if (q.isEmpty()) {
                 Spacer(Modifier.weight(1f))
             } else {
+                // ---- what the search understood: one chip each (A removes it); blue ones came from the Assistant ----
+                if (structured || asking || aiChips != null) {
+                    androidx.compose.foundation.layout.FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    ) {
+                        Text("UNDERSTOOD", color = C.sub.copy(alpha = 0.7f), fontSize = 7.5.sp, letterSpacing = 1.4.sp, modifier = Modifier.align(Alignment.CenterVertically))
+                        chips.forEachIndexed { i, c -> UnderstoodChip(c, if (i == 0) chipFr else null) { removed = removed + c.id } }
+                        if (asking) Text(
+                            "\u2726 Asking the Assistant\u2026", color = AiBlue, fontSize = 10.sp,
+                            modifier = Modifier.align(Alignment.CenterVertically).border(1.dp, AiBlue.copy(alpha = 0.6f), RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
+                }
                 // ---- filter chips ----
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 10.dp)) {
                     (listOf("all" to ("All" to total), "games" to ("Games" to local.size), "apps" to ("Apps" to apps.size), "romm" to ("RomM" to remote.size)))
@@ -305,8 +364,8 @@ fun SearchOverlay(vm: EclipseVM) = Glass {
                             // Up from the top row: straight back to the search bar (voice search, when it's on)
                             .onPreviewKeyEvent { e ->
                                 if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionUp && focusedIdx in 0 until cols) {
-                                    cameUp = true
-                                    runCatching { field.requestFocus() }
+                                    if (chips.isNotEmpty() && (structured || aiChips != null)) runCatching { chipFr.requestFocus() }
+                                    else { cameUp = true; runCatching { field.requestFocus() } }
                                     true
                                 } else false
                             },
@@ -488,6 +547,28 @@ private fun LetterStrip(
                     fontSize = if (space) 6.sp else 9.sp, letterSpacing = if (space) 1.sp else 0.sp
                 )
             }
+        }
+    }
+}
+
+/** The Assistant's colour on the search chips (blue, so its guesses stand apart from what Eclipse understood itself). */
+private val AiBlue = Color(0xFF9DB2E6)
+
+/** One thing the search understood ("SYSTEM SNES ✕"): A (or a tap) removes it. */
+@Composable
+private fun UnderstoodChip(c: SearchQuery.Chip, fr: FocusRequester?, onRemove: () -> Unit) {
+    val tint = if (c.ai) AiBlue else C.accent
+    val shape = RoundedCornerShape(50)
+    FocusBox(shape = shape, onClick = onRemove, focusRequester = fr, focusKey = "chip:${c.id}") {
+        Row(
+            Modifier.clip(shape).background(tint.copy(alpha = 0.14f)).border(1.dp, tint.copy(alpha = 0.55f), shape)
+                .padding(start = 10.dp, end = 7.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (c.ai) Text("\u2726 ", color = tint, fontSize = 9.sp)
+            Text(SearchQuery.keyOf(c), color = tint.copy(alpha = 0.85f), fontSize = 7.5.sp, letterSpacing = 1.2.sp)
+            Text(" " + SearchQuery.shown(c), color = C.ink, fontSize = 11.sp, maxLines = 1, fontFamily = FontFamily.Default)
+            Text("  \u2715", color = C.sub, fontSize = 9.sp)
         }
     }
 }

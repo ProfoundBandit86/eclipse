@@ -127,6 +127,32 @@ object AiHelper {
         if (provider == GEMINI) gemini(key, model?.ifBlank { null } ?: GEMINI_MODEL, system, turns)
         else claude(key, model?.ifBlank { null } ?: CLAUDE_MODEL, system, turns)
 
+    /**
+     * A short question with no web search and a short answer (search turning a sentence into filters): the plain text
+     * that came back. Throws [AiError] like [ask].
+     */
+    suspend fun plain(provider: String, key: String, model: String?, system: String, question: String): String {
+        if (provider == GEMINI) {
+            val body = JSONObject()
+                .put("system_instruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", system))))
+                .put("contents", JSONArray().put(JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put("text", question)))))
+                .put("generationConfig", JSONObject().put("responseMimeType", "application/json"))
+            val m = model?.ifBlank { null } ?: GEMINI_MODEL
+            val r = post("https://generativelanguage.googleapis.com/v1beta/models/$m:generateContent", mapOf("x-goog-api-key" to key), body)
+            val parts = r.optJSONArray("candidates")?.optJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts") ?: throw AiError("No answer came back")
+            val text = StringBuilder()
+            for (i in 0 until parts.length()) parts.optJSONObject(i)?.let { p -> if (!p.optBoolean("thought")) text.append(p.optString("text")) }
+            return text.toString().ifBlank { throw AiError("No answer came back") }
+        }
+        val body = JSONObject().put("model", model?.ifBlank { null } ?: CLAUDE_MODEL).put("max_tokens", 400).put("system", system)
+            .put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", question)))
+        val r = post("https://api.anthropic.com/v1/messages", claudeHeaders(key), body)
+        val content = r.optJSONArray("content") ?: throw AiError("No answer came back")
+        val text = StringBuilder()
+        for (i in 0 until content.length()) content.optJSONObject(i)?.takeIf { it.optString("type") == "text" }?.let { text.append(it.optString("text")) }
+        return text.toString().ifBlank { throw AiError("No answer came back") }
+    }
+
     /** A tiny question with no searching, to see whether the key works. Null = it does; else what went wrong. */
     suspend fun test(provider: String, key: String, model: String?): String? = try {
         if (provider == GEMINI) {
