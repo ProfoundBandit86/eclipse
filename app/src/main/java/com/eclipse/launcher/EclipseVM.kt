@@ -3472,7 +3472,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Settings → Connections → RomM → "Convert installs to CHD": a finished .cue / .iso install is converted first (to RVZ
+     * Settings → Connections → RomM → "Compress after download": a finished .cue / .iso install is converted first (to RVZ
      * for a GameCube / Wii disc, which Dolphin plays; CHD for the rest) and
      * only then shown (and played, for "Install & play"). A multi-disc game plays once disc 1 is converted; the other
      * discs convert after it. If a conversion fails the original is used. Returns true when it took over.
