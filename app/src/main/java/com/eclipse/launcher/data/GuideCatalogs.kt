@@ -4,7 +4,7 @@ import android.content.Context
 import org.json.JSONArray
 
 /**
- * Guide and map pages known by title (assets/companion/*.json), so the Companion opens a game's own GameFAQs guide,
+ * Guide and map pages known by title (the JSON files in assets/companion), so the Companion opens a game's own GameFAQs guide,
  * StrategyWiki walkthrough or VGMaps map instead of a search page.
  *
  * The three catalogues and the way titles are matched come from Game Twin by Mert Aslantürk
