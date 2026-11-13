@@ -26,6 +26,44 @@ object Updater {
 
     data class Release(val version: String, val tag: String, val apkUrl: String, val size: Long, val notes: String)
 
+    /** A release's APK on this repository, or null when it has none (or it's a draft). */
+    private fun releaseOf(o: JSONObject): Release? {
+        if (o.optBoolean("draft")) return null
+        val tag = o.optString("tag_name").ifEmpty { return null }
+        val assets = o.optJSONArray("assets") ?: return null
+        for (i in 0 until assets.length()) {
+            val a = assets.getJSONObject(i)
+            val u = a.optString("browser_download_url")
+            if (u.endsWith(".apk", true) && u.startsWith(ALLOWED)) return Release(tag.removePrefix("v"), tag, u, a.optLong("size"), o.optString("body").trim())
+        }
+        return null
+    }
+
+    /**
+     * The newest version for an update channel: [daily] false = the latest full release (what everyone gets);
+     * true = the newest of the full releases and the daily test builds (pre-releases like 0.1.27-daily.4, made from
+     * the daily branch). Null when GitHub can't be reached.
+     */
+    suspend fun latest(daily: Boolean): Release? = if (!daily) latest() else withContext(Dispatchers.IO) {
+        runCatching {
+            val c = (URL("https://api.github.com/repos/$REPO/releases?per_page=30").openConnection() as HttpURLConnection).apply {
+                connectTimeout = 8000; readTimeout = 8000
+                setRequestProperty("Accept", "application/vnd.github+json")
+                setRequestProperty("User-Agent", "Eclipse-launcher")
+            }
+            try {
+                if (c.responseCode != 200) return@runCatching null
+                val arr = org.json.JSONArray(c.inputStream.bufferedReader().readText())
+                var best: Release? = null
+                for (i in 0 until arr.length()) {
+                    val r = releaseOf(arr.getJSONObject(i)) ?: continue
+                    if (best == null || isNewer(r.version, best.version)) best = r
+                }
+                best
+            } finally { c.disconnect() }
+        }.getOrNull()
+    }
+
     /** The latest published (non-pre-release) version, or null when it can't be reached. */
     suspend fun latest(): Release? = withContext(Dispatchers.IO) {
         runCatching {
@@ -52,7 +90,11 @@ object Updater {
         }.getOrNull()
     }
 
-    /** True when [latest] is a higher version than [current] ("0.1.10" > "0.1.9"; anything after a "-" ignored). */
+    /**
+     * True when [latest] is a higher version than [current] ("0.1.10" > "0.1.9"). A daily build comes before the
+     * release it leads up to, and later daily builds after earlier ones: 0.1.27-daily.3 < 0.1.27-daily.4 < 0.1.27 <
+     * 0.1.28-daily.1. (Any other "-" suffix counts like a daily build numbered by its digits.)
+     */
     fun isNewer(latest: String, current: String): Boolean {
         fun parts(v: String) = v.substringBefore('-').split('.').map { it.filter(Char::isDigit).toIntOrNull() ?: 0 }
         val a = parts(latest); val b = parts(current)
@@ -60,7 +102,14 @@ object Updater {
             val x = a.getOrElse(i) { 0 }; val y = b.getOrElse(i) { 0 }
             if (x != y) return x > y
         }
-        return false
+        // same version number: a full release beats its daily builds; between daily builds, the higher number wins
+        fun pre(v: String): Int? = if ('-' !in v) null else v.substringAfter('-').filter(Char::isDigit).takeLast(9).toIntOrNull() ?: 0
+        val pa = pre(latest); val pb = pre(current)
+        return when {
+            pa == null -> pb != null
+            pb == null -> false
+            else -> pa > pb
+        }
     }
 
     private fun dir(ctx: Context) = File(ctx.cacheDir, "updates")

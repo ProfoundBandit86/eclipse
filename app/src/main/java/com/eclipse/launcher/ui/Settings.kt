@@ -250,7 +250,7 @@ private val SETTINGS_INDEX: List<Triple<String, Int, String>> = listOf(
     Triple("Installed apps", 2, "emulators android games scan"), Triple("RetroArch cores", 2, "cores"),
     Triple("24-hour clock", 5, "time"), Triple("Auto-hide dock", 5, "left dock"), Triple("Compact dock", 5, "icons only"), Triple("Pages", 5, "left dock order hide move search recent systems apps scopes"),
     Triple("Clock panel", 5, "time wifi corner"),
-    Triple("Default launcher", 5, "home app"), Triple("Run setup again", 5, "wizard first run"),
+    Triple("Default launcher", 5, "home app"), Triple("Daily test builds", 5, "update channel stable daily beta pre-release"), Triple("Run setup again", 5, "wizard first run"),
     Triple("Use second screen", 7, "dual bottom display"), Triple("Media controls page", 7, "music playback"), Triple("Screen mirror page", 7, "mirror"), Triple("Transfers page", 7, "romm download upload chd progress"), Triple("Show finished transfers", 7, "romm history done"),
     Triple("Dock on second screen", 7, "bottom dock"), Triple("Where apps open", 7, "which screen"), Triple("Now Playing buttons", 7, "screenshot walkthrough"),
     Triple("Show Now Playing", 7, "bottom screen game running"),
@@ -299,6 +299,10 @@ private fun General(vm: EclipseVM) {
         ActionRow("Show the tutorial again", "The short tour of Home, the dock and the settings panel.") { vm.restartTutorial() }
         DropSection("Updates")
         ToggleRow("Check for updates at start", "Looks for a newer Eclipse on GitHub when Eclipse opens, and asks before installing it.", vm.flag("update_check", true)) { vm.setFlag("update_check", it) }
+        // Stable: the releases everyone gets. Daily: also the test builds from the daily branch (pre-releases)
+        ToggleRow("Daily test builds", "Get the newest test build as well as releases. Off: releases only (a release newer than your test build replaces it).", vm.flag("update_daily", false)) {
+            vm.setFlag("update_daily", it); vm.checkForUpdate(manual = true)
+        }
         ActionRow("Check for updates", vm.updateStatus ?: "You have ${vm.appVersion()}") { vm.checkForUpdate(manual = true) }
         DropSection("Crash reports")
         val ctxNow = androidx.compose.ui.platform.LocalContext.current

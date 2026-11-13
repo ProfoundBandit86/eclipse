@@ -357,7 +357,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     fun checkForUpdate(manual: Boolean) {
         if (manual) updateStatus = "Checking\u2026"
         viewModelScope.launch {
-            val r = com.eclipse.launcher.data.Updater.latest()
+            val r = com.eclipse.launcher.data.Updater.latest(daily = flag("update_daily", false))
             val cur = appVersion()
             when {
                 r == null -> updateStatus = if (manual) "Couldn't reach GitHub" else updateStatus
