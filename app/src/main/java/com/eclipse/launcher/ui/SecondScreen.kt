@@ -588,6 +588,8 @@ private fun NowPlayingPage(
     var ra by remember(s?.game?.id) { mutableStateOf<RaProgress?>(null) }
     LaunchedEffect(s?.game?.id) { ra = s?.game?.let { vm.loadRa(it) } }
     val bottomPad = if (dockOn) 104.dp else 24.dp
+    // the buttons also show with no game running, unless that's turned off (and there's at least one button)
+    val idleButtons = vm.flag("np_idle_buttons", true) && (vm.flag("npb_shot") || openMirror != null || vm.flag("npb_walk"))
 
     Box(Modifier.fillMaxSize().background(HomeDark)) {
         if (s == null) {
@@ -618,7 +620,26 @@ private fun NowPlayingPage(
                 enter = slideInHorizontally(tween(380)) { -it / 3 } + fadeIn(tween(380)),
                 exit = slideOutHorizontally(tween(260)) { -it / 3 } + fadeOut(tween(260))
             ) {
-                if (g != null) GameInfoPanel(vm, g, Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, top = 58.dp, bottom = bottomPad + 6.dp))
+                if (g != null) GameInfoPanel(vm, g, Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, top = 58.dp, bottom = bottomPad + 6.dp + (if (idleButtons) 44.dp else 0.dp)))
+            }
+            // the Now Playing buttons with no game running (Settings → Screens → Now Playing → "Buttons when no game
+            // runs"): Screenshot, Mirror, and the Companion for the game highlighted on the top screen (else the last one played)
+            if (idleButtons) {
+                val cg = g ?: vm.recent.firstOrNull { it !in vm.hiddenGames }?.let { id -> vm.games.firstOrNull { it.id == id } }
+                Row(
+                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = bottomPad),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (vm.flag("npb_shot")) NpButton("Screenshot", Icons.Filled.PhotoCamera, Modifier.weight(1f)) { vm.takeScreenshot() }
+                    if (openMirror != null) {
+                        val mirroring by com.eclipse.launcher.media.Mirror.running.collectAsState()
+                        NpButton(if (mirroring) "Mirror on" else "Mirror", Icons.Filled.ScreenShare, Modifier.weight(1f)) { openMirror() }
+                    }
+                    if (vm.flag("npb_walk") && cg != null) {
+                        NpButton("Companion", Icons.Filled.MenuBook, Modifier.weight(1f), onLongClick = { editWalk(cg) }) { openCompanion(cg) }
+                    }
+                }
+                vm.shotStatus?.let { Text(it, color = C.ink, fontSize = 12.sp, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = bottomPad + 44.dp)) }
             }
         } else {
             // ---- a game is running: its art, blurred, under the right dock's rows ----

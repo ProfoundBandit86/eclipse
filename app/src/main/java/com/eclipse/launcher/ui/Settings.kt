@@ -264,7 +264,7 @@ private val SETTINGS_INDEX: List<Triple<String, Int, String>> = listOf(
     Triple("Default launcher", 5, "home app"), Triple("Daily test builds", 5, "update channel stable daily beta pre-release"), Triple("Run setup again", 5, "wizard first run"),
     Triple("Use second screen", 4, "dual bottom display"), Triple("Dim the bottom screen", 4, "dim sleep dark idle battery timeout level"), Triple("Media controls page", 4, "music playback"), Triple("Screen mirror page", 4, "mirror"), Triple("Transfers page", 4, "romm download upload chd progress"), Triple("Show finished transfers", 4, "romm history done"),
     Triple("Dock on second screen", 4, "bottom dock"), Triple("Where apps open", 4, "which screen"), Triple("Now Playing buttons", 4, "screenshot walkthrough"),
-    Triple("Show Now Playing", 4, "bottom screen game running"),
+    Triple("Show Now Playing", 4, "bottom screen game running"), Triple("Buttons when no game runs", 4, "now playing screenshot mirror companion idle hide"),
     Triple("LaunchBox", 3, "artwork database scraper"), Triple("Save as WebP", 1, "webp lossless png space compress images"), Triple("Generate missing art", 1, "generate draw media physical cart 3d box missing"),
     Triple("SteamGridDB", 3, "api key art scraper"), Triple("IGDB", 3, "twitch client scraper"), Triple("RetroAchievements", 3, "achievements cheevos"),
     Triple("RomM server", 3, "server sync saves romm"), Triple("RomM library share", 3, "upload smb folder"), Triple("Transfers", 3, "uploads downloads history romm"),
@@ -495,6 +495,7 @@ private fun DualScreen(vm: EclipseVM) {
                     DropChoice("Show Now Playing", vm.flag("np_show", true), null, "ds:np:show", radio = false, checked = vm.flag("np_show", true)) { vm.setFlag("np_show", !vm.flag("np_show", true)) }
                     DropChoice("Screenshot button", vm.flag("npb_shot"), null, "ds:np:shot", radio = false, checked = vm.flag("npb_shot")) { vm.setFlag("npb_shot", !vm.flag("npb_shot")) }
                     DropChoice("Companion button", vm.flag("npb_walk"), null, "ds:np:walk", radio = false, checked = vm.flag("npb_walk")) { vm.setFlag("npb_walk", !vm.flag("npb_walk")) }
+                    DropChoice("Buttons when no game runs", vm.flag("np_idle_buttons", true), null, "ds:np:idle", radio = false, checked = vm.flag("np_idle_buttons", true)) { vm.setFlag("np_idle_buttons", !vm.flag("np_idle_buttons", true)) }
                 }
             }
             ToggleRow("Dock on second screen", "Long-press an app in its drawer to pin it.", vm.flag("dock2")) { vm.setFlag("dock2", it) }
@@ -731,7 +732,7 @@ private fun RommPanel(vm: EclipseVM, openR: String?, toggleR: (String) -> Unit) 
                 ColumnLabel("Library share \u00b7 uploads")
                 RommShareRow(vm)
                 if (ready) {
-                    ToggleRow("Compress after download", "Downloaded games are compressed in a format their emulator reads: CHD for disc games, RVZ for GameCube / Wii, ZIP for cartridges, XISO, ZAR, Z3DS, WUX. Multi-disc games start after disc 1. Originals are deleted if Tools says so.", vm.flag("romm_chd", false)) { vm.setFlag("romm_chd", it) }
+                    ToggleRow("Compress after download", "Downloaded games are compressed in a format their emulator reads: CHD for disc games, RVZ for GameCube / Wii, ZIP for cartridges, XISO, ZAR, Z3DS, WUX. Multi-disc games start after disc 1. Originals are deleted if Tools says so.", vm.flag("romm_chd", true)) { vm.setFlag("romm_chd", it) }
                     ToggleRow("Sync saves", "Newer saves come down from RomM before a game starts; changed saves go up after it closes.", vm.flag("romm_saves", false)) { vm.setFlag("romm_saves", it) }
                     if (vm.flag("romm_saves", false)) {
                         FieldRow("Save folders", vm.key("romm_savedirs").ifBlank { "/storage/emulated/0/RetroArch/saves" }) { vm.setKey("romm_savedirs", it) }
@@ -2482,7 +2483,7 @@ private fun SetupTwoColumns(vm: EclipseVM, page: SetupPage) {
                             }
                         }
                     }
-                    Reveal(n++) { ToggleRow("Compress after download", "Games are compressed (CHD, RVZ, ZIP …) before they start.", vm.flag("romm_chd", false)) { vm.setFlag("romm_chd", it) } }
+                    Reveal(n++) { ToggleRow("Compress after download", "Games are compressed (CHD, RVZ, ZIP …) before they start.", vm.flag("romm_chd", true)) { vm.setFlag("romm_chd", it) } }
                     Reveal(n++) {
                         Text("ROMM'S LIBRARY SHARE · FOR SENDING GAMES", color = Color(0xFF8E897F), fontSize = 7.5.sp, letterSpacing = 1.6.sp, modifier = Modifier.padding(start = 4.dp, top = 6.dp))
                     }

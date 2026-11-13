@@ -3488,7 +3488,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
      * discs convert after it. If a conversion fails the original is used. Returns true when it took over.
      */
     private fun convertThenInstall(rom: RomM.Rom, file: File, playNow: Boolean): Boolean {
-        if (!flag("romm_chd", false)) return false
+        if (!flag("romm_chd", true)) return false
         // whatever the Tools' Compress games would do with it, if its system's emulators can read the result: a disc →
         // CHD / RVZ / XISO / ZAR, a cartridge ROM → ZIP, a 3DS file → Z3DS, a Wii U disc or folder → WUX / WUA.
         // Anything else (or a system whose emulators can't read any of them) is installed as it came.
