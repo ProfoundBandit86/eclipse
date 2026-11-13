@@ -711,7 +711,7 @@ private fun RommPanel(vm: EclipseVM, openR: String?, toggleR: (String) -> Unit) 
                 ColumnLabel("Library share \u00b7 uploads")
                 RommShareRow(vm)
                 if (ready) {
-                    ToggleRow("Compress after download", "A disc game (.cue / .iso) from RomM is converted to a CHD (RVZ for GameCube / Wii) before it shows up or starts. Multi-disc games start after disc 1. Originals are deleted if Settings \u2192 Tools says so.", vm.flag("romm_chd", false)) { vm.setFlag("romm_chd", it) }
+                    ToggleRow("Compress after download", "Downloaded games are compressed in a format their emulator reads: CHD for disc games, RVZ for GameCube / Wii, ZIP for cartridges, XISO, ZAR, Z3DS, WUX. Multi-disc games start after disc 1. Originals are deleted if Tools says so.", vm.flag("romm_chd", false)) { vm.setFlag("romm_chd", it) }
                     ToggleRow("Sync saves", "Newer saves come down from RomM before a game starts; changed saves go up after it closes.", vm.flag("romm_saves", false)) { vm.setFlag("romm_saves", it) }
                     if (vm.flag("romm_saves", false)) {
                         FieldRow("Save folders", vm.key("romm_savedirs").ifBlank { "/storage/emulated/0/RetroArch/saves" }) { vm.setKey("romm_savedirs", it) }
@@ -2462,7 +2462,7 @@ private fun SetupTwoColumns(vm: EclipseVM, page: SetupPage) {
                             }
                         }
                     }
-                    Reveal(n++) { ToggleRow("Compress after download", "Disc games become CHDs (GameCube / Wii: RVZ) before they start.", vm.flag("romm_chd", false)) { vm.setFlag("romm_chd", it) } }
+                    Reveal(n++) { ToggleRow("Compress after download", "Games are compressed (CHD, RVZ, ZIP …) before they start.", vm.flag("romm_chd", false)) { vm.setFlag("romm_chd", it) } }
                     Reveal(n++) {
                         Text("ROMM'S LIBRARY SHARE · FOR SENDING GAMES", color = Color(0xFF8E897F), fontSize = 7.5.sp, letterSpacing = 1.6.sp, modifier = Modifier.padding(start = 4.dp, top = 6.dp))
                     }

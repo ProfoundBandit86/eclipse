@@ -3472,24 +3472,25 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Settings → Connections → RomM → "Compress after download": a finished .cue / .iso install is converted first (to RVZ
-     * for a GameCube / Wii disc, which Dolphin plays; CHD for the rest) and
+     * Settings → Connections → RomM → "Compress after download": a finished download is compressed first, the way its
+     * emulators can read (CHD, RVZ for GameCube / Wii, XISO, ZAR, ZIP for cartridges, Z3DS, WUX / WUA), and
      * only then shown (and played, for "Install & play"). A multi-disc game plays once disc 1 is converted; the other
      * discs convert after it. If a conversion fails the original is used. Returns true when it took over.
      */
     private fun convertThenInstall(rom: RomM.Rom, file: File, playNow: Boolean): Boolean {
         if (!flag("romm_chd", false)) return false
-        if (!isConvertible(file)) return false
-        if (alreadyConverted(file)) return false
-        // a system whose emulators can't use CHD / RVZ (Xbox, PS3 …): installed as it came
-        val item = discItem(file, false, rom.bp) ?: return false
+        // whatever the Tools' Compress games would do with it, if its system's emulators can read the result: a disc →
+        // CHD / RVZ / XISO / ZAR, a cartridge ROM → ZIP, a 3DS file → Z3DS, a Wii U disc or folder → WUX / WUA.
+        // Anything else (or a system whose emulators can't read any of them) is installed as it came.
+        val disc = if (isConvertible(file) && !alreadyConverted(file)) discItem(file, false, rom.bp) else null
+        val item = disc ?: runCatching { romItem(Game("dl:${rom.id}", rom.name, rom.bp, file.path)) }.getOrNull() ?: return false
         viewModelScope.launch {
             while (chdJob != null) delay(1000)
-            message = "Converting ${rom.name} to ${item.format}\u2026"
+            message = "Compressing ${rom.name} to ${item.format}\u2026"
             val del = chdDelete
             runChd(listOf(item), del, auto = true, romm = true) { saved, ok ->
-                // (an XISO replaces the original under its own name when originals are deleted)
-                val done = if (item.xiso && del) file else File(file.parentFile, file.nameWithoutExtension + "." + item.ext)
+                // (an XISO replaces the original under its own name when originals are deleted; a .wua has its own place)
+                val done = if (item.xiso && del) file else item.dest ?: File(file.parentFile, file.nameWithoutExtension + "." + item.ext)
                 rommInstalled(rom, if (ok > 0 && done.isFile) done else file, playNow, converted = true, savedBytes = if (ok > 0) saved else -1L)
             }
         }
