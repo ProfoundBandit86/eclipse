@@ -2,7 +2,6 @@ package com.eclipse.launcher.data
 
 import android.content.Context
 import android.net.Uri
-import android.os.Environment
 import org.json.JSONObject
 import java.io.File
 import java.util.zip.ZipEntry
@@ -274,65 +273,87 @@ object Themes {
         "Imported theme"
     }
 
-    /** Writes "Eclipse theme template.zip" to Downloads: a theme.json to edit and a README listing every system name. */
-    fun writeTemplate(): File? = try {
-        @Suppress("DEPRECATION")
-        val dl = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-        dl.mkdirs()
-        val f = File(dl, "Eclipse theme template.zip")
-        ZipOutputStream(f.outputStream().buffered()).use { z ->
-            fun put(name: String, text: String) {
-                z.putNextEntry(ZipEntry(name)); z.write(text.toByteArray()); z.closeEntry()
-            }
-            put(
-                "theme.json",
-                JSONObject()
-                    .put("name", "My theme")
-                    .put("author", "You")
-                    .put("accent", "#E60012")
-                    .put("focus", "#00C3E3")
-                    .put("wallpaper", "wallpaper.jpg")
-                    .put("bottomWallpaper", "bottom.jpg")
-                    .put("wallpaperMode", "fallback")
-                    .toString(2)
-            )
-            val systems = Platforms.all.joinToString("\n") { "  ${it.id.padEnd(16)} ${it.name}" }
-            put(
-                "README.txt",
-                """
-                ECLIPSE THEME
-                ============
-                Put your images next to theme.json, zip the lot, and import it in Eclipse: Settings > Themes > Import theme.
-                Everything is optional - leave out anything you don't want to change.
+    /**
+     * What Export theme puts in the zip. [colours] are theme.json's colour and number fields as they are now
+     * ("accent" -> "#RRGGBB", "glassStrength" -> 70 …). Pictures are by system id. Wallpapers and the font are
+     * anything Eclipse can open: a file, a file:// or content:// address, or one of its own (file:///android_asset/…).
+     */
+    class Export(
+        val name: String,
+        val author: String,
+        val colours: Map<String, Any>,
+        val wallpaper: String?,
+        val bottom: String?,
+        val dock: Map<String, File>,
+        val icons: Map<String, String>?,
+        val backdrops: Map<String, String>?,
+        val logos: Map<String, String>?,
+        val font: File?
+    )
 
-                theme.json
-                  name             shown in the theme list
-                  author           your name
-                  accent           colour of selected buttons, e.g. #E60012
-                  focus            colour of the highlight outline, e.g. #00C3E3
-                  wallpaper        image for the home screen (top screen)
-                  bottomWallpaper  image for the bottom screen
-                  font             a .ttf or .otf file in the zip, e.g. "font.ttf" (optional)
-                  wallpaperMode    "fallback" = only where a game has no backdrop of its own
-                                   "always"   = always show the theme wallpaper
+    /** What [export] wrote, and how much of it. */
+    class Exported(val file: File, val icons: Int, val backdrops: Int, val logos: Int, val font: Boolean)
 
-                icons/            each system's icon, named after the system: icons/snes.png, icons/psx.jpg ...
-                                  Square images look best (about 512 x 512).
-                backdrops/        optional: a backdrop per system, named like the icons (backdrops/snes.jpg).
-                                  Shown behind the platforms while that system is highlighted, and on its games screen.
-                dock/             dock icons: home.png, games.png, romm.png, apps.png, settings.png (square, transparent background)
+    /** A file name made safe for any storage ("My theme: v2" -> "My theme v2"). */
+    private fun safeName(s: String) = s.replace(Regex("[\\\\/:*?\"<>|]+"), " ").replace(Regex("\\s+"), " ").trim().take(60)
 
-                Images can be .png, .jpg or .webp. Wallpapers look best at 1920 x 1080 (top) and 1080 x 1240 (bottom on the AYN Thor).
-
-                SYSTEM NAMES
-                """.trimIndent() + "\n" + systems + "\n"
-            )
-            z.putNextEntry(ZipEntry("icons/")); z.closeEntry()
-            z.putNextEntry(ZipEntry("backdrops/")); z.closeEntry()
-            z.putNextEntry(ZipEntry("dock/")); z.closeEntry()
+    /** Opens a picture or font Eclipse is using, wherever it lives. */
+    private fun open(ctx: Context, src: String): java.io.InputStream? = try {
+        when {
+            src.startsWith("file:///android_asset/") -> ctx.assets.open(src.removePrefix("file:///android_asset/"))
+            src.startsWith("file://") -> Uri.parse(src).path?.let { File(it) }?.takeIf { it.isFile }?.inputStream()
+            src.startsWith("content://") -> ctx.contentResolver.openInputStream(Uri.parse(src))
+            src.startsWith("/") -> File(src).takeIf { it.isFile }?.inputStream()
+            else -> null // a web address: not ours to pack
         }
-        f
-    } catch (e: Exception) {
-        null
+    } catch (e: Exception) { null }
+
+    /** The extension a picture should keep in the zip (".png" …), from its name; ".jpg" when it can't tell. */
+    private fun extOf(src: String): String {
+        val e = src.substringBefore('?').substringAfterLast('/').substringAfterLast('.', "").lowercase()
+        return if (e in imageExts || e == "svg") e else "jpg"
+    }
+
+    /**
+     * Export theme: today's look as an Eclipse theme zip in Eclipse/export, ready to import on another device or to
+     * share. Holds theme.json (name, author, colours, wallpaper settings), the wallpapers and dock icons, and, if you
+     * chose them, the icons, backdrops, logos and font in use.
+     */
+    fun export(ctx: Context, x: Export): Exported {
+        val dir = EclipseHome.export()
+        val base = safeName(x.name).ifEmpty { "My theme" }
+        var f = File(dir, "$base.zip")
+        var n = 2
+        while (f.exists()) f = File(dir, "$base ($n).zip").also { n++ }
+        var icons = 0; var backdrops = 0; var logos = 0; var font = false
+        val names = HashSet<String>()
+        try {
+            ZipOutputStream(f.outputStream().buffered()).use { z ->
+                fun put(name: String, input: java.io.InputStream?): Boolean {
+                    input ?: return false
+                    if (!names.add(name)) { input.close(); return false }
+                    input.use { z.putNextEntry(ZipEntry(name)); it.copyTo(z); z.closeEntry() }
+                    return true
+                }
+                val json = JSONObject().put("name", x.name.trim().ifEmpty { "My theme" })
+                if (x.author.isNotBlank()) json.put("author", x.author.trim())
+                for ((k, v) in x.colours) json.put(k, v)
+                x.wallpaper?.let { w -> val e = extOf(w); if (put("wallpaper.$e", open(ctx, w))) json.put("wallpaper", "wallpaper.$e") }
+                x.bottom?.let { w -> val e = extOf(w); if (put("bottom.$e", open(ctx, w))) json.put("bottomWallpaper", "bottom.$e") }
+                for ((k, v) in x.dock) put("dock/$k.${v.extension.lowercase()}", v.inputStream())
+                x.icons?.forEach { (id, src) -> if (put("icons/$id.${extOf(src)}", open(ctx, src))) icons++ }
+                x.backdrops?.forEach { (id, src) -> if (put("backdrops/$id.${extOf(src)}", open(ctx, src))) backdrops++ }
+                x.logos?.forEach { (id, src) -> if (put("logos/$id.${extOf(src)}", open(ctx, src))) logos++ }
+                x.font?.takeIf { it.isFile }?.let { ff ->
+                    val e = ff.extension.lowercase().takeIf { it in fontExts } ?: "ttf"
+                    if (put("font.$e", ff.inputStream())) { json.put("font", "font.$e"); font = true }
+                }
+                z.putNextEntry(ZipEntry("theme.json")); z.write(json.toString(2).toByteArray()); z.closeEntry()
+            }
+        } catch (e: Exception) {
+            f.delete()
+            throw e
+        }
+        return Exported(f, icons, backdrops, logos, font)
     }
 }

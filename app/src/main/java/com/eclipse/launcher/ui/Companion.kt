@@ -78,6 +78,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -124,13 +125,14 @@ import kotlin.math.abs
  * ScreenScraper shown but not ready yet).
  */
 
-// The theme's colours (the bottom screen keeps its dark look; your text / label colours and accent apply)
+// The theme's colours: light mode, glass colour, text / label colours and accent all apply
 private val INK: Color @Composable @androidx.compose.runtime.ReadOnlyComposable get() = C.ink
 private val SUB: Color @Composable @androidx.compose.runtime.ReadOnlyComposable get() = C.sub
 private val LINE: Color @Composable @androidx.compose.runtime.ReadOnlyComposable get() = C.x(0x1AFFFFFFL)
 private val CARD: Color @Composable @androidx.compose.runtime.ReadOnlyComposable get() = C.x(0x0EFFFFFFL)
 /** Pop-ups and panels over the hub. */
-private val PANEL: Color @Composable @androidx.compose.runtime.ReadOnlyComposable get() = C.bg.copy(alpha = 0.97f)
+private val PANEL: Color @Composable @androidx.compose.runtime.ReadOnlyComposable get() =
+    (ThemeColors.glass.value.takeIf { it.isSpecified } ?: C.bg).copy(alpha = 0.97f)
 private const val SOON_TEXT = "Manuals from ScreenScraper will be added in a future update..... Hopefully"
 
 @Composable
@@ -263,7 +265,7 @@ fun CompanionHub(vm: EclipseVM, g: Game, close: () -> Unit) {
         if (!covered) {
             val bg = vm.artOf(g, ArtKind.HERO) ?: vm.artOf(g, ArtKind.BACKDROP) ?: vm.wallpaperBottom()
             if (bg != null) coil.compose.AsyncImage(bg, null, Modifier.fillMaxSize().softBlur(18.dp), contentScale = ContentScale.Crop)
-            Box(Modifier.fillMaxSize().background(Color(0xB307070A)))
+            Box(Modifier.fillMaxSize().background(HomeDark.copy(alpha = 0.7f)))
         }
         Column(Modifier.fillMaxSize()) {
             // header
@@ -370,7 +372,7 @@ private fun GuidesTab(
                         Text(last.title, color = INK, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(top = 3.dp))
                         Text("${last.source} · $pct% read · on this device", color = SUB, fontSize = 11.sp)
-                        Box(Modifier.padding(top = 6.dp).fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color(0x1AFFFFFF))) {
+                        Box(Modifier.padding(top = 6.dp).fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(C.x(0x1AFFFFFFL))) {
                             Box(Modifier.fillMaxWidth(pct / 100f).fillMaxHeight().background(C.accent))
                         }
                     }
@@ -620,7 +622,7 @@ private fun HubSearch(g: Game, onCancel: () -> Unit, onGo: (String) -> Unit) {
         ) {
             Text("Search the web for ${g.name}", color = INK, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
             Text("The game's name is added for you: just type what you're stuck on.", color = SUB, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp, bottom = 10.dp))
-            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0x59000000)).border(1.dp, LINE, RoundedCornerShape(10.dp)).padding(12.dp)) {
+            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(C.x(0x59000000L)).border(1.dp, LINE, RoundedCornerShape(10.dp)).padding(12.dp)) {
                 BasicTextField(
                     text, { text = it }, singleLine = true,
                     textStyle = TextStyle(color = INK, fontSize = 15.sp), cursorBrush = SolidColor(C.accent),
@@ -706,7 +708,7 @@ private fun GuideReader(g: Game, s: Guides.Saved, onBack: () -> Unit) {
                     }
                 ) {
                     val h = maxHeight
-                    Box(Modifier.align(Alignment.TopCenter).padding(vertical = 8.dp).width(2.dp).fillMaxHeight().background(Color(0x1AFFFFFF)))
+                    Box(Modifier.align(Alignment.TopCenter).padding(vertical = 8.dp).width(2.dp).fillMaxHeight().background(C.x(0x1AFFFFFFL)))
                     if (count > 1) marks.forEach { m ->
                         Box(Modifier.align(Alignment.TopCenter).offset(y = (h - 16.dp) * (m.toFloat() / (count - 1)) + 4.dp).size(width = 12.dp, height = 3.dp).background(C.accent.copy(alpha = 0.7f)))
                     }
@@ -836,7 +838,7 @@ private fun FindBar(query: String, matches: List<Int>, hit: Int, onQuery: (Strin
                 .border(1.dp, C.accent.copy(alpha = 0.4f), RoundedCornerShape(14.dp)).padding(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(Color(0x59000000)).padding(horizontal = 10.dp, vertical = 10.dp)) {
+            Box(Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(C.x(0x59000000L)).padding(horizontal = 10.dp, vertical = 10.dp)) {
                 BasicTextField(
                     query, onQuery, singleLine = true, textStyle = TextStyle(color = INK, fontSize = 14.sp), cursorBrush = SolidColor(C.accent),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -1052,7 +1054,7 @@ private fun HubInput(title: String, hint: String, button: String, start: String 
                 .background(PANEL).border(1.dp, LINE, RoundedCornerShape(14.dp)).clickable(enabled = false) {}.padding(14.dp)
         ) {
             Text(title, color = INK, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 10.dp))
-            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0x59000000)).border(1.dp, LINE, RoundedCornerShape(10.dp)).padding(12.dp)) {
+            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(C.x(0x59000000L)).border(1.dp, LINE, RoundedCornerShape(10.dp)).padding(12.dp)) {
                 BasicTextField(
                     text, { text = it }, singleLine = true,
                     textStyle = TextStyle(color = INK, fontSize = 15.sp), cursorBrush = SolidColor(C.accent),
@@ -1111,7 +1113,7 @@ private fun ChecklistTab(g: Game, root: File, tick: Int, changed: () -> Unit) {
                 val done = items.count { it.done }
                 Column {
                     SectionLabel("$done of ${items.size} done")
-                    Box(Modifier.padding(bottom = 8.dp).fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color(0x1AFFFFFF))) {
+                    Box(Modifier.padding(bottom = 8.dp).fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(C.x(0x1AFFFFFFL))) {
                         Box(Modifier.fillMaxWidth(done.toFloat() / items.size).fillMaxHeight().background(C.accent))
                     }
                 }
@@ -1201,7 +1203,7 @@ private fun TrophiesTab(p: RaProgress?, loaded: Boolean) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) {
         item { Column {
             SectionLabel("${p.earned} of ${p.total} · ${p.earned * 100 / p.total}%")
-            Box(Modifier.padding(bottom = 8.dp).fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color(0x1AFFFFFF))) {
+            Box(Modifier.padding(bottom = 8.dp).fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(C.x(0x1AFFFFFFL))) {
                 Box(Modifier.fillMaxWidth(p.earned.toFloat() / p.total).fillMaxHeight().background(C.accent))
             }
             Row(Modifier.padding(bottom = 8.dp)) {
@@ -1780,7 +1782,7 @@ private fun AskTab(vm: EclipseVM, g: Game, root: File, open: (Guides.Site) -> Un
             Row(Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 10.dp, top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                 val field = RoundedCornerShape(24.dp)
                 Row(
-                    Modifier.weight(1f).heightIn(min = 48.dp).clip(field).background(Color(0x66000000))
+                    Modifier.weight(1f).heightIn(min = 48.dp).clip(field).background(C.x(0x66000000L))
                         .border(1.dp, if (typing || listening) C.accent.copy(alpha = 0.7f) else LINE, field).padding(horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {

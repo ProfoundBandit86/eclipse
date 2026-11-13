@@ -28,6 +28,9 @@ object EclipseHome {
         else dir().let { it.mkdirs(); it.isDirectory && it.canWrite() }
     } catch (e: Exception) { false }
 
+    /** Eclipse/export: where Export theme saves its zips (needs all-files access, so you can reach them). */
+    fun export(): File = File(dir(), "export").apply { mkdirs() }
+
     fun themes(ctx: Context): File = (if (usable()) File(dir(), "Themes") else File(ctx.filesDir, "themes")).apply { mkdirs() }
 
     fun packs(ctx: Context, kind: String): File =

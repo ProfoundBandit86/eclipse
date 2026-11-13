@@ -34,6 +34,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.isSpecified
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import com.eclipse.launcher.ui.ThemeColors
@@ -2610,11 +2612,62 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun saveThemeTemplate() {
+    /** Export theme pop-up open (Look & Feel → Theme → Export theme). */
+    var themeExporter by mutableStateOf(false)
+
+    /**
+     * Export theme: the look you have now (colours, glass, wallpapers, the theme's dock icons, and whichever of
+     * icons / backdrops / logos / font you tick) zipped as an Eclipse theme into Eclipse/export.
+     */
+    fun exportTheme(name: String, author: String, icons: Boolean, backdrops: Boolean, logos: Boolean, font: Boolean) {
         if (!hasAllFiles()) { message = "Allow all-files access first (Settings → General → Permissions)"; return }
+        val t = theme
+        fun hex(c: Color) = String.format("#%06X", c.toArgb() and 0xFFFFFF)
+        val colours = LinkedHashMap<String, Any>()
+        colours["description"] = "Exported from Eclipse"
+        colours["accent"] = hex(ThemeColors.accent.value)
+        colours["focus"] = hex(ThemeColors.focus.value)
+        ThemeColors.text.value.takeIf { it.isSpecified }?.let { colours["text"] = hex(it) }
+        ThemeColors.labels.value.takeIf { it.isSpecified }?.let { colours["labels"] = hex(it) }
+        ThemeColors.glass.value.takeIf { it.isSpecified }?.let { colours["glass"] = hex(it) }
+        (hexColor(colorBackdrop) ?: t?.background?.let { Color(it) })?.let { colours["background"] = hex(it) }
+        colours["glassStrength"] = Math.round(ThemeColors.glassAlpha.value * 100)
+        ThemeColors.dim.value.takeIf { it >= 0f }?.let { colours["dim"] = Math.round(it * 100) }
+        val mode = wallMode.ifEmpty { if (t?.alwaysWallpaper == true) "always" else "" }
+        if (mode.isNotEmpty()) colours["wallpaperMode"] = mode
+        fun local(m: Map<String, String>) = m.filterValues { it.startsWith("file:") || it.startsWith("content:") || it.startsWith("/") }
+        val iconMap = if (!icons) null else (iconSource().orEmpty().mapValues { it.value.path } + local(platIcon))
+        val backMap = if (!backdrops) null else (backdropSource().orEmpty().mapValues { it.value.path } + local(platBg))
+        val logoMap = if (!logos) null else {
+            // Eclipse's own logos (white) for systems nothing else has a logo for, then the pack's / theme's, then your picks
+            val own = Platforms.all.mapNotNull { p -> com.eclipse.launcher.data.SystemArt.logo(p.id, "dark")?.let { p.id to it } }.toMap()
+            own + logoSource().orEmpty().mapValues { it.value.path } + local(platLogo)
+        }
+        val fontFile: File? = if (!font) null else when {
+            fontChoice == "custom" -> customFontFile
+            fontChoice.startsWith("file:") -> File(ctx.filesDir, "fonts/" + fontChoice.removePrefix("file:"))
+            fontChoice.isEmpty() -> t?.font
+            else -> null // Android's own fonts (serif, mono …) can't be packed
+        }
+        val x = Themes.Export(
+            name = name, author = author, colours = colours,
+            wallpaper = if (sysWall) null else wallpaperTop(), bottom = wallpaperBottom(),
+            dock = t?.dock.orEmpty(), icons = iconMap, backdrops = backMap, logos = logoMap, font = fontFile
+        )
+        themeExporter = false
+        message = "Exporting theme…"
         viewModelScope.launch {
-            val f = withContext(Dispatchers.IO) { Themes.writeTemplate() }
-            message = if (f != null) "Saved to Download/${f.name}" else "Couldn't save the template"
+            message = try {
+                val r = withContext(Dispatchers.IO) { Themes.export(ctx, x) }
+                val bits = listOfNotNull(
+                    r.icons.takeIf { icons }?.let { "$it icons" }, r.backdrops.takeIf { backdrops }?.let { "$it backdrops" },
+                    r.logos.takeIf { logos }?.let { "$it logos" },
+                    if (font) (if (r.font) "font" else "no font file to pack") else null
+                )
+                "Saved to Eclipse/export/${r.file.name}" + (if (bits.isNotEmpty()) " · " + bits.joinToString(", ") else "")
+            } catch (e: Exception) {
+                "Couldn't export the theme: ${e.message ?: e.javaClass.simpleName}"
+            }
         }
     }
 

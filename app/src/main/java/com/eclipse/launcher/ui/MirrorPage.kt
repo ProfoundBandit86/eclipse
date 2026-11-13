@@ -49,7 +49,7 @@ import kotlinx.coroutines.delay
 fun MirrorPage(vm: EclipseVM, onPicking: (Boolean) -> Unit) {
     val ctx = LocalContext.current
     val running by Mirror.running.collectAsState()
-    Box(Modifier.fillMaxSize().background(Color(0xFF08080B))) {
+    Box(Modifier.fillMaxSize().background(if (running) Color(0xFF08080B) else HomeDark)) {
         if (!running) MirrorIntro { Mirror.request(ctx) } else MirrorLive(vm, onPicking)
     }
 }
@@ -131,20 +131,20 @@ private fun MirrorLive(vm: EclipseVM, onPicking: (Boolean) -> Unit) {
 /** Shown before mirroring starts: what it does, and the button that asks Android for permission. */
 @Composable
 private fun MirrorIntro(start: () -> Unit) {
-    Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(0x1FE2B44C), Color(0x00000000)), radius = 900f)))
+    Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(C.accent.copy(alpha = 0.12f), Color.Transparent), radius = 900f)))
     Column(
         Modifier.fillMaxSize().padding(28.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Box(Modifier.size(64.dp).clip(CircleShape).background(Color(0x1FFFFFFF)).border(1.dp, Color(0x33FFFFFF), CircleShape), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(64.dp).clip(CircleShape).background(C.x(0x1FFFFFFFL)).border(1.dp, C.x(0x33FFFFFFL), CircleShape), contentAlignment = Alignment.Center) {
             Icon(Icons.Filled.ScreenShare, null, tint = C.accent, modifier = Modifier.size(30.dp))
         }
         Text("Mirror the top screen", color = C.ink, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp))
         Text(
             "Show the whole top screen here, or zoom in on one part of it: a map, a health bar, a scoreboard. " +
                 "Eclipse remembers the area for each game.",
-            color = Color(0xB3FFFFFF), fontSize = 14.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp).widthIn(max = 420.dp)
+            color = C.x(0xB3FFFFFFL), fontSize = 14.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp).widthIn(max = 420.dp)
         )
         Spacer(Modifier.height(20.dp))
         FocusBox(Modifier.height(46.dp).widthIn(min = 200.dp), shape = EclipseButtonShape, onClick = start) {
@@ -153,7 +153,7 @@ private fun MirrorIntro(start: () -> Unit) {
         }
         Text(
             "Android asks for permission on the top screen each time it starts.",
-            color = Color(0x80FFFFFF), fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 12.dp)
+            color = C.sub, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 12.dp)
         )
     }
 }
@@ -202,7 +202,7 @@ private fun PickArea(viewSize: IntSize, src: Pair<Int, Int>, done: (FloatArray) 
                     Modifier.offset(x = minOf(a.x, b.x).toDp(), y = minOf(a.y, b.y).toDp())
                         .size(width = kotlin.math.abs(b.x - a.x).toDp(), height = kotlin.math.abs(b.y - a.y).toDp())
                         .border(2.dp, C.accent, RoundedCornerShape(4.dp))
-                        .background(Color(0x22E2B44C))
+                        .background(C.accent.copy(alpha = 0.13f))
                 )
             }
         }
@@ -214,8 +214,8 @@ private fun MirrorChip(text: String, modifier: Modifier = Modifier, selected: Bo
     FocusBox(modifier.height(36.dp), shape = RoundedCornerShape(18.dp), onClick = onClick) {
         Box(
             Modifier.matchParentSize()
-                .background(if (selected) C.accent else if (gold) Color(0x26E2B44C) else Color(0x33FFFFFF))
-                .border(1.dp, if (gold) Color(0x66E2B44C) else Color(0x26FFFFFF), RoundedCornerShape(18.dp))
+                .background(if (selected) C.accent else if (gold) C.accent.copy(alpha = 0.15f) else Color(0x33FFFFFF))
+                .border(1.dp, if (gold) C.accent.copy(alpha = 0.4f) else Color(0x26FFFFFF), RoundedCornerShape(18.dp))
         )
         Text(
             text, color = if (selected) C.onAccent else if (gold) C.accent else Color.White,

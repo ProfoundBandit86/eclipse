@@ -3,6 +3,7 @@ package com.eclipse.launcher.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -111,6 +112,17 @@ fun AppearancePicker(vm: EclipseVM, kind: String) = Glass {
                         entries.forEachIndexed { i, e ->
                             LookRow(e, e.id == current, if (i == firstIndex) first else null, "pick:$kind:${e.id}", onFocus = { shown = e.id }) { use(e.id) }
                         }
+                        // Eclipse's own logos (the ones used when no pack or theme has a system's logo): black / white
+                        // to suit the card's glass colour, or in colour (was Look & Feel → Card logos)
+                        if (kind == "logos") {
+                            DropSection("Eclipse's logos")
+                            listOf(
+                                LookEntry("", "Black / white", "Whichever reads on the glass colour", false),
+                                LookEntry("color", "Colour", "The systems' own colours", false)
+                            ).forEach { m ->
+                                LookRow(m, vm.cardMode == m.id, null, "pick:logos:style:${m.id}", onFocus = { }) { vm.chooseCardMode(m.id) }
+                            }
+                        }
                         DropSection("Add")
                         LookAction(
                             "Import…",
@@ -124,7 +136,7 @@ fun AppearancePicker(vm: EclipseVM, kind: String) = Glass {
                                 else -> Pickers.pack(Packs.BACKDROPS)
                             }
                         }
-                        if (kind == "theme") LookAction("Save a template", "to Download", "pick:theme:template") { vm.saveThemeTemplate() }
+                        if (kind == "theme") LookAction("Export theme", "to Eclipse/export", "pick:theme:export") { vm.themeExporter = true }
                         Note(
                             when (kind) {
                                 "theme" -> "Eclipse themes, or any zipped theme. I'll try, but no promises."
@@ -368,4 +380,47 @@ private fun DockMini(img: File?, icon: ImageVector, on: Boolean, accent: Color) 
         if (img != null) AsyncImage(img, null, Modifier.size(26.dp), contentScale = ContentScale.Fit)
         else Icon(icon, null, tint = if (on) accent else Color(0xFFCFCAC0), modifier = Modifier.size(22.dp))
     }
+}
+
+/**
+ * Export theme (Look & Feel → Theme → Export theme): a name, an author, and which pictures to take along. The zip
+ * goes to Eclipse/export; colours, glass, wallpapers and the theme's dock icons always go in.
+ */
+@Composable
+fun ThemeExportSheet(vm: EclipseVM) = Glass {
+    val close = { vm.themeExporter = false }
+    BackHandler { close() }
+    var name by remember { mutableStateOf(vm.theme?.name?.let { "$it (mine)" } ?: "My theme") }
+    var author by remember { mutableStateOf(vm.theme?.author.orEmpty()) }
+    var icons by remember { mutableStateOf(true) }
+    var backdrops by remember { mutableStateOf(true) }
+    var logos by remember { mutableStateOf(true) }
+    var font by remember { mutableStateOf(true) }
+    val first = remember { FocusRequester() }
+    MenuSheet("Export theme", "Your look as a theme", "Colours, glass and wallpapers always go in. Saved to Eclipse/export.", onDismiss = close) {
+        // two columns so it fits the top screen: who made it on the left, what goes in on the right
+        Row(
+            Modifier.heightIn(max = 300.dp).verticalScroll(androidx.compose.foundation.rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text("THEME NAME", color = C.sub, fontSize = 8.sp, letterSpacing = 1.4.sp)
+                TextBox(name, Modifier.fillMaxWidth(), placeholder = "My theme", focusKey = "export:name") { name = it }
+                Text("AUTHOR", color = C.sub, fontSize = 8.sp, letterSpacing = 1.4.sp, modifier = Modifier.padding(top = 6.dp))
+                TextBox(author, Modifier.fillMaxWidth(), placeholder = "Your name", focusKey = "export:author") { author = it }
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text("INCLUDE", color = C.sub, fontSize = 8.sp, letterSpacing = 1.4.sp)
+                MenuRow("Icons", value = if (icons) "Yes" else "No", selected = icons, fr = first) { icons = !icons }
+                MenuRow("Backdrops", value = if (backdrops) "Yes" else "No", selected = backdrops) { backdrops = !backdrops }
+                MenuRow("Logos", value = if (logos) "Yes" else "No", selected = logos) { logos = !logos }
+                MenuRow("Font", value = if (font) "Yes" else "No", selected = font, note = "if it's a file") { font = !font }
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.weight(1f)) { MenuRow("Cancel") { close() } }
+            Box(Modifier.weight(1f)) { MenuRow("Export", gold = true, enabled = name.isNotBlank()) { vm.exportTheme(name, author, icons, backdrops, logos, font) } }
+        }
+    }
+    FocusOnShow(first)
 }

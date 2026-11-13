@@ -343,6 +343,7 @@ fun Root(vm: EclipseVM, pickFolder: () -> Unit, pickImage: () -> Unit) {
         // the Companion over this screen (no bottom screen showing), above the game's page
         vm.companionTop?.let { g -> CompanionHub(vm, g) { vm.companionTop = null } }
         vm.appearancePicker?.let { if (it == "colours") ColoursScreen(vm) else AppearancePicker(vm, it) }
+        if (vm.themeExporter) ThemeExportSheet(vm)
         vm.colorPicker?.let { ColorWheelDialog(vm, it) }
         vm.themeImport?.let { ThemeImportScreen(vm, it) }
         vm.packImport?.let { PackImportScreen(vm, it) }

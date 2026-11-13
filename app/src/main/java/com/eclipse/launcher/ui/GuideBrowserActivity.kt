@@ -21,6 +21,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.lifecycleScope
 import com.eclipse.launcher.data.AdBlock
@@ -98,6 +99,19 @@ class GuideBrowserActivity : ComponentActivity() {
     private var fellBack = false
 
     private val accent: Int get() = runCatching { ThemeColors.accent.value.toArgb() }.getOrDefault(0xFFD4A537.toInt())
+    /** Light mode (Look & Feel): the bar goes warm off-white with dark writing, like the rest of Eclipse. */
+    private val light: Boolean get() = runCatching { ThemeColors.light.value }.getOrDefault(false)
+    /** The bar: your / the theme's glass colour (solid), else near-black, or off-white in light mode. */
+    private val barColor: Int get() = runCatching {
+        ThemeColors.glass.value.takeIf { it.isSpecified }?.copy(alpha = 1f)?.toArgb()
+    }.getOrNull() ?: if (light) Color.parseColor("#F7F4EE") else Color.parseColor("#0E0D0B")
+    /** Writing on the bar: your / the theme's text colour, else whatever reads on the bar. */
+    private val inkColor: Int get() = runCatching {
+        ThemeColors.text.value.takeIf { it.isSpecified }?.toArgb()
+    }.getOrNull() ?: if (androidx.core.graphics.ColorUtils.calculateLuminance(barColor) > 0.5) Color.parseColor("#1B1A17") else Color.parseColor("#F2EEE6")
+    private val barIsLight: Boolean get() = androidx.core.graphics.ColorUtils.calculateLuminance(barColor) > 0.5
+    /** Writing on a button filled with the accent. */
+    private val onAccent: Int get() = if (androidx.core.graphics.ColorUtils.calculateLuminance(accent) > 0.45) Color.parseColor("#1A1505") else Color.WHITE
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
@@ -105,17 +119,17 @@ class GuideBrowserActivity : ComponentActivity() {
     private fun pill(text: String, filled: Boolean = false, onClick: () -> Unit): TextView = TextView(this).apply {
         this.text = text
         textSize = 13f
-        setTextColor(if (filled) Color.parseColor("#1A1505") else Color.parseColor("#F2EEE6"))
+        setTextColor(if (filled) onAccent else inkColor)
         if (filled) paint.isFakeBoldText = true
         gravity = Gravity.CENTER
         minHeight = dp(40)
         setPadding(dp(14), dp(8), dp(14), dp(8))
         val shape = GradientDrawable().apply {
             cornerRadius = dp(20).toFloat()
-            setColor(if (filled) accent else Color.parseColor("#1AFFFFFF"))
-            setStroke(dp(1), if (filled) accent else Color.parseColor("#26FFFFFF"))
+            setColor(if (filled) accent else if (barIsLight) Color.parseColor("#12000000") else Color.parseColor("#1AFFFFFF"))
+            setStroke(dp(1), if (filled) accent else if (barIsLight) Color.parseColor("#1F000000") else Color.parseColor("#26FFFFFF"))
         }
-        background = RippleDrawable(ColorStateList.valueOf(Color.parseColor("#33FFFFFF")), shape, null)
+        background = RippleDrawable(ColorStateList.valueOf(if (barIsLight) Color.parseColor("#22000000") else Color.parseColor("#33FFFFFF")), shape, null)
         isClickable = true
         setOnClickListener { onClick() }
     }
@@ -129,8 +143,8 @@ class GuideBrowserActivity : ComponentActivity() {
         val fallback = intent.getStringExtra(FALLBACK)
         val siteName = intent.getStringExtra(SITE) ?: "Guide"
         val gameId = intent.getStringExtra(GAME) ?: ""
-        window.statusBarColor = Color.parseColor("#0E0D0B")
-        window.navigationBarColor = Color.parseColor("#0E0D0B")
+        window.statusBarColor = barColor
+        window.navigationBarColor = barColor
 
         web = WebView(this).apply {
             settings.javaScriptEnabled = true
@@ -162,7 +176,7 @@ class GuideBrowserActivity : ComponentActivity() {
         titleView = TextView(this).apply {
             text = siteName
             textSize = 13f
-            setTextColor(Color.parseColor("#F2EEE6"))
+            setTextColor(inkColor)
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             setPadding(dp(10), 0, dp(10), 0)
@@ -171,7 +185,7 @@ class GuideBrowserActivity : ComponentActivity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(8), dp(8), dp(8), dp(8))
-            setBackgroundColor(Color.parseColor("#0E0D0B"))
+            setBackgroundColor(barColor)
             addView(pill("‹ Back") { goBack() })
             addView(titleView, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
             addView(pill("⤓ Map") { saveMap(gameId) })
@@ -182,7 +196,7 @@ class GuideBrowserActivity : ComponentActivity() {
         }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#0E0D0B"))
+            setBackgroundColor(barColor)
             addView(bar, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
             addView(web, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         }

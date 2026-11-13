@@ -60,6 +60,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -82,8 +83,8 @@ import kotlinx.coroutines.launch
 /** Content of the second display: wallpaper / Now Playing + dock, then (swipe) media controls and the screen mirror. */
 @Composable
 fun SecondaryContent(vm: EclipseVM, displayId: Int) {
-    // the bottom screen keeps its dark look in light mode (it sits over its own wallpaper and the mirror)
-    EclipseTheme { androidx.compose.runtime.CompositionLocalProvider(LocalPal provides LightPal) {
+    // the bottom screen follows Eclipse's look like the top one: theme colours, glass, light mode, font and text size
+    EclipseTheme { run {
         // the media page is there only while something is playing or paused
         val nowMedia by vm.media.info.collectAsState()
         // pages: home, then media controls (while something plays), then the screen mirror
@@ -185,7 +186,7 @@ fun SecondaryContent(vm: EclipseVM, displayId: Int) {
                             }
                         },
                     contentAlignment = Alignment.Center
-                ) { Box(Modifier.size(36.dp, 4.dp).clip(RoundedCornerShape(2.dp)).background(Color(0x66FFFFFF))) }
+                ) { Box(Modifier.size(36.dp, 4.dp).clip(RoundedCornerShape(2.dp)).background(C.x(0x66FFFFFFL))) }
             }
             // something is playing: a chip on the main page that jumps to the media controls
             val playing by vm.media.info.collectAsState()
@@ -197,7 +198,7 @@ fun SecondaryContent(vm: EclipseVM, displayId: Int) {
                     shape = RoundedCornerShape(18.dp),
                     onClick = { scope.launch { pager.animateScrollToPage(pageIds.indexOf("media").coerceAtLeast(0)) } }
                 ) {
-                    Box(Modifier.matchParentSize().background(Color(0x66000000)))
+                    Box(Modifier.matchParentSize().background(shade(0.4f)))
                     Text(
                         (if (track.playing) "\u266A  " else "\u2016  ") + track.title.ifBlank { "Media" } +
                             (if (track.artist.isNotBlank()) " \u00b7 ${track.artist}" else "") + "  \u203A",
@@ -286,7 +287,7 @@ private fun BottomDock(vm: EclipseVM, launch: (String) -> Unit, openDrawer: () -
             val rem = removePkg?.let { p -> pinned.firstOrNull { it.pkg == p } }
             if (rem != null) {
                 Row(
-                    Modifier.clip(RoundedCornerShape(14.dp)).background(Color(0xD90A0A0C)).border(1.dp, Color(0x24FFFFFF), RoundedCornerShape(14.dp)).padding(8.dp),
+                    Modifier.dockPanel(RoundedCornerShape(14.dp)).padding(8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(vm.nameOf(rem), color = C.ink, fontSize = 13.sp, modifier = Modifier.padding(start = 6.dp))
@@ -294,12 +295,15 @@ private fun BottomDock(vm: EclipseVM, launch: (String) -> Unit, openDrawer: () -
                     Pill("Cancel") { removePkg = null }
                 }
             }
+            // all in the theme's glass (its colour and strength, light mode too)
+            val edge = C.x(0x24FFFFFFL)
+            val tint = glassTint(ThemeColors.light.value)
             val panel = when (style) {
-                "solid" -> Modifier.clip(RoundedCornerShape(20.dp)).background(Color(0xF2121216)).border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(20.dp))
+                "solid" -> Modifier.dockPanel(RoundedCornerShape(20.dp))
                 "clear" -> Modifier
-                "bar" -> Modifier.fillMaxWidth().background(Color(0xB30A0A0C)).drawBehind { drawLine(Color(0x24FFFFFF), androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Offset(size.width, 0f), 1.dp.toPx()) }
+                "bar" -> Modifier.fillMaxWidth().background(tint).drawBehind { drawLine(edge, androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Offset(size.width, 0f), 1.dp.toPx()) }
                 // frosted glass with a hairline edge, like the top screen's docks
-                else -> Modifier.clip(RoundedCornerShape(20.dp)).background(Color(0x9E0A0A0C)).border(1.dp, Color(0x24FFFFFF), RoundedCornerShape(20.dp))
+                else -> Modifier.panel2(RoundedCornerShape(20.dp))
             }
             Row(
                 panel.padding(horizontal = if (bar) 0.dp else 10.dp, vertical = 9.dp),
@@ -395,20 +399,18 @@ private fun DrawerOverlay(vm: EclipseVM, launch: (String) -> Unit, close: () -> 
         Column(
             Modifier.fillMaxSize().padding(start = 6.dp, end = 6.dp, top = 30.dp)
                 .offset { IntOffset(0, dragY.roundToInt()) }
-                .clip(sheet)
-                .background(Color(0xEB0C0C10))
-                .border(1.dp, Color(0x24FFFFFF), sheet)
+                .dockPanel(sheet)
                 .pointerInput(Unit) { detectTapGestures { } }
         ) {
             Box(Modifier.fillMaxWidth().then(sheetTop).padding(top = 9.dp, bottom = 4.dp), contentAlignment = Alignment.Center) {
-                Box(Modifier.size(40.dp, 4.dp).clip(RoundedCornerShape(2.dp)).background(Color(0x66FFFFFF)))
+                Box(Modifier.size(40.dp, 4.dp).clip(RoundedCornerShape(2.dp)).background(C.x(0x66FFFFFFL)))
             }
             Row(Modifier.fillMaxWidth().then(sheetTop).padding(start = 18.dp, end = 14.dp, top = 4.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Apps", color = C.ink, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Text("${all.size} APPS", color = Color(0xFFC8CAD2), fontSize = 9.sp, letterSpacing = 1.4.sp, modifier = Modifier.padding(start = 10.dp, top = 3.dp).weight(1f))
+                Text("${all.size} APPS", color = C.sub, fontSize = 9.sp, letterSpacing = 1.4.sp, modifier = Modifier.padding(start = 10.dp, top = 3.dp).weight(1f))
                 FocusBox(Modifier.size(34.dp), shape = CircleShape, onClick = close) {
-                    Box(Modifier.fillMaxSize().background(Color(0x1AFFFFFF)), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Filled.Close, contentDescription = "Close", tint = Color(0xFFDDDDDD), modifier = Modifier.size(18.dp))
+                    Box(Modifier.fillMaxSize().background(C.x(0x1AFFFFFFL)), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Filled.Close, contentDescription = "Close", tint = C.ink, modifier = Modifier.size(18.dp))
                     }
                 }
             }
@@ -416,13 +418,13 @@ private fun DrawerOverlay(vm: EclipseVM, launch: (String) -> Unit, close: () -> 
             Row(
                 Modifier.padding(horizontal = 18.dp, vertical = 4.dp).fillMaxWidth().height(38.dp)
                     .pointerInput(Unit) { detectTapGestures { typing = true } }
-                    .clip(RoundedCornerShape(9.dp)).background(Color(0x59000000)).border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(9.dp))
+                    .clip(RoundedCornerShape(9.dp)).background(C.x(0x59000000L)).border(1.dp, C.x(0x1AFFFFFFL), RoundedCornerShape(9.dp))
                     .padding(horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(androidx.compose.material.icons.Icons.Filled.Search, null, tint = Color(0xFFB4AFA5), modifier = Modifier.size(18.dp))
+                Icon(androidx.compose.material.icons.Icons.Filled.Search, null, tint = C.sub, modifier = Modifier.size(18.dp))
                 Box(Modifier.padding(start = 8.dp).weight(1f)) {
-                    if (query.isEmpty()) Text("Search apps", color = Color(0xFFB4AFA5), fontSize = 13.sp)
+                    if (query.isEmpty()) Text("Search apps", color = C.sub, fontSize = 13.sp)
                     androidx.compose.foundation.text.BasicTextField(
                         query, { query = it }, singleLine = true,
                         textStyle = TextStyle(color = C.ink, fontSize = 13.sp),
@@ -457,7 +459,7 @@ private fun DrawerOverlay(vm: EclipseVM, launch: (String) -> Unit, close: () -> 
                             }
                         }
                     }
-                    if (shown.isEmpty()) item { Text("No apps match \u201c$query\u201d.", color = Color(0xFFB4AFA5), modifier = Modifier.padding(18.dp)) }
+                    if (shown.isEmpty()) item { Text("No apps match \u201c$query\u201d.", color = C.sub, modifier = Modifier.padding(18.dp)) }
                     // last: close Eclipse on this screen (e.g. when you've switched to another launcher); it comes back with Eclipse
                     item(key = "close") {
                         val ctx = LocalContext.current
@@ -471,10 +473,10 @@ private fun DrawerOverlay(vm: EclipseVM, launch: (String) -> Unit, close: () -> 
                 }
                 Box(
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(36.dp)
-                        .background(Brush.verticalGradient(listOf(Color(0x000C0C10), Color(0xF00C0C10)))),
+                        .background(Brush.verticalGradient(listOf(panelFade(0f), panelFade(0.94f)))),
                     contentAlignment = Alignment.BottomCenter
                 ) {
-                    Text("TAP TO OPEN  \u00b7  HOLD TO DOCK  \u00b7  SWIPE DOWN TO CLOSE", color = Color(0xFFB4AFA5), fontSize = 8.sp, letterSpacing = 1.2.sp, modifier = Modifier.padding(bottom = 9.dp))
+                    Text("TAP TO OPEN  \u00b7  HOLD TO DOCK  \u00b7  SWIPE DOWN TO CLOSE", color = C.sub, fontSize = 8.sp, letterSpacing = 1.2.sp, modifier = Modifier.padding(bottom = 9.dp))
                 }
             }
         }
@@ -556,13 +558,13 @@ private fun NowPlayingPage(
     LaunchedEffect(s?.game?.id) { ra = s?.game?.let { vm.loadRa(it) } }
     val bottomPad = if (dockOn) 104.dp else 24.dp
 
-    Box(Modifier.fillMaxSize().background(Color(0xFF07070A))) {
+    Box(Modifier.fillMaxSize().background(HomeDark)) {
         if (s == null) {
             // ---- nothing running: the game highlighted on the top screen (its hero or backdrop), else the wallpaper
             val g = rememberSettled(vm.focused?.takeIf { vm.screen != Screen.SETTINGS && !vm.searchOpen })
             val art = g?.let { vm.artOf(it, ArtKind.HERO) ?: vm.artOf(it, ArtKind.BACKDROP) } ?: vm.wallpaperBottom()
             SteadyImage(art, Modifier.fillMaxSize())
-            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x5907070A), Color(0x2607070A), Color(0xBF07070A)))))
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(shade(0.35f), shade(0.15f), shade(0.75f)))))
             // stay on a game for half a second: its details slide in
             var showInfo by remember { mutableStateOf(false) }
             LaunchedEffect(g?.id) { showInfo = false; if (g != null) { delay(500); showInfo = true } }
@@ -594,7 +596,7 @@ private fun NowPlayingPage(
             val plat = Platforms.byId(game.platform)
             val bg = vm.artOf(game, ArtKind.HERO) ?: vm.artOf(game, ArtKind.BACKDROP) ?: vm.wallpaperBottom()
             if (bg != null) AsyncImage(bg, null, Modifier.fillMaxSize().softBlur(18.dp), contentScale = ContentScale.Crop)
-            Box(Modifier.fillMaxSize().background(Color(0x9907070A)))
+            Box(Modifier.fillMaxSize().background(shade(0.6f)))
             Box(Modifier.align(Alignment.TopEnd).padding(top = 16.dp, end = 16.dp)) { StatusPill(now) }
             BoxWithConstraints(Modifier.fillMaxSize().padding(start = 14.dp, top = 16.dp, end = 14.dp, bottom = bottomPad)) {
                 val coverW = (maxWidth * 0.29f).coerceIn(96.dp, 180.dp)
@@ -606,11 +608,10 @@ private fun NowPlayingPage(
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Box(
                             Modifier.width(coverW).aspectRatio(3f / 4f).shadow(18.dp, RoundedCornerShape(10.dp)).clip(RoundedCornerShape(10.dp))
-                                .border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(10.dp))
+                                .border(1.dp, C.x(0x1FFFFFFFL), RoundedCornerShape(10.dp))
                         ) { Cover(game.name, vm.artOf(game, ArtKind.BOX), Modifier.fillMaxSize()) }
                         Column(
-                            Modifier.weight(1f).clip(RoundedCornerShape(18.dp)).background(Color(0x9E0A0A0C))
-                                .border(1.dp, Color(0x24FFFFFF), RoundedCornerShape(18.dp)).padding(12.dp),
+                            Modifier.weight(1f).panel2(RoundedCornerShape(18.dp)).padding(12.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(game.name, color = C.ink, fontSize = 19.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 22.sp)
@@ -622,15 +623,15 @@ private fun NowPlayingPage(
                             ra?.let { p ->
                                 val frac = if (p.total == 0) 0f else p.earned / p.total.toFloat()
                                 Column(
-                                    Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp)).background(Color(0x0FFFFFFF))
-                                        .border(1.dp, Color(0x12FFFFFF), RoundedCornerShape(9.dp)).padding(horizontal = 12.dp, vertical = 7.dp),
+                                    Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp)).background(C.x(0x0FFFFFFFL))
+                                        .border(1.dp, C.x(0x12FFFFFFL), RoundedCornerShape(9.dp)).padding(horizontal = 12.dp, vertical = 7.dp),
                                     verticalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text("ACHIEVEMENTS", color = C.x(0xFFCFCAC0L), fontSize = 9.sp, letterSpacing = 1.4.sp, modifier = Modifier.weight(1f))
                                         Text("${p.earned} / ${p.total}", color = C.accent, fontSize = 9.sp, letterSpacing = 1.2.sp)
                                     }
-                                    Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color(0x26FFFFFF))) {
+                                    Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(C.x(0x26FFFFFFL))) {
                                         Box(Modifier.fillMaxWidth(frac).fillMaxHeight().background(C.accent))
                                     }
                                 }
@@ -651,7 +652,7 @@ private fun NowPlayingPage(
                             }
                         }
                     }
-                    vm.shotStatus?.let { Text(it, color = Color(0xE6FFFFFF), fontSize = 12.sp) }
+                    vm.shotStatus?.let { Text(it, color = C.ink, fontSize = 12.sp) }
                 }
             }
         }
@@ -666,12 +667,12 @@ private fun NowPlayingPage(
 private fun GameInfoPanel(vm: EclipseVM, g: com.eclipse.launcher.data.Game, modifier: Modifier) {
     val shape = RoundedCornerShape(18.dp)
     Row(
-        modifier.clip(shape).background(Color(0xA60A0A0C)).border(1.dp, Color(0x24FFFFFF), shape).padding(14.dp),
+        modifier.panel2(shape).padding(14.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Box(
             Modifier.fillMaxHeight(0.86f).aspectRatio(3f / 4f, matchHeightConstraintsFirst = true).shadow(14.dp, RoundedCornerShape(10.dp)).clip(RoundedCornerShape(10.dp))
-                .border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(10.dp))
+                .border(1.dp, C.x(0x1FFFFFFFL), RoundedCornerShape(10.dp))
         ) { Cover(g.name, vm.artOf(g, ArtKind.BOX), Modifier.fillMaxSize()) }
         Column(Modifier.weight(1f).fillMaxHeight()) {
             DropSection(Platforms.byId(g.platform)?.name ?: if (g.platform == "android") "Android" else g.platform)
@@ -696,7 +697,7 @@ private fun GameInfoPanel(vm: EclipseVM, g: com.eclipse.launcher.data.Game, modi
                         text, color = C.x(0xFFE4E0D8L), fontSize = 11.5.sp, lineHeight = 17.sp,
                         modifier = Modifier.fillMaxWidth().verticalScroll(scroll, enabled = false)
                     )
-                    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(28.dp).background(Brush.verticalGradient(listOf(Color(0x000A0A0C), Color(0xE60A0A0C)))))
+                    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(28.dp).background(Brush.verticalGradient(listOf(panelFade(0f), panelFade(0.9f)))))
                 }
             }
         }
@@ -707,8 +708,8 @@ private fun GameInfoPanel(vm: EclipseVM, g: com.eclipse.launcher.data.Game, modi
 @Composable
 private fun NpRow(label: String, value: String) {
     Row(
-        Modifier.fillMaxWidth().height(28.dp).clip(RoundedCornerShape(9.dp)).background(Color(0x0FFFFFFF))
-            .border(1.dp, Color(0x12FFFFFF), RoundedCornerShape(9.dp)).padding(horizontal = 12.dp),
+        Modifier.fillMaxWidth().height(28.dp).clip(RoundedCornerShape(9.dp)).background(C.x(0x0FFFFFFFL))
+            .border(1.dp, C.x(0x12FFFFFFL), RoundedCornerShape(9.dp)).padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(label.uppercase(), color = C.x(0xFFCFCAC0L), fontSize = 9.sp, letterSpacing = 1.4.sp, maxLines = 1, modifier = Modifier.weight(1f))
@@ -722,7 +723,7 @@ private fun NpButton(text: String, icon: ImageVector, modifier: Modifier, onLong
     val shape = RoundedCornerShape(9.dp)
     FocusBox(modifier.height(36.dp), shape = shape, onClick = onClick, onLongClick = onLongClick) {
         Row(
-            Modifier.fillMaxSize().background(Color(0x0FFFFFFF)).border(1.dp, Color(0x14FFFFFF), shape).padding(horizontal = 8.dp),
+            Modifier.fillMaxSize().background(C.x(0x0FFFFFFFL)).border(1.dp, C.x(0x14FFFFFFL), shape).padding(horizontal = 8.dp),
             horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(icon, null, tint = C.accent, modifier = Modifier.size(14.dp))
@@ -754,7 +755,7 @@ private fun StatusPill(now: Long) {
         } catch (e: Exception) { false }
     }
     Row(
-        Modifier.clip(RoundedCornerShape(14.dp)).background(Color(0x8C0A0A0C)).border(1.dp, Color(0x24FFFFFF), RoundedCornerShape(14.dp))
+        Modifier.panel2(RoundedCornerShape(14.dp))
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
@@ -782,7 +783,7 @@ private fun MediaPage(vm: EclipseVM) {
         } else {
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF2A2440), C.x(0xFF121216L)))))
         }
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x8C000000), Color(0xB3000000), Color(0xE6000000)))))
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(shade(0.55f), shade(0.7f), shade(0.9f)))))
 
         Column(
             Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 28.dp),
@@ -817,7 +818,7 @@ private fun MediaBtn(icon: androidx.compose.ui.graphics.vector.ImageVector, big:
                 .border(1.dp, C.x(0x40FFFFFFL), CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Icon(icon, null, tint = Color.White, modifier = Modifier.size(if (big) 38.dp else 26.dp))
+            Icon(icon, null, tint = C.ink, modifier = Modifier.size(if (big) 38.dp else 26.dp))
         }
     }
 }
@@ -850,8 +851,8 @@ private fun WalkSheet(vm: EclipseVM, g: Game, openViewer: (String) -> Unit, clos
     }
     MenuSheet("Companion", g.name, "Search GameFAQs, or type a web address. Leave it blank for GameFAQs.", onDismiss = close) {
         Box(
-            Modifier.fillMaxWidth().heightIn(min = 38.dp).clip(RoundedCornerShape(9.dp)).background(Color(0x59000000))
-                .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(9.dp)).padding(horizontal = 12.dp, vertical = 9.dp)
+            Modifier.fillMaxWidth().heightIn(min = 38.dp).clip(RoundedCornerShape(9.dp)).background(C.x(0x59000000L))
+                .border(1.dp, C.x(0x1AFFFFFFL), RoundedCornerShape(9.dp)).padding(horizontal = 12.dp, vertical = 9.dp)
         ) {
             androidx.compose.foundation.text.BasicTextField(
                 text, { text = it }, singleLine = true,
@@ -931,9 +932,23 @@ private fun RecentPage(vm: EclipseVM) {
                     ) {
                         Cover(g.name, vm.artOf(g, com.eclipse.launcher.data.ArtKind.BOX), Modifier.fillMaxSize())
                     }
-                    Text(g.name, color = Color(0xE6FFFFFF), fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp, start = 1.dp))
+                    Text(g.name, color = C.x(0xE6FFFFFFL), fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp, start = 1.dp))
                 }
             }
         }
     }
 }
+
+/** The bottom screen's shading over wallpapers and art: the theme's background colour (near-black; off-white in light mode). */
+@Composable
+private fun shade(alpha: Float): Color = HomeDark.copy(alpha = alpha)
+
+/** The colour a glass panel fades into at its bottom edge: the theme's glass colour, else the look's own. */
+@Composable
+private fun panelFade(alpha: Float): Color =
+    (ThemeColors.glass.value.takeIf { it.isSpecified } ?: if (ThemeColors.light.value) Color(0xFFF2EEE6) else Color(0xFF121214)).copy(alpha = alpha)
+
+/** A bottom screen panel in the theme's glass (colour, strength, light mode) with a hairline edge. */
+@Composable
+private fun Modifier.panel2(shape: androidx.compose.ui.graphics.Shape): Modifier =
+    this.clip(shape).background(glassTint(ThemeColors.light.value)).border(1.dp, C.x(0x24FFFFFFL), shape)

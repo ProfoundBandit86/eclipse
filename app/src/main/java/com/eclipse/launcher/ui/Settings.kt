@@ -241,9 +241,9 @@ fun SettingsScreen(vm: EclipseVM, pickFolder: () -> Unit, interactive: Boolean =
 /** Every setting's name (and words people might search for), with the tab it's on. */
 private val SETTINGS_INDEX: List<Triple<String, Int, String>> = listOf(
     Triple("Crash reports", 5, "crash error log report bug"), Triple("Background colour", 0, "overlay shading backdrop color"),
-    Triple("Theme", 0, "import themes"), Triple("Card logos", 0, "system platform card colour logo glass"), Triple("Corners", 0, "rounded corners radius art cards"), Triple("Colours", 0, "accent highlight glass text labels dim color"),
+    Triple("Theme", 0, "import themes"), Triple("Logos", 0, "system logo pack colour black white card"), Triple("Glass effect", 0, "frosted blur battery"), Triple("Corners", 0, "rounded corners radius art cards"), Triple("Colours", 0, "accent highlight glass text labels dim color"),
     Triple("Font", 0, "typeface import"), Triple("Text size", 0, "bigger smaller scale"), Triple("Icons", 0, "icon pack platform"),
-    Triple("Backdrops", 0, "backdrop pack background"), Triple("Reload images", 0, "refresh eclipse folder"), Triple("Android wallpaper", 0, "live wallpaper system"),
+    Triple("Backdrops", 0, "backdrop pack background"), Triple("Sound", 0, "click volume sounds"), Triple("Export theme", 0, "share save zip template"), Triple("Reload images", 0, "refresh eclipse folder"), Triple("Android wallpaper", 0, "live wallpaper system"),
     Triple("Wallpaper (top / bottom screen)", 0, "background picture"),
     Triple("Scan for new games", 2, "rescan library roms"), Triple("Views", 1, "view types slide cover flow grid list install custom turn off"), Triple("Tools", 3, "chd convert m3u playlists multi disc romm upload send bulk"), Triple("ROM folders", 2, "add folder path"),
     Triple("Systems and emulators", 2, "platform emulator core edit"), Triple("Scraping", 4, "artwork box art descriptions scrape"),
@@ -1850,29 +1850,16 @@ private fun AppearanceTab(vm: EclipseVM) {
     ) + vm.importedFonts.map { f -> (if (f == "custom.ttf") "custom" else "file:$f") to vm.fontLabel(f) }
     val usingFile = vm.fontChoice.removePrefix("file:").takeIf { vm.fontChoice.startsWith("file:") } ?: if (vm.fontChoice == "custom") "custom.ttf" else null
 
-    // ---- Look: across both columns, in pairs (Theme | Colours, Card logos | Corners, Icons | Backdrops, Glass | Reload)
-    DropSection("Look")
+    // ---- General | Images, then Text and Wallpaper | Sounds (the order of the sketch, 0.1.26)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
         Column(Modifier.weight(1f).focusGroup(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            DropSection("General")
             DropRow("Theme", vm.theme?.name ?: "Eclipse", "ap:theme", opens = true) { vm.appearancePicker = "theme" }
-            // system cards are made of the glass colour; their logos are black or white to suit it, or in colour
-            val cardModes = listOf("" to "Black / white", "color" to "Colour")
-            DropRow("Card logos", cardModes.firstOrNull { it.first == vm.cardMode }?.second ?: "Black / white", "ap:cards", open == "cards") { toggle("cards") }
-            AnimatedVisibility(open == "cards") {
-                DropMenu {
-                    cardModes.forEach { (id, label) ->
-                        DropChoice(label, id == vm.cardMode, if (id == "") "whichever reads on the glass colour" else null, "ap:cards:$id") { vm.chooseCardMode(id); open = null }
-                    }
-                }
-            }
-            DropRow("Icons", packLabel(vm, vm.iconChoice, vm.iconPacks), "ap:icons", opens = true) { vm.appearancePicker = "icons" }
-            // Glass effect: frosted panels over a blurred picture (off: plain tinted panels, lighter on the battery)
-            ToggleRow("Glass effect", "Frosted panels and blur. Off is lighter on the battery.", !vm.lowPowerOn()) { vm.chooseLowPower(!it) }
-        }
-        Column(Modifier.weight(1f).focusGroup(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
             // glass, accent, highlight, text, labels, glass strength and dim: their own screen with a live preview
             val custom = listOf(vm.colorGlass, vm.colorAccent, vm.colorFocus, vm.colorText, vm.colorLabels).any { it.isNotBlank() } || vm.glassStrength >= 0 || vm.bgDim >= 0
             DropRow("Colours", if (custom) "Your own" else "Theme's", "ap:colours", opens = true, swatch = C.accent) { vm.appearancePicker = "colours" }
+            // Glass effect: frosted panels over a blurred picture (off: plain tinted panels, lighter on the battery)
+            ToggleRow("Glass effect", "Frosted panels and blur. Off is lighter on the battery.", !vm.lowPowerOn()) { vm.chooseLowPower(!it) }
             DropRow("Corners", "Art ${vm.cornerArt}% \u00b7 Cards ${vm.cornerCard}% \u00b7 Icons ${vm.cornerIcon}%", "ap:corners", open == "corners") { toggle("corners") }
             AnimatedVisibility(open == "corners") {
                 DropMenu {
@@ -1886,17 +1873,41 @@ private fun AppearanceTab(vm: EclipseVM) {
                     }
                 }
             }
+        }
+        Column(Modifier.weight(1f).focusGroup(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            DropSection("Images")
+            DropRow("Icons", packLabel(vm, vm.iconChoice, vm.iconPacks), "ap:icons", opens = true) { vm.appearancePicker = "icons" }
             DropRow("Backdrops", packLabel(vm, vm.backdropChoice, vm.backdropPacks), "ap:backdrops", opens = true) { vm.appearancePicker = "backdrops" }
-            // system logos (where Eclipse writes a system's name): Eclipse's own, a logo pack or a theme's
+            // system logos (where Eclipse writes a system's name): Eclipse's own (black / white or colour), a logo pack or a theme's
             DropRow("Logos", packLabel(vm, vm.logoChoice, vm.logoPacks), "ap:logos", opens = true) { vm.appearancePicker = "logos" }
             // every theme's and pack's pictures are plain files in the Eclipse folder: tweak them, then reload
             DropRow("Reload images", if (vm.homeInUse) "Eclipse folder" else "Eclipse storage", "ap:reload", opens = true) { vm.reloadImages() }
-
         }
     }
-    // ---- then Wallpaper on the left, Text and Sounds on the right
     Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
         Column(Modifier.weight(1f).focusGroup(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            DropSection("Text")
+            DropRow("Font", fonts.firstOrNull { it.first == vm.fontChoice }?.second ?: "Default", "ap:font", open == "font") { toggle("font") }
+            AnimatedVisibility(open == "font") {
+                DropMenu {
+                    fonts.forEach { (id, label) ->
+                        DropChoice(label, id == vm.fontChoice, null, "ap:font:$id", previewFont = vm.previewFont(id)) { vm.chooseFont(id) }
+                    }
+                    DropChoice("Import font\u2026", false, ".ttf or .otf", "ap:fontimport", radio = false) { Pickers.font() }
+                    if (usingFile != null && usingFile in vm.importedFonts) {
+                        DropChoice("Remove \u201C${vm.fontLabel(usingFile)}\u201D", false, "back to the default", "ap:fontremove", radio = false) { vm.deleteFont(usingFile) }
+                    }
+                }
+            }
+            // text size, right under the font (50 … 130%)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) {
+                    PercentSlider(((vm.textSize - 50) * 100 / 80).coerceIn(0, 100), "SMALL", "BIG") { p ->
+                        vm.chooseTextSize((50 + Math.round(p * 80 / 100f / 5f) * 5).coerceIn(50, 130))
+                    }
+                }
+                Text("${vm.textSize}%", color = C.ink, fontSize = 11.sp, modifier = Modifier.padding(start = 8.dp))
+            }
             DropSection("Wallpaper")
             DropRow("Android wallpaper", if (vm.sysWall) "On" else "Off", "ap:syswall", open == "syswall") { toggle("syswall") }
             AnimatedVisibility(open == "syswall") {
@@ -1933,30 +1944,7 @@ private fun AppearanceTab(vm: EclipseVM) {
             }
         }
         Column(Modifier.weight(1f).focusGroup(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            DropSection("Text")
-            DropRow("Font", fonts.firstOrNull { it.first == vm.fontChoice }?.second ?: "Default", "ap:font", open == "font") { toggle("font") }
-            AnimatedVisibility(open == "font") {
-                DropMenu {
-                    fonts.forEach { (id, label) ->
-                        DropChoice(label, id == vm.fontChoice, null, "ap:font:$id", previewFont = vm.previewFont(id)) { vm.chooseFont(id) }
-                    }
-                    DropChoice("Import font\u2026", false, ".ttf or .otf", "ap:fontimport", radio = false) { Pickers.font() }
-                    if (usingFile != null && usingFile in vm.importedFonts) {
-                        DropChoice("Remove \u201C${vm.fontLabel(usingFile)}\u201D", false, "back to the default", "ap:fontremove", radio = false) { vm.deleteFont(usingFile) }
-                    }
-                }
-            }
-            DropRow("Text size", "${vm.textSize}%", "ap:textsize", open == "size") { toggle("size") }
-            AnimatedVisibility(open == "size") {
-                DropMenu { TextSizeSlider(vm) }
-            }
             DropSection("Sounds")
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) {
-                    PercentSlider(vm.uiVolume, "OFF", "LOUD") { vm.chooseUiVolume(it); com.eclipse.launcher.media.UiSound.tick() }
-                }
-                Text("${vm.uiVolume}%", color = C.ink, fontSize = 11.sp, modifier = Modifier.padding(start = 8.dp))
-            }
             val builtIn = com.eclipse.launcher.media.UiSound.BUILT_IN
             val soundLabel = builtIn.firstOrNull { it.first == vm.uiSoundPick }?.second ?: vm.uiSoundPick.removePrefix("file:").substringBeforeLast('.')
             DropRow("Sound", soundLabel, "ap:sound", open == "sound") { toggle("sound") }
@@ -1971,6 +1959,12 @@ private fun AppearanceTab(vm: EclipseVM) {
                     DropChoice("Choose a sound file\u2026", false, null, "ap:sound:pick", radio = false) { open = null; Pickers.sound() }
                     if (vm.uiSoundPick.startsWith("file:")) DropChoice("Remove my sound", false, null, "ap:sound:del", radio = false) { vm.deleteSound(vm.uiSoundPick.removePrefix("file:")); open = null }
                 }
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) {
+                    PercentSlider(vm.uiVolume, "OFF", "LOUD") { vm.chooseUiVolume(it); com.eclipse.launcher.media.UiSound.tick() }
+                }
+                Text("${vm.uiVolume}%", color = C.ink, fontSize = 11.sp, modifier = Modifier.padding(start = 8.dp))
             }
         }
     }
