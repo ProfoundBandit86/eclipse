@@ -50,13 +50,15 @@ object RomM {
         val bp: String = "",
         val platformName: String = "",
         /** critic / user rating, 0..100 (from IGDB or ScreenScraper via RomM), when the server has one */
-        val rating: Float? = null
+        val rating: Float? = null,
+        /** developers / publishers, when the server's metadata has them (search finds games by them) */
+        val companies: List<String> = emptyList()
     ) {
         fun encode(): String = JSONObject()
             .put("id", id).put("p", platformId).put("n", name).put("fs", fsName).put("m", multi).put("sz", sizeBytes)
             .put("sum", summary ?: "").put("cov", cover ?: "").put("shot", screenshot ?: "")
             .put("shots", JSONArray(shots)).put("y", year ?: 0).put("g", JSONArray(genres)).put("add", addedMs)
-            .put("bp", bp).put("pn", platformName).put("r", rating?.toDouble() ?: -1.0).toString()
+            .put("bp", bp).put("pn", platformName).put("r", rating?.toDouble() ?: -1.0).put("co", JSONArray(companies)).toString()
 
         companion object {
             fun decode(s: String): Rom? = try {
@@ -66,7 +68,7 @@ object RomM {
                     o.getInt("id"), o.optInt("p"), o.getString("n"), o.getString("fs"), o.optBoolean("m"), o.optLong("sz"),
                     o.optString("sum").ifEmpty { null }, o.optString("cov").ifEmpty { null }, o.optString("shot").ifEmpty { null },
                     strs("shots"), o.optInt("y").takeIf { it > 0 }, strs("g"), o.optLong("add"), o.optString("bp"), o.optString("pn"),
-                    o.optDouble("r", -1.0).takeIf { it >= 0 }?.toFloat()
+                    o.optDouble("r", -1.0).takeIf { it >= 0 }?.toFloat(), strs("co")
                 )
             } catch (e: Exception) {
                 null
@@ -262,6 +264,10 @@ object RomM {
         val genres = ArrayList<String>()
         val ga = o.optJSONArray("genres") ?: o.optJSONObject("metadatum")?.optJSONArray("genres") ?: o.optJSONObject("igdb_metadata")?.optJSONArray("genres")
         ga?.let { a -> for (i in 0 until a.length()) (a.optJSONObject(i)?.optString("name") ?: a.optString(i)).takeIf { it.isNotBlank() }?.let(genres::add) }
+        // developers / publishers: strings or objects, on the rom or in its metadata block
+        val companies = ArrayList<String>()
+        val ca = o.optJSONArray("companies") ?: o.optJSONObject("metadatum")?.optJSONArray("companies") ?: o.optJSONObject("igdb_metadata")?.optJSONArray("companies")
+        ca?.let { a -> for (i in 0 until a.length()) (a.optJSONObject(i)?.optString("name") ?: a.optString(i)).takeIf { it.isNotBlank() }?.let(companies::add) }
         // release date: seconds or milliseconds since 1970, from the rom or its metadata
         val rel = o.optLong("first_release_date", 0L).takeIf { it > 0 }
             ?: o.optJSONObject("metadatum")?.optLong("first_release_date", 0L)?.takeIf { it > 0 }
@@ -282,7 +288,7 @@ object RomM {
             o.optLong("fs_size_bytes", o.optLong("file_size_bytes", 0L)),
             o.optString("summary").ifEmpty { null }, cover, shot ?: shots.firstOrNull(),
             shots.take(6), year, genres.take(4), parseTime(o.optString("created_at")),
-            rating = rating?.coerceIn(0.0, 100.0)?.toFloat()
+            rating = rating?.coerceIn(0.0, 100.0)?.toFloat(), companies = companies.distinct().take(4)
         )
     }
 

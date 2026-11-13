@@ -119,13 +119,20 @@ fun SearchOverlay(vm: EclipseVM) = Glass {
 
     val q = query.trim().lowercase()
     val src = if (!vm.rommOn()) "local" else vm.searchSource
-    val local = remember(q, vm.games, src) {
-        if (q.isEmpty() || src == "romm") emptyList() else vm.games.filter { q in it.name.lowercase() && it.id !in vm.hiddenGames }
-            .sortedWith(compareBy<Game> { !it.name.lowercase().startsWith(q) }.thenBy { it.name.lowercase() }).take(40)
+    // besides the name: each game's year, genre, developer and publisher (yours from scraping or your edits; RomM's
+    // from its metadata). Name matches come first, then matches on these.
+    val typing = q.isNotEmpty()
+    val localDetails = remember(vm.games, vm.gameInfo, typing) {
+        if (!typing) emptyMap() else vm.games.associate { g -> g.id to listOf("y", "g", "d", "pub").joinToString(" ") { vm.gameDetail(g, it) }.lowercase() }
+    }
+    val local = remember(q, vm.games, src, localDetails) {
+        if (q.isEmpty() || src == "romm") emptyList() else vm.games.filter { it.id !in vm.hiddenGames && (q in it.name.lowercase() || q in (localDetails[it.id] ?: "")) }
+            .sortedWith(compareBy<Game> { q !in it.name.lowercase() }.thenBy { !it.name.lowercase().startsWith(q) }.thenBy { it.name.lowercase() }).take(60)
     }
     val remote = remember(q, vm.rommCatalog, vm.rommLink, src) {
-        if (q.isEmpty() || src == "local") emptyList() else vm.rommCatalog.filter { q in it.name.lowercase() && vm.installedRom(it.id) == null }
-            .sortedWith(compareBy<RomM.Rom> { !it.name.lowercase().startsWith(q) }.thenBy { it.name.lowercase() }).take(40)
+        fun details(r: RomM.Rom) = ((r.year?.toString() ?: "") + " " + r.genres.joinToString(" ") + " " + r.companies.joinToString(" ")).lowercase()
+        if (q.isEmpty() || src == "local") emptyList() else vm.rommCatalog.filter { vm.installedRom(it.id) == null && (q in it.name.lowercase() || q in details(it)) }
+            .sortedWith(compareBy<RomM.Rom> { q !in it.name.lowercase() }.thenBy { !it.name.lowercase().startsWith(q) }.thenBy { it.name.lowercase() }).take(60)
     }
     val apps = remember(q, vm.apps, vm.renames, src) {
         if (q.isEmpty() || src == "romm") emptyList() else vm.apps.filter { q in vm.nameOf(it).lowercase() }
@@ -182,7 +189,7 @@ fun SearchOverlay(vm: EclipseVM) = Glass {
                 Spacer(Modifier.width(10.dp))
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                     if (query.isEmpty()) Text(
-                        if (listening) "Listening\u2026" else if (vm.searchVoice && barFocused) "Press Up to speak, A to type" else "Search games & apps",
+                        if (listening) "Listening\u2026" else if (vm.searchVoice && barFocused) "Press Up to speak, A to type" else "Games, apps, genre, year, publisher",
                         color = C.sub, fontSize = 15.sp, fontFamily = FontFamily.Default
                     )
                     BasicTextField(

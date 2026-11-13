@@ -163,10 +163,23 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         return front + sorted
     }
     /** Whether a system shows on the platforms: it has games (All games and Favourites show whenever you have any). */
-    fun showsPlat(id: String, counts: Map<String, Int>): Boolean = when (id) {
-        com.eclipse.launcher.data.Platforms.ALL, com.eclipse.launcher.data.Platforms.FAVORITES -> (counts[com.eclipse.launcher.data.Platforms.ALL] ?: 0) > 0
+    fun showsPlat(id: String, counts: Map<String, Int>): Boolean = when {
+        id in hiddenPlats && !showHidden() -> false
+        id == com.eclipse.launcher.data.Platforms.ALL || id == com.eclipse.launcher.data.Platforms.FAVORITES -> (counts[com.eclipse.launcher.data.Platforms.ALL] ?: 0) > 0
         else -> (counts[id] ?: 0) > 0
     }
+
+    // ---- hidden systems (the system menu's Hide) and the right panel's Show hidden ----
+    var hiddenPlats by mutableStateOf(store.list("hidden_plats").toSet())
+        private set
+    fun setPlatHidden(id: String, hide: Boolean) {
+        hiddenPlats = if (hide) hiddenPlats + id else hiddenPlats - id
+        store.putList("hidden_plats", hiddenPlats.toList())
+        val name = com.eclipse.launcher.data.Platforms.byId(id)?.name ?: id
+        message = if (hide) "Hid $name. Turn on Show hidden in the right panel (R) to see it again." else "$name is back"
+    }
+    /** Show hidden (the right panel on the systems and games screens): hidden systems and games show there again. */
+    fun showHidden(): Boolean = flag("show_hidden", false)
     var appearancePicker by mutableStateOf<String?>(null)  // "theme" / "icons" / "backdrops" picker open in Settings
     var platReorder by mutableStateOf(false)              // the "reorder platforms" screen is open
     /** The Companion (ui/Companion.kt) open for this game on the bottom screen / on this screen (no bottom screen showing). */
@@ -199,7 +212,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     fun platformCounts(): Map<String, Int> {
         val romOnly = platSource == "rommonly" && rommOn()
         // Source RomM: only games that came from, or are matched to, RomM
-        val shown = games.filter { it.id !in hiddenGames && (!romOnly || it.id in rommLink) }
+        val shown = games.filter { (it.id !in hiddenGames || showHidden()) && (!romOnly || it.id in rommLink) }
         val local = shown.groupingBy { it.platform }.eachCount() +
             (com.eclipse.launcher.data.Platforms.FAVORITES to shown.count { it.id in favGames }) +
             (com.eclipse.launcher.data.Platforms.ALL to shown.count { it.platform != "android" })

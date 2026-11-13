@@ -1117,10 +1117,10 @@ private fun SystemCardFace(vm: EclipseVM, p: PlatformDef, modifier: Modifier) {
         val iconShape = RoundedCornerShape(w * 0.30f * (vm.cornerIcon / 100f))
         if (!portrait) {
             CardIcon(p, icon, Modifier.fillMaxSize().clip(iconShape))
-        } else Column(Modifier.fillMaxSize().padding(bottom = pad), horizontalAlignment = Alignment.CenterHorizontally) {
+        } else Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             CardIcon(p, icon, Modifier.fillMaxWidth().aspectRatio(1f).clip(iconShape))
-            // the logo (or the name) centred in what is left
-            Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = pad, vertical = pad * 0.3f), contentAlignment = Alignment.Center) {
+            // the logo (or the name) centred between the icon and the card's bottom edge (same gap above and below)
+            Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = pad, vertical = pad * 0.6f), contentAlignment = Alignment.Center) {
                 var failed by remember(logo) { mutableStateOf(false) }
                 if (logo != null && !failed) AsyncImage(
                     model = logo, contentDescription = p.name, contentScale = ContentScale.Fit, onError = { failed = true },
@@ -1191,6 +1191,9 @@ fun PlatformMenu(vm: EclipseVM, id: String, pickImage: () -> Unit) {
         val inDock = id in vm.dockSystems
         MenuRow(if (inDock) "Unpin from the left dock" else "Pin to the left dock") { vm.toggleDockSystem(id); vm.platformMenu = null }
         if (!special) MenuRow("Edit system") { vm.platformMenu = null; vm.sysEdit = id }
+        // Hide: off the systems screens and Home (its games stay in All games and search); the right panel's Show hidden brings it back
+        val hidden = id in vm.hiddenPlats
+        MenuRow(if (hidden) "Unhide system" else "Hide system") { vm.platformMenu = null; vm.setPlatHidden(id, !hidden) }
         MenuRow("Cancel", value = "B") { vm.platformMenu = null }
     }
 }
@@ -1553,6 +1556,7 @@ private fun PlatformDrawer(vm: EclipseVM, close: () -> Unit) {
         extra = {
             if (vm.platSort == "custom") DrawerSection("Rearrange", "Custom order", false) { close(); vm.platReorder = true }
         },
+        hiddenToggle = true,
         close = close
     )
 }
@@ -1570,6 +1574,8 @@ fun OptionsDrawer(
     extra: (@Composable ColumnScope.() -> Unit)? = null,
     /** the size drop-down (it has its own slider), placed after the first [sizeAt] lists */
     size: (@Composable ColumnScope.() -> Unit)? = null, sizeAt: Int = lists.size,
+    /** a Show hidden switch at the bottom (the systems and games screens): hidden systems / games show again */
+    hiddenToggle: Boolean = false,
     close: () -> Unit
 ) = Glass {
     val fm = LocalFocusManager.current
@@ -1676,6 +1682,12 @@ fun OptionsDrawer(
                     }
                     if (size != null && (sizeAt <= 0 || viewLists.none { it.index == sizeAt - 1 })) size.invoke(this)
                     extra?.invoke(this)
+                }
+                if (hiddenToggle) {
+                    DockHeading("Hidden")
+                    val on = vm.showHidden()
+                    val n = vm.hiddenGames.size + vm.hiddenPlats.size
+                    DrawerSection("Show hidden", if (on) "On" else if (n == 0) "None" else "Off \u00b7 $n", false) { vm.setFlag("show_hidden", !on) }
                 }
             } else {
                 DockHeading("Quick")

@@ -347,10 +347,10 @@ fun PlatformsScreen(vm: EclipseVM) {
     val withRomm = (vm.flag("romm_lists", false) || vm.platSource == "romm" || romOnly) && vm.rommOn()
     val sort = vm.gameSort
     val favSys = sel == Platforms.FAVORITES
-    val list = remember(vm.games, sel, withRomm, romOnly, vm.rommCatalog, vm.rommLink, vm.favGames, sort, vm.lastPlayed, vm.playtime, vm.hiddenGames) {
+    val list = remember(vm.games, sel, withRomm, romOnly, vm.rommCatalog, vm.rommLink, vm.favGames, sort, vm.lastPlayed, vm.playtime, vm.hiddenGames, vm.showHidden()) {
         // Sort (options drawer): A-Z with favourites first, recently played, most played, or favourites only
         // (the Favourites "system": your favourite games from every system; hidden games never show)
-        val all = vm.games.filter { (sel == null || it.platform == sel || (favSys && it.id in vm.favGames)) && it.id !in vm.hiddenGames && (!romOnly || it.id in vm.rommLink) } +
+        val all = vm.games.filter { (sel == null || it.platform == sel || (favSys && it.id in vm.favGames)) && (it.id !in vm.hiddenGames || vm.showHidden()) && (!romOnly || it.id in vm.rommLink) } +
             (if (withRomm && !favSys) vm.rommEntriesFor(sel) else emptyList())
         when (sort) {
             "recent" -> all.sortedWith(compareByDescending<Game> { vm.lastPlayed[it.id]?.toLongOrNull() ?: 0L }.thenBy { it.name.lowercase() })
@@ -615,7 +615,8 @@ fun PlatformsScreen(vm: EclipseVM) {
                     }
                 }),
                 size = { if (mode != "list") IconSizeSection(vm, sizeKey, mode, gridFallback = 6) },
-                sizeAt = before.size
+                sizeAt = before.size,
+                hiddenToggle = true
             ) {
                 vm.gamesDrawer = false
                 runCatching { first.requestFocus() }
