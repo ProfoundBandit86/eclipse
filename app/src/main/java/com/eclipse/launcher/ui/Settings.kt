@@ -98,6 +98,10 @@ object Pickers {
     var pack: (String) -> Unit = {}
     /** picks a view type to install (a .json, or a .zip of them) */
     var view: () -> Unit = {}
+    /** picks a guide from your own files (.txt, .html, .epub) for the Companion; the callback gets it */
+    var guideFile: ((android.net.Uri) -> Unit) -> Unit = {}
+    /** where a picked guide file goes (set by [guideFile]) */
+    var guideDone: ((android.net.Uri) -> Unit)? = null
 }
 
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
@@ -258,7 +262,7 @@ private val SETTINGS_INDEX: List<Triple<String, Int, String>> = listOf(
     Triple("24-hour clock", 4, "time"), Triple("Auto-hide dock", 4, "left dock"), Triple("Compact dock", 4, "icons only"), Triple("Pages", 4, "left dock order hide move search recent systems apps scopes"),
     Triple("Clock panel", 4, "time wifi corner"),
     Triple("Default launcher", 5, "home app"), Triple("Daily test builds", 5, "update channel stable daily beta pre-release"), Triple("Run setup again", 5, "wizard first run"),
-    Triple("Use second screen", 4, "dual bottom display"), Triple("Media controls page", 4, "music playback"), Triple("Screen mirror page", 4, "mirror"), Triple("Transfers page", 4, "romm download upload chd progress"), Triple("Show finished transfers", 4, "romm history done"),
+    Triple("Use second screen", 4, "dual bottom display"), Triple("Dim the bottom screen", 4, "dim sleep dark idle battery timeout level"), Triple("Media controls page", 4, "music playback"), Triple("Screen mirror page", 4, "mirror"), Triple("Transfers page", 4, "romm download upload chd progress"), Triple("Show finished transfers", 4, "romm history done"),
     Triple("Dock on second screen", 4, "bottom dock"), Triple("Where apps open", 4, "which screen"), Triple("Now Playing buttons", 4, "screenshot walkthrough"),
     Triple("Show Now Playing", 4, "bottom screen game running"),
     Triple("LaunchBox", 3, "artwork database scraper"), Triple("Save as WebP", 1, "webp lossless png space compress images"), Triple("Generate missing art", 1, "generate draw media physical cart 3d box missing"),
@@ -506,6 +510,22 @@ private fun DualScreen(vm: EclipseVM) {
                 }
                 AnimatedVisibility(open == "size") {
                     DropMenu { listOf("small" to "Small", "medium" to "Medium", "large" to "Large").forEach { (id, label) -> DropChoice(label, id == vm.dock2Size, null, "ds:docksize:$id") { vm.chooseDock2Size(id); open = null } } }
+                }
+            }
+            // dims after a while untouched (a tap wakes it): how long, and how dark
+            val afters = listOf(0 to "Never", 30 to "30 s", 60 to "1 min", 120 to "2 min", 300 to "5 min", 600 to "10 min")
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Box(Modifier.weight(1f)) { DropRow("Dim after", afters.firstOrNull { it.first == vm.dim2After }?.second ?: "${vm.dim2After} s", "ds:dimafter", open == "dimafter") { toggle("dimafter") } }
+                Box(Modifier.weight(1f)) { DropRow("Dim level", "${vm.dim2Level}%", "ds:dimlevel", open == "dimlevel") { toggle("dimlevel") } }
+            }
+            AnimatedVisibility(open == "dimafter") {
+                DropMenu { afters.forEach { (sec, label) -> DropChoice(label, sec == vm.dim2After, if (sec == 0) "always bright" else null, "ds:dimafter:$sec") { vm.chooseDim2After(sec); open = null } } }
+            }
+            AnimatedVisibility(open == "dimlevel") {
+                DropMenu {
+                    Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                        PercentSlider(vm.dim2Level, "LIGHT", "BLACK") { vm.chooseDim2Level(it) }
+                    }
                 }
             }
         }
@@ -2528,6 +2548,7 @@ private fun Credits(vm: EclipseVM) {
     CreditRow(vm, "Dolphin (disc code: RVZ converter)", "Dolphin Emulator Project \u00b7 GPL-2.0-or-later", "https://github.com/dolphin-emu/dolphin")
     CreditRow(vm, "Zstandard, liblzma, {fmt}, Mbed TLS", "Used by Dolphin's converter \u00b7 BSD, public domain, MIT, Apache 2.0", "https://github.com/dolphin-emu/dolphin/tree/master/Externals")
     CreditRow(vm, "ZArchive (Xbox 360 .zar files)", "Exzap \u00b7 MIT No Attribution", "https://github.com/Exzap/ZArchive")
+    CreditRow(vm, "Game Twin (guide and map catalogues, title matching)", "Mert Aslantürk \u00b7 GPL-3.0", "https://github.com/alpha-minus/game-twin")
     CreditRow(vm, "jcifs-ng (network shares)", "AgNO3 & contributors \u00b7 LGPL 2.1", "https://github.com/AgNO3/jcifs-ng")
     CreditRow(vm, "Jetpack Compose, AndroidX & Material icons", "Google \u00b7 Apache License 2.0", "https://developer.android.com/jetpack/androidx")
     CreditRow(vm, "Kotlin & kotlinx.coroutines", "JetBrains \u00b7 Apache License 2.0", "https://github.com/Kotlin/kotlinx.coroutines")

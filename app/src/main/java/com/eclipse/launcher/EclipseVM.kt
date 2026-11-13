@@ -677,6 +677,16 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         private set
     fun chooseDock2Size(v: String) { dock2Size = v; store.putStr("dock2_size", v) }
 
+    // ---- the bottom screen dims after a while untouched (Settings → Screens → Second screen); a tap wakes it ----
+    /** Seconds without a touch before it dims; 0 = never. */
+    var dim2After by mutableIntStateOf(store.str("dim2_after", "120").toIntOrNull() ?: 120)
+        private set
+    /** How dark it goes, 10..100 % (100 = black). */
+    var dim2Level by mutableIntStateOf(store.str("dim2_level", "80").toIntOrNull()?.coerceIn(10, 100) ?: 80)
+        private set
+    fun chooseDim2After(sec: Int) { dim2After = sec; store.putStr("dim2_after", sec.toString()) }
+    fun chooseDim2Level(pct: Int) { dim2Level = pct.coerceIn(10, 100); store.putStr("dim2_level", dim2Level.toString()) }
+
     fun toggleDock2(pkg: String) {
         val slot = dock2.indexOf(pkg)
         val free = dock2.indexOf("")

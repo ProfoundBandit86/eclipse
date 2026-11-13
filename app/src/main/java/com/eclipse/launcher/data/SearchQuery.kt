@@ -53,9 +53,9 @@ object SearchQuery {
 
     /** Systems people name differently from their folders. */
     private val systemWords = mapOf(
-        "playstation" to "psx", "ps1" to "psx", "psone" to "psx", "playstation 2" to "ps2", "playstation 3" to "ps3",
+        "playstation" to "ps1", "ps1" to "ps1", "psone" to "ps1", "psx" to "ps1", "playstation 2" to "ps2", "playstation 3" to "ps3",
         "playstation portable" to "psp", "vita" to "psvita", "super nintendo" to "snes", "super famicom" to "snes",
-        "famicom" to "nes", "genesis" to "megadrive", "mega drive" to "megadrive", "game boy" to "gb", "gameboy" to "gb",
+        "famicom" to "nes", "genesis" to "genesis", "mega drive" to "md", "megadrive" to "md", "game boy" to "gb", "gameboy" to "gb",
         "game boy color" to "gbc", "gameboy color" to "gbc", "game boy advance" to "gba", "gameboy advance" to "gba",
         "nintendo 64" to "n64", "gamecube" to "gc", "game cube" to "gc", "nintendo ds" to "nds", "3ds" to "3ds",
         "dreamcast" to "dreamcast", "saturn" to "saturn", "wii" to "wii", "wii u" to "wiiu", "switch" to "switch"

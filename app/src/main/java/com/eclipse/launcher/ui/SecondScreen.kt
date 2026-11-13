@@ -149,7 +149,33 @@ fun SecondaryContent(vm: EclipseVM, displayId: Int) {
         }
 
 
-        Box(Modifier.fillMaxSize().background(Color.Black)) {
+        // ---- dimming: after Settings → Screens → "Dim after" without a touch, a dark veil (as dark as "Dim level");
+        // the first tap only wakes it. Any touch, a game starting or stopping, or the Companion opening resets the time.
+        var lastTouch by remember { mutableLongStateOf(System.currentTimeMillis()) }
+        var dimmed by remember { mutableStateOf(false) }
+        val mirroringNow by com.eclipse.launcher.media.Mirror.running.collectAsState()
+        LaunchedEffect(vm.session?.game?.id, companion) { lastTouch = System.currentTimeMillis(); dimmed = false }
+        LaunchedEffect(lastTouch, vm.dim2After, mirroringNow) {
+            dimmed = false
+            // never while the mirror is showing the top screen (you're watching it)
+            if (vm.dim2After <= 0 || mirroringNow) return@LaunchedEffect
+            delay(vm.dim2After * 1000L)
+            dimmed = true
+        }
+        val veil by androidx.compose.animation.core.animateFloatAsState(if (dimmed) vm.dim2Level / 100f else 0f, androidx.compose.animation.core.tween(if (dimmed) 1200 else 200), label = "dim2")
+
+        Box(
+            Modifier.fillMaxSize().background(Color.Black)
+                // every touch counts (seen first, then passed on untouched)
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                            lastTouch = System.currentTimeMillis()
+                        }
+                    }
+                }
+        ) {
           // frosted look: the page and dock blur behind the drawer and the screen bubble.
           // Not drawn at all while the walkthrough browser covers the screen: every redraw of the web page used to
           // redraw this (blurred wallpaper and all) underneath it, which is what made the browser so slow.
@@ -240,6 +266,11 @@ fun SecondaryContent(vm: EclipseVM, displayId: Int) {
             walkGame?.let { g -> WalkSheet(vm, g, { openWeb(it) }) { walkGame = null } }
             companion?.let { g -> CompanionHub(vm, g) { vm.companionBottom = null } }
             browser?.let { url -> BrowserOverlay(url) { browser = null } }
+            // the veil: while it's down, a tap only wakes the screen
+            if (veil > 0.001f) Box(
+                Modifier.fillMaxSize().background(Color.Black.copy(alpha = veil))
+                    .then(if (dimmed) Modifier.pointerInput(Unit) { detectTapGestures { lastTouch = System.currentTimeMillis() } } else Modifier)
+            )
         }
     } }
 }

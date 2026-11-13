@@ -16,7 +16,14 @@ object CompanionData {
 
     // ---------------------------------------------------------------- checklist
 
-    data class Item(val id: Long, val text: String, val done: Boolean = false, val missable: Boolean = false)
+    /**
+     * One thing to tick off. [section]: the heading it sits under ("" = none). [color]: a colour tag, 0 = none, else
+     * 1..[TAG_COLORS] (see the Checklist tab).
+     */
+    data class Item(val id: Long, val text: String, val done: Boolean = false, val missable: Boolean = false, val section: String = "", val color: Int = 0)
+
+    /** How many colour tags there are (the Checklist tab draws them). */
+    const val TAG_COLORS = 6
 
     private fun checklistFile(root: File, gameId: String) = File(Guides.dir(root, gameId), "checklist.json")
 
@@ -24,13 +31,16 @@ object CompanionData {
         val arr = runCatching { JSONArray(checklistFile(root, gameId).readText()) }.getOrNull() ?: return emptyList()
         return (0 until arr.length()).mapNotNull { i ->
             val o = arr.optJSONObject(i) ?: return@mapNotNull null
-            Item(o.optLong("id"), o.optString("text"), o.optBoolean("done"), o.optBoolean("missable"))
+            Item(o.optLong("id"), o.optString("text"), o.optBoolean("done"), o.optBoolean("missable"), o.optString("section"), o.optInt("color"))
         }
     }
 
     fun saveChecklist(root: File, gameId: String, items: List<Item>) {
         val arr = JSONArray()
-        items.forEach { arr.put(JSONObject().put("id", it.id).put("text", it.text).put("done", it.done).put("missable", it.missable)) }
+        items.forEach {
+            arr.put(JSONObject().put("id", it.id).put("text", it.text).put("done", it.done).put("missable", it.missable)
+                .put("section", it.section).put("color", it.color))
+        }
         Guides.dir(root, gameId).mkdirs()
         checklistFile(root, gameId).writeText(arr.toString())
     }
@@ -44,6 +54,51 @@ object CompanionData {
             .map { it.text.trim() }.filter { it.length in 3..70 && known.add(it.lowercase()) }
             .take(200).map { Item(id++, it) }
     }
+
+    /**
+     * A pasted or Assistant-written list as items: "# Group" and "## Section" lines are headings ("Group · Section"
+     * when both), "- [ ] thing", "- [x] thing", "- thing", "* thing" and "1. thing" are items (ticked for [x]), other
+     * lines are items too. Markdown emphasis is dropped; "(missable)" or "MISSABLE" marks one missable.
+     */
+    fun parseList(text: String): List<Item> {
+        var group = ""; var section = ""
+        var id = System.currentTimeMillis()
+        val out = ArrayList<Item>()
+        fun clean(s: String) = s.replace(Regex("[*_`]+"), "").replace(Regex("\\[([^\\]]+)]\\([^)]*\\)"), "$1").trim()
+        for (raw in text.lines()) {
+            val line = raw.trim()
+            if (line.isEmpty() || line.startsWith("```") || line == "---") continue
+            val h = Regex("^(#{1,6})\\s+(.+)$").find(line)
+            if (h != null) {
+                val title = clean(h.groupValues[2])
+                if (h.groupValues[1].length == 1) { group = title; section = "" } else section = title
+                continue
+            }
+            val m = Regex("^(?:[-*+]|\\d+[.)])\\s+(?:\\[( |x|X)]\\s+)?(.+)$").find(line)
+            val body = clean(m?.groupValues?.get(2) ?: line)
+            if (body.isEmpty()) continue
+            val done = m?.groupValues?.get(1)?.equals("x", true) == true
+            val missable = Regex("\\(missable\\)|\\bMISSABLE\\b").containsMatchIn(body)
+            val label = listOf(group, section).filter { it.isNotEmpty() }.joinToString(" \u00b7 ")
+            out += Item(id++, body.replace(Regex("\\s*\\(missable\\)", RegexOption.IGNORE_CASE), "").trim(), done, missable, label)
+        }
+        return out.take(400)
+    }
+
+    /**
+     * Ready-made requests for the Assistant to write a checklist ({game} = the game's name). Adapted from Game Twin's
+     * checklist prompts (Mert Aslantürk, GPL-3.0).
+     */
+    val CHECKLIST_PROMPTS = listOf(
+        "Full completion" to "Write a completionist checklist for {game}: story milestones, collectibles, side content, achievements and anything you can permanently miss.",
+        "Bosses and how to beat them" to "List every boss in {game}, in the order you meet them. Each boss is a section; its items are a short, concrete strategy: weak points, recommended level or gear, the attacks to dodge.",
+        "Essential items in order" to "For {game}, list the essential items and upgrades to pick up, in the order they become available. Use sections for early, mid and late game.",
+        "Puzzle hints" to "For {game}, list the puzzles in order. Each puzzle is a section; its first item is a light nudge, the next ones are bigger hints, and the last item is the full solution.",
+        "Missables only" to "List everything in {game} that can be permanently missed, grouped by the point in the game where you lose the chance. Say what to do and when."
+    )
+
+    /** What every checklist request ends with: the format [parseList] reads. */
+    const val CHECKLIST_FORMAT = "Format: '#' for 1-3 top-level groups, '##' for sections, '- [ ]' for each item; add '(missable)' after anything that can be missed. Return only the list, no introduction, closing remarks or code fences."
 
     // ---------------------------------------------------------------- maps
 

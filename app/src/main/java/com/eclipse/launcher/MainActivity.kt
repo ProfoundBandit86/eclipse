@@ -150,6 +150,16 @@ class MainActivity : ComponentActivity() {
             com.eclipse.launcher.ui.Pickers.view = {
                 viewLauncher.launch(arrayOf("application/json", "application/zip", "application/x-zip-compressed", "application/octet-stream", "text/plain", "*/*"))
             }
+            // a guide from your own files, for the Companion (it opens on this screen, even for the bottom screen's Companion)
+            val guideLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+                val cb = com.eclipse.launcher.ui.Pickers.guideDone
+                com.eclipse.launcher.ui.Pickers.guideDone = null
+                if (uri != null && cb != null) cb(uri)
+            }
+            com.eclipse.launcher.ui.Pickers.guideFile = { cb ->
+                com.eclipse.launcher.ui.Pickers.guideDone = cb
+                guideLauncher.launch(arrayOf("text/plain", "text/html", "application/xhtml+xml", "application/epub+zip", "application/octet-stream"))
+            }
             com.eclipse.launcher.ui.Pickers.theme = {
                 themeLauncher.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream"))
             }

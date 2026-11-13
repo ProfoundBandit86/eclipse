@@ -24,6 +24,13 @@ With it, from Dolphin's Externals:
   - Mbed TLS (AES, SHA-1, MD5 only): Copyright The Mbed TLS Contributors. Apache License 2.0
     (externals/mbedtls/LICENSE).
 
+From Game Twin (https://github.com/alpha-minus/game-twin), Copyright 2026 Mert Aslantürk, GPL-3.0-or-later:
+  - app/src/main/assets/companion/gamefaqs_catalog.json, strategywiki_catalog.json and vgmaps_catalog.json (game
+    titles and the addresses of their guide and map pages), and the way titles are matched against them
+    (data/GuideCatalogs.kt).
+  - The idea and endpoint for achievement tips (RetroAchievements comments) and the checklist requests the Assistant
+    is given (data/CompanionData.kt), adapted. Game Twin's name, logo and artwork are not used.
+
 Other material
 --------------
 

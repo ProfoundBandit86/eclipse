@@ -63,6 +63,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -309,8 +310,8 @@ fun CompanionHub(vm: EclipseVM, g: Game, close: () -> Unit) {
                 when (p) {
                     0 -> GuidesTab(g, root, savedTick, open = { openSite(it) }, read = { reading = it }, changed = { savedTick++ })
                     2 -> MapsTab(g, root, savedTick, open = { openSite(it) }, view = { mapView = it }, changed = { savedTick++ })
-                    3 -> ChecklistTab(g, root, savedTick, changed = { savedTick++ })
-                    4 -> TrophiesTab(ra, raLoaded)
+                    3 -> ChecklistTab(vm, g, root, savedTick, changed = { savedTick++ })
+                    4 -> TrophiesTab(vm, ra, raLoaded)
                     5 -> AskTab(vm, g, root, open = { openSite(it) }, changed = { savedTick++ })
                     else -> ManualTab(vm, g, root, open = { manual = it }, soon = { if (vm.ssBuilt) signIn = true else soon = true })
                 }
@@ -354,8 +355,16 @@ private fun GuidesTab(
     val ctx = LocalContext.current
     var saved by remember { mutableStateOf<List<Guides.Saved>>(emptyList()) }
     LaunchedEffect(g.id, tick) { saved = withContext(Dispatchers.IO) { Guides.saved(root, g.id) } }
-    val sites = remember(g.name) { Guides.sites(g.name) }
+    // the general list straight away; then the game's own guide pages, once the catalogues are read (data/GuideCatalogs.kt)
+    var sites by remember(g.name) { mutableStateOf(Guides.sites(g.name)) }
+    LaunchedEffect(g.name, g.platform) {
+        sites = withContext(Dispatchers.IO) {
+            Guides.sites(g.name, com.eclipse.launcher.data.GuideCatalogs.gameFaqs(ctx, g.name, g.platform), com.eclipse.launcher.data.GuideCatalogs.strategyWiki(ctx, g.name))
+        }
+    }
     var deleting by remember { mutableStateOf<Guides.Saved?>(null) }
+    var importNote by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
     val last = remember(saved, tick) { Guides.lastRead(ctx, g.id)?.let { n -> saved.firstOrNull { it.file.name == n } } }
 
     Box(Modifier.fillMaxSize()) {
@@ -390,6 +399,19 @@ private fun GuidesTab(
             item { SectionLabel("Find guides for this game") }
             itemsIndexed(sites, key = { _, s -> s.name }) { _, s ->
                 HubRow(s.badge, s.color, s.name, s.note, tag = if (s.best) "Best for this series" else null, trailing = "↗") { open(s) }
+            }
+            // a guide you already have: a .txt, a saved web page (.html) or an e-book (.epub), from your own folders
+            item {
+                HubRow("FILE", 0xFF4A4A4A, "Open a guide file", importNote ?: "A .txt, .html or .epub from your folders (the file picker opens on the top screen)", trailing = "＋") {
+                    importNote = "Pick the file on the top screen\u2026"
+                    Pickers.guideFile { uri ->
+                        scope.launch {
+                            val s = withContext(Dispatchers.IO) { runCatching { Guides.importFile(ctx, uri, root, g.id) }.getOrNull() }
+                            importNote = if (s == null) "That file couldn't be read as a guide" else null
+                            if (s != null) { changed(); read(s) }
+                        }
+                    }
+                }
             }
             item {
                 Text("Open a guide, then tap Save to keep it here: it opens in the reader, works offline and remembers where you were.",
@@ -1035,8 +1057,9 @@ private fun ManualViewer(file: File, onBack: () -> Unit) {
 // ---------------------------------------------------------------- a small typing box (new checklist item, marker label)
 
 @Composable
-private fun HubInput(title: String, hint: String, button: String, start: String = "", onCancel: () -> Unit, onGo: (String) -> Unit) {
+private fun HubInput(title: String, hint: String, button: String, start: String = "", lines: Boolean = false, onCancel: () -> Unit, onGo: (String) -> Unit) {
     var text by remember { mutableStateOf(start) }
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     val fr = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     // the bottom screen's window takes focus while typing (it can't get the keyboard otherwise)
@@ -1056,15 +1079,17 @@ private fun HubInput(title: String, hint: String, button: String, start: String 
             Text(title, color = INK, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 10.dp))
             Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(C.x(0x59000000L)).border(1.dp, LINE, RoundedCornerShape(10.dp)).padding(12.dp)) {
                 BasicTextField(
-                    text, { text = it }, singleLine = true,
-                    textStyle = TextStyle(color = INK, fontSize = 15.sp), cursorBrush = SolidColor(C.accent),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    text, { text = it }, singleLine = !lines,
+                    textStyle = TextStyle(color = INK, fontSize = if (lines) 13.sp else 15.sp), cursorBrush = SolidColor(C.accent),
+                    keyboardOptions = if (lines) KeyboardOptions.Default else KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { go() }),
-                    modifier = Modifier.fillMaxWidth().focusRequester(fr)
+                    modifier = Modifier.fillMaxWidth().then(if (lines) Modifier.heightIn(min = 110.dp, max = 220.dp) else Modifier).focusRequester(fr)
                 )
-                if (text.isEmpty()) Text(hint, color = SUB, fontSize = 15.sp)
+                if (text.isEmpty()) Text(hint, color = SUB, fontSize = if (lines) 13.sp else 15.sp)
             }
             Row(Modifier.align(Alignment.End).padding(top = 12.dp)) {
+                // (the window has focus while typing, so the clipboard can be read)
+                if (lines) { HubPill("Paste") { clipboard.getText()?.text?.let { text = if (text.isBlank()) it else text + "\n" + it } }; Spacer(Modifier.width(8.dp)) }
                 HubPill("Cancel", onClick = onCancel)
                 Spacer(Modifier.width(8.dp))
                 HubPill(button, gold = true) { go() }
@@ -1089,22 +1114,62 @@ private fun HubSheet(title: String, note: String?, onDismiss: () -> Unit, button
 
 // ---------------------------------------------------------------- Checklist tab
 
-/** Your own list for the game: tap to tick, hold for Missable / Delete. Items can come from a saved guide's sections. */
-@OptIn(ExperimentalFoundationApi::class)
+/** The colour tags a checklist item can have (1..6; 0 = none): red, orange, yellow, green, blue, purple. */
+private val TAGS = listOf(0xFFE57373, 0xFFFFB74D, 0xFFFFE082, 0xFF81C784, 0xFF64B5F6, 0xFFBA68C8)
+
+/**
+ * Your own list for the game, in sections: tap to tick; hold for Missable, a colour tag, Move up / down, Delete. Items
+ * can come from a saved guide's sections, a pasted list (markdown or one per line), or the Assistant.
+ */
+@OptIn(ExperimentalFoundationApi::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-private fun ChecklistTab(g: Game, root: File, tick: Int, changed: () -> Unit) {
+private fun ChecklistTab(vm: EclipseVM, g: Game, root: File, tick: Int, changed: () -> Unit) {
     val scope = rememberCoroutineScope()
     var items by remember { mutableStateOf<List<CompanionData.Item>>(emptyList()) }
     var guides by remember { mutableStateOf<List<Guides.Saved>>(emptyList()) }
     LaunchedEffect(g.id) { items = withContext(Dispatchers.IO) { CompanionData.checklist(root, g.id) } }
     LaunchedEffect(g.id, tick) { guides = withContext(Dispatchers.IO) { Guides.saved(root, g.id) } }
     var adding by remember { mutableStateOf(false) }
+    var pasting by remember { mutableStateOf(false) }
     var importing by remember { mutableStateOf(false) }
+    var asking by remember { mutableStateOf(false) }
+    var writing by remember { mutableStateOf<String?>(null) }   // the Assistant is writing this kind of list
     var menu by remember { mutableStateOf<CompanionData.Item?>(null) }
     var note by remember { mutableStateOf<String?>(null) }
     fun put(list: List<CompanionData.Item>) {
         items = list
         scope.launch { withContext(Dispatchers.IO) { CompanionData.saveChecklist(root, g.id, list) }; changed() }
+    }
+    fun add(more: List<CompanionData.Item>, from: String) {
+        if (more.isEmpty()) { note = "Nothing to add came from $from."; return }
+        val known = items.map { it.section.lowercase() + "|" + it.text.lowercase() }.toHashSet()
+        put(items + more.filter { known.add(it.section.lowercase() + "|" + it.text.lowercase()) })
+    }
+    // Move up / down: past the next item in the same section
+    fun move(row: CompanionData.Item, dir: Int) {
+        val i = items.indexOfFirst { it.id == row.id }
+        var j = i + dir
+        while (j in items.indices && items[j].section != row.section) j += dir
+        if (i < 0 || j !in items.indices) return
+        put(items.toMutableList().also { val t = it[i]; it[i] = it[j]; it[j] = t })
+    }
+    fun ask(kind: String, prompt: String) {
+        asking = false
+        if (!vm.aiReady()) { note = "Add a key under Settings → Connections → Assistant first."; return }
+        writing = kind
+        scope.launch {
+            val r = runCatching {
+                com.eclipse.launcher.data.AiHelper.plain(
+                    vm.aiProvider, vm.aiKey(), vm.aiModel(),
+                    "You write checklists for players of retro and modern video games. Be accurate; leave out anything you're unsure of.",
+                    prompt.replace("{game}", Guides.cleanTitle(g.name)) + "\n\n" + CompanionData.CHECKLIST_FORMAT,
+                    json = false, maxTokens = 3000
+                )
+            }
+            writing = null
+            r.onSuccess { add(CompanionData.parseList(it), "the Assistant") }
+                .onFailure { note = "The Assistant couldn't write it: ${it.message ?: "no answer"}" }
+        }
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -1118,45 +1183,90 @@ private fun ChecklistTab(g: Game, root: File, tick: Int, changed: () -> Unit) {
                     }
                 }
             } else item {
-                Text("Nothing on the list yet. Add what you want to keep track of: collectibles, side quests, things you can miss.",
+                Text("Nothing on the list yet. Add what you want to keep track of: collectibles, side quests, things you can miss. Or ask the Assistant to write one.",
                     color = SUB, fontSize = 12.sp, modifier = Modifier.padding(start = 2.dp, top = 10.dp, bottom = 10.dp))
             }
-            itemsIndexed(items, key = { _, row -> row.id }) { _, row ->
-                val shape = RoundedCornerShape(10.dp)
-                Row(
-                    Modifier.fillMaxWidth().padding(bottom = 6.dp).heightIn(min = 48.dp).clip(shape).background(CARD).border(1.dp, LINE, shape)
-                        .combinedClickable(onClick = { put(items.map { x -> if (x.id == row.id) x.copy(done = !x.done) else x }) }, onLongClick = { menu = row })
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(Modifier.size(22.dp).clip(RoundedCornerShape(5.dp)).background(if (row.done) C.accent else Color.Transparent)
-                        .border(1.5.dp, if (row.done) C.accent else SUB, RoundedCornerShape(5.dp)), contentAlignment = Alignment.Center) {
-                        if (row.done) Text("✓", color = C.onAccent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            itemsIndexed(items, key = { _, row -> row.id }) { i, row ->
+                Column {
+                    // a section's heading, over its first item, with how much of it is done
+                    if (row.section.isNotEmpty() && (i == 0 || items[i - 1].section != row.section)) {
+                        val inSec = items.filter { it.section == row.section }
+                        Row(Modifier.padding(top = 8.dp, bottom = 5.dp, start = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(row.section.uppercase(), color = C.accent, fontSize = 9.5.sp, letterSpacing = 1.4.sp, fontWeight = FontWeight.SemiBold,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                            Text("  ${inSec.count { it.done }}/${inSec.size}", color = SUB, fontSize = 9.5.sp)
+                        }
                     }
-                    Text(row.text, color = if (row.done) SUB else INK, fontSize = 13.5.sp, modifier = Modifier.weight(1f).padding(horizontal = 10.dp))
-                    if (row.missable) Text("MISSABLE", color = Color(0xFFFF8A7A), fontSize = 8.5.sp, letterSpacing = 1.sp,
-                        modifier = Modifier.border(1.dp, Color(0x73FF8A7A), RoundedCornerShape(4.dp)).padding(horizontal = 5.dp, vertical = 1.dp))
+                    val shape = RoundedCornerShape(10.dp)
+                    Row(
+                        Modifier.fillMaxWidth().padding(bottom = 6.dp).heightIn(min = 48.dp).clip(shape).background(CARD).border(1.dp, LINE, shape)
+                            .combinedClickable(onClick = { put(items.map { x -> if (x.id == row.id) x.copy(done = !x.done) else x }) }, onLongClick = { menu = row }),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // its colour tag, a stripe down the left edge
+                        Box(Modifier.width(4.dp).height(48.dp).background(if (row.color in 1..TAGS.size) Color(TAGS[row.color - 1]) else Color.Transparent))
+                        Box(Modifier.padding(start = 8.dp).size(22.dp).clip(RoundedCornerShape(5.dp)).background(if (row.done) C.accent else Color.Transparent)
+                            .border(1.5.dp, if (row.done) C.accent else SUB, RoundedCornerShape(5.dp)), contentAlignment = Alignment.Center) {
+                            if (row.done) Text("✓", color = C.onAccent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Text(row.text, color = if (row.done) SUB else INK, fontSize = 13.5.sp, modifier = Modifier.weight(1f).padding(horizontal = 10.dp, vertical = 8.dp))
+                        if (row.missable) Text("MISSABLE", color = Color(0xFFFF8A7A), fontSize = 8.5.sp, letterSpacing = 1.sp,
+                            modifier = Modifier.padding(end = 10.dp).border(1.dp, Color(0x73FF8A7A), RoundedCornerShape(4.dp)).padding(horizontal = 5.dp, vertical = 1.dp))
+                    }
                 }
             }
             item { Column {
-                Row(Modifier.padding(top = 4.dp)) {
+                writing?.let { w -> Text("The Assistant is writing \u201c$w\u201d\u2026", color = C.accent, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)) }
+                androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     HubPill("＋ Add item", gold = true) { adding = true }
-                    Spacer(Modifier.width(8.dp))
+                    HubPill("\u2726 Ask the Assistant", enabled = writing == null) { asking = true }
+                    HubPill("Paste a list") { pasting = true }
                     HubPill("Import from a guide") { if (guides.isEmpty()) note = "Save a guide first (Guides → open one → Save). Its section titles can then be added here." else importing = true }
                 }
-                Text("Tap to tick. Hold an item to mark it missable or delete it.", color = SUB, fontSize = 11.sp,
+                Text("Tap to tick. Hold an item to mark it missable, give it a colour, move it or delete it.", color = SUB, fontSize = 11.sp,
                     modifier = Modifier.padding(top = 10.dp, start = 2.dp, bottom = 16.dp))
             } }
         }
         menu?.let { row ->
-            HubSheet(row.text, null, onDismiss = { menu = null }) {
-                Row {
-                    HubPill(if (row.missable) "Not missable" else "Missable") { put(items.map { x -> if (x.id == row.id) x.copy(missable = !x.missable) else x }); menu = null }
-                    Spacer(Modifier.width(8.dp))
-                    HubPill("Delete") { put(items.filter { x -> x.id != row.id }); menu = null }
-                    Spacer(Modifier.width(8.dp))
-                    HubPill("Cancel") { menu = null }
+            HubSheet(row.text, row.section.ifEmpty { null }, onDismiss = { menu = null }) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // colour tags: none, then the six
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        (0..TAGS.size).forEach { c ->
+                            val sel = row.color == c
+                            Box(
+                                Modifier.size(26.dp).clip(CircleShape).background(if (c == 0) Color.Transparent else Color(TAGS[c - 1]))
+                                    .border(if (sel) 2.5.dp else 1.dp, if (sel) INK else SUB, CircleShape)
+                                    .clickable { put(items.map { x -> if (x.id == row.id) x.copy(color = c) else x }); menu = null },
+                                contentAlignment = Alignment.Center
+                            ) { if (c == 0) Text("✕", color = SUB, fontSize = 11.sp) }
+                        }
+                    }
+                    Row {
+                        HubPill("▲ Up") { move(row, -1); menu = null }
+                        Spacer(Modifier.width(8.dp))
+                        HubPill("▼ Down") { move(row, 1); menu = null }
+                        Spacer(Modifier.width(8.dp))
+                        HubPill(if (row.missable) "Not missable" else "Missable") { put(items.map { x -> if (x.id == row.id) x.copy(missable = !x.missable) else x }); menu = null }
+                    }
+                    Row {
+                        HubPill("Delete") { put(items.filter { x -> x.id != row.id }); menu = null }
+                        if (row.section.isNotEmpty()) {
+                            Spacer(Modifier.width(8.dp))
+                            HubPill("Delete section") { put(items.filter { x -> x.section != row.section }); menu = null }
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        HubPill("Cancel") { menu = null }
+                    }
                 }
+            }
+        }
+        if (asking) HubSheet("Ask the Assistant", "It writes a list for ${Guides.cleanTitle(g.name)}, added under its own headings. Answers can be wrong.", onDismiss = { asking = false }) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                CompanionData.CHECKLIST_PROMPTS.forEach { (kind, prompt) ->
+                    HubRow("\u2726", 0xFF3A4A7A, kind, prompt.replace("{game}", "the game").substringBefore(':').take(80), trailing = "＋") { ask(kind, prompt) }
+                }
+                HubPill("Cancel", modifier = Modifier.align(Alignment.End)) { asking = false }
             }
         }
         if (importing) HubSheet("Import from a guide", "Adds the guide's section titles as items.", onDismiss = { importing = false }) {
@@ -1178,6 +1288,10 @@ private fun ChecklistTab(g: Game, root: File, tick: Int, changed: () -> Unit) {
             adding = false
             put(items + CompanionData.Item(System.currentTimeMillis(), t))
         }
+        if (pasting) HubInput("Paste a list", "One item per line, or markdown: # headings and - [ ] items", "Add", lines = true, onCancel = { pasting = false }) { t ->
+            pasting = false
+            add(CompanionData.parseList(t), "that text")
+        }
     }
 }
 
@@ -1185,8 +1299,20 @@ private fun ChecklistTab(g: Game, root: File, tick: Int, changed: () -> Unit) {
 
 /** The game's RetroAchievements: what's left (missable ones first), or everything. */
 @Composable
-private fun TrophiesTab(p: RaProgress?, loaded: Boolean) {
+private fun TrophiesTab(vm: EclipseVM, p: RaProgress?, loaded: Boolean) {
     var show by remember { mutableStateOf("Locked") }
+    val ctx = LocalContext.current
+    // tap an achievement: players' tips on how to get it (RetroAchievements comments, kept for offline)
+    var openTips by remember { mutableStateOf<Int?>(null) }
+    val tips = remember { androidx.compose.runtime.mutableStateMapOf<Int, List<RetroAch.Tip>?>() }
+    var loadingTips by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(openTips) {
+        val id = openTips ?: return@LaunchedEffect
+        if (tips.containsKey(id)) return@LaunchedEffect
+        loadingTips = id
+        tips[id] = RetroAch.tips(vm.key("ra_user"), vm.key("ra_key"), id, ctx.cacheDir)
+        loadingTips = null
+    }
     if (p == null || p.total == 0) {
         Text(if (!loaded) "Asking RetroAchievements…" else "No achievements to show. Sign in to RetroAchievements under Settings → Connections; games it doesn't know have none.",
             color = SUB, fontSize = 12.sp, modifier = Modifier.padding(16.dp))
@@ -1218,7 +1344,10 @@ private fun TrophiesTab(p: RaProgress?, loaded: Boolean) {
         }
         itemsIndexed(list, key = { _, a -> a.id }) { _, a ->
             val shape = RoundedCornerShape(10.dp)
-            Row(Modifier.fillMaxWidth().padding(bottom = 6.dp).heightIn(min = 52.dp).clip(shape).background(CARD).border(1.dp, LINE, shape)
+            val open = openTips == a.id
+            Column(Modifier.fillMaxWidth().padding(bottom = 6.dp).clip(shape).background(CARD).border(1.dp, if (open) C.accent.copy(alpha = 0.5f) else LINE, shape)
+                .clickable { openTips = if (open) null else a.id }) {
+            Row(Modifier.fillMaxWidth().heightIn(min = 52.dp)
                 .padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 coil.compose.AsyncImage(RetroAch.badgeUrl(a.badge), null, Modifier.size(36.dp).clip(RoundedCornerShape(7.dp)), alpha = if (a.earned) 1f else 0.45f)
                 Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
@@ -1230,6 +1359,24 @@ private fun TrophiesTab(p: RaProgress?, loaded: Boolean) {
                     Text(if (a.earned) "Unlocked" + (a.date?.let { " · " + it.take(10) } ?: "") else a.description, color = SUB, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
                 Text(if (a.earned) "✓" else "${a.points}", color = if (a.earned) C.accent else SUB, fontSize = 12.sp)
+            }
+            if (open) {
+                val t = tips[a.id]
+                Column(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("TIPS FROM PLAYERS", color = C.accent, fontSize = 9.sp, letterSpacing = 1.6.sp)
+                    when {
+                        loadingTips == a.id -> Text("Asking RetroAchievements…", color = SUB, fontSize = 11.5.sp)
+                        t == null && tips.containsKey(a.id) -> Text("Couldn't reach RetroAchievements.", color = SUB, fontSize = 11.5.sp)
+                        t.isNullOrEmpty() -> Text("No one has left a tip for this one yet.", color = SUB, fontSize = 11.5.sp)
+                        else -> t!!.take(15).forEach { tip ->
+                            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(C.x(0x0AFFFFFFL)).padding(8.dp)) {
+                                Text(tip.text, color = INK, fontSize = 12.sp, lineHeight = 16.sp)
+                                Text(tip.user + (if (tip.date.isNotBlank()) " · " + tip.date else ""), color = SUB, fontSize = 9.5.sp, modifier = Modifier.padding(top = 3.dp))
+                            }
+                        }
+                    }
+                }
+            }
             }
         }
     }
@@ -1247,6 +1394,9 @@ private fun MapsTab(g: Game, root: File, tick: Int, open: (Guides.Site) -> Unit,
     var deleting by remember { mutableStateOf<CompanionData.GameMap?>(null) }
     var status by remember { mutableStateOf<String?>(null) }
     val site = remember(g.platform) { Guides.mapSite(g.platform) }
+    // the game's own VGMaps pages, when the catalogue knows them
+    var vgPages by remember(g.name) { mutableStateOf<List<com.eclipse.launcher.data.GuideCatalogs.Entry>>(emptyList()) }
+    LaunchedEffect(g.name, g.platform) { vgPages = withContext(Dispatchers.IO) { com.eclipse.launcher.data.GuideCatalogs.vgmaps(ctx, g.name, g.platform) } }
 
     fun screenshot() {
         status = "Taking a picture of the top screen…"
@@ -1280,7 +1430,14 @@ private fun MapsTab(g: Game, root: File, tick: Int, open: (Guides.Site) -> Unit,
             }
             item { SectionLabel("Add a map") }
             item { HubRow("📷", 0xFF444444, "Screenshot the top screen", "Keeps what the game is showing now (its own map screen, say)", trailing = "＋") { screenshot() } }
-            item { HubRow(site.badge, site.color, site.name, site.note, trailing = "↗") { open(site) } }
+            // VGMaps: the game's own maps first (by system), then the system's atlas
+            items(vgPages.size) { i ->
+                val e = vgPages[i]
+                HubRow("MAP", 0xFF3A5A2C, "VGMaps · ${e.title}", "Maps for ${e.system} · open one and tap Save map", trailing = "↗") {
+                    open(Guides.Site("VGMaps", e.title, e.url, "MAP", 0xFF3A5A2C, fallback = site.url))
+                }
+            }
+            item { HubRow(site.badge, site.color, if (vgPages.isEmpty()) site.name else "VGMaps atlas", site.note, trailing = "↗") { open(site) } }
             status?.let { s -> item { Text(s, color = C.accent, fontSize = 12.sp, modifier = Modifier.padding(4.dp)) } }
             item {
                 Text("On any page in the Companion's browser, Map keeps the biggest picture on it here. Open a map to pinch, drag, and hold to drop a marker.",
@@ -1323,8 +1480,21 @@ private fun MapViewer(g: Game, root: File, map0: CompanionData.GameMap, onBack: 
         }
         failed = bmp == null
     }
-    var scale by remember { mutableFloatStateOf(1f) }
+    // zoom and position are remembered per map (as parts of the box, so they fit any screen): "scale,x,y"
+    val ctx = LocalContext.current
+    val viewKey = "mapview_" + Integer.toHexString(map0.file.absolutePath.hashCode())
+    val prefs = remember { ctx.getSharedPreferences("companion", android.content.Context.MODE_PRIVATE) }
+    val saved = remember { prefs.getString(viewKey, null)?.split(',')?.mapNotNull { it.toFloatOrNull() }?.takeIf { it.size == 3 } }
+    var scale by remember { mutableFloatStateOf(saved?.get(0)?.coerceIn(1f, 10f) ?: 1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    var boxSize by remember { mutableStateOf(androidx.compose.ui.geometry.Size.Zero) }
+    var restored by remember { mutableStateOf(saved == null) }
+    DisposableEffect(viewKey) {
+        onDispose {
+            val b = boxSize
+            if (b.width > 0f && b.height > 0f) prefs.edit().putString(viewKey, "$scale,${offset.x / b.width},${offset.y / b.height}").apply()
+        }
+    }
     var pending by remember { mutableStateOf<Offset?>(null) }   // a new marker's place (0..1), waiting for its label
     var picked by remember { mutableStateOf<CompanionData.Marker?>(null) }
     fun keep(m: CompanionData.GameMap) {
@@ -1343,6 +1513,11 @@ private fun MapViewer(g: Game, root: File, map0: CompanionData.GameMap, onBack: 
             val b = bmp
             val boxW = constraints.maxWidth.toFloat()
             val boxH = constraints.maxHeight.toFloat()
+            SideEffect {
+                boxSize = androidx.compose.ui.geometry.Size(boxW, boxH)
+                // where you left this map last time (once the box's size is known)
+                if (!restored && saved != null && boxW > 0f) { offset = Offset(saved[1] * boxW, saved[2] * boxH); restored = true }
+            }
             if (b == null) {
                 Text(if (failed) "This picture can't be opened." else "Opening…", color = SUB, fontSize = 13.sp, modifier = Modifier.align(Alignment.Center))
             } else {

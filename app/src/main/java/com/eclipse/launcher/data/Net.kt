@@ -319,4 +319,31 @@ object RetroAch {
 
     fun badgeUrl(badge: String) = "https://media.retroachievements.org/Badge/$badge.png"
 
+    /** A player's comment on an achievement: how they got it, what to watch out for. */
+    data class Tip(val user: String, val date: String, val text: String)
+
+    /**
+     * Players' comments on an achievement, newest first (the RetroAchievements site's own posts left out), kept in
+     * [cacheDir]/ra_comments/<id>.json for a week so they read offline. Null when RetroAchievements can't be reached
+     * and nothing is kept. (Idea and endpoint from Game Twin by Mert Aslantürk, GPL-3.0.)
+     */
+    suspend fun tips(user: String, key: String, achievementId: Int, cacheDir: File): List<Tip>? = withContext(Dispatchers.IO) {
+        val dir = File(cacheDir, "ra_comments").apply { mkdirs() }
+        val f = File(dir, "$achievementId.json")
+        fun parse(text: String): List<Tip>? = runCatching {
+            val a = JSONObject(text).optJSONArray("Results") ?: JSONArray()
+            (0 until a.length()).mapNotNull { i ->
+                val o = a.optJSONObject(i) ?: return@mapNotNull null
+                val who = o.optString("User")
+                val t = o.optString("CommentText").trim()
+                if (t.isEmpty() || who.equals("Server", true)) null else Tip(who, o.optString("Submitted").take(10), t)
+            }
+        }.getOrNull()
+        val fresh = f.isFile && System.currentTimeMillis() - f.lastModified() < 7L * 86_400_000L
+        if (fresh) parse(f.readText())?.let { return@withContext it }
+        val body = Http.get("$BASE/API_GetComments.php?z=${Http.enc(user)}&y=${Http.enc(key)}&t=2&i=$achievementId&c=50&sort=-submitted")
+        val got = body?.let { parse(it) }
+        if (got != null) { runCatching { f.writeText(body) }; got } else if (f.isFile) parse(f.readText()) else null
+    }
+
 }

@@ -128,15 +128,15 @@ object AiHelper {
         else claude(key, model?.ifBlank { null } ?: CLAUDE_MODEL, system, turns)
 
     /**
-     * A short question with no web search and a short answer (search turning a sentence into filters): the plain text
-     * that came back. Throws [AiError] like [ask].
+     * A question with no web search (search turning a sentence into filters, a checklist written for a game): the
+     * plain text that came back. [json]: ask Gemini for JSON. Throws [AiError] like [ask].
      */
-    suspend fun plain(provider: String, key: String, model: String?, system: String, question: String): String {
+    suspend fun plain(provider: String, key: String, model: String?, system: String, question: String, json: Boolean = true, maxTokens: Int = 400): String {
         if (provider == GEMINI) {
             val body = JSONObject()
                 .put("system_instruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", system))))
                 .put("contents", JSONArray().put(JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put("text", question)))))
-                .put("generationConfig", JSONObject().put("responseMimeType", "application/json"))
+                .apply { if (json) put("generationConfig", JSONObject().put("responseMimeType", "application/json")) }
             val m = model?.ifBlank { null } ?: GEMINI_MODEL
             val r = post("https://generativelanguage.googleapis.com/v1beta/models/$m:generateContent", mapOf("x-goog-api-key" to key), body)
             val parts = r.optJSONArray("candidates")?.optJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts") ?: throw AiError("No answer came back")
@@ -144,7 +144,7 @@ object AiHelper {
             for (i in 0 until parts.length()) parts.optJSONObject(i)?.let { p -> if (!p.optBoolean("thought")) text.append(p.optString("text")) }
             return text.toString().ifBlank { throw AiError("No answer came back") }
         }
-        val body = JSONObject().put("model", model?.ifBlank { null } ?: CLAUDE_MODEL).put("max_tokens", 400).put("system", system)
+        val body = JSONObject().put("model", model?.ifBlank { null } ?: CLAUDE_MODEL).put("max_tokens", maxTokens).put("system", system)
             .put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", question)))
         val r = post("https://api.anthropic.com/v1/messages", claudeHeaders(key), body)
         val content = r.optJSONArray("content") ?: throw AiError("No answer came back")

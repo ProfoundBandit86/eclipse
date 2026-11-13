@@ -47,7 +47,7 @@ object Guides {
      * Zelda → Zelda Dungeon, Metroid → Omega Metroid, Pokémon → Bulbapedia, Minecraft → Chunkbase. Then GameFAQs and
      * StrategyWiki.
      */
-    fun sites(title0: String): List<Site> {
+    fun sites(title0: String, gameFaqs: GuideCatalogs.Entry? = null, strategyWiki: GuideCatalogs.Entry? = null): List<Site> {
         val title = cleanTitle(title0)
         val t = title.lowercase()
         val q = Http.enc(title)
@@ -70,16 +70,21 @@ object Guides {
         }
         if ("minecraft" in t)
             out += Site("Chunkbase", "Seed map, biome and structure finder", "https://www.chunkbase.com/apps/", "CB", 0xFF3E7A2A, true)
-        out += Site("GameFAQs", "Classic guides · open one and tap Save", "https://gamefaqs.gamespot.com/search?game=$q", "FAQ", 0xFF1D3B6E)
+        // the game's own guide pages when the catalogues know them (data/GuideCatalogs.kt), else the site's search /
+        // the page named after the game
+        out += if (gameFaqs != null) Site("GameFAQs", "Guides for ${gameFaqs.title} · open one and tap Save", gameFaqs.url, "FAQ", 0xFF1D3B6E,
+            fallback = "https://gamefaqs.gamespot.com/search?game=$q")
+        else Site("GameFAQs", "Classic guides · open one and tap Save", "https://gamefaqs.gamespot.com/search?game=$q", "FAQ", 0xFF1D3B6E)
         // (the wiki's guide for a game is the page named after it; its search jumps there, or lists near matches)
-        out += Site("StrategyWiki", "Community wiki guide", "https://strategywiki.org/wiki/" + Http.enc(title.replace(' ', '_')), "SW", 0xFF2C5A3A,
+        out += Site("StrategyWiki", if (strategyWiki != null) "Walkthrough for ${strategyWiki.title}" else "Community wiki guide",
+            strategyWiki?.url ?: ("https://strategywiki.org/wiki/" + Http.enc(title.replace(' ', '_'))), "SW", 0xFF2C5A3A,
             fallback = "https://strategywiki.org/w/index.php?search=$q")
         return out
     }
 
     /** Where to look for maps of a game: VGMaps' atlas for its system. */
     fun mapSite(platform: String): Site {
-        val folder = VGMAPS[platform]
+        val folder = GuideCatalogs.VGMAPS_SYSTEMS[platform] ?: VGMAPS[platform]
         return Site("VGMaps", "Full maps of classic games · open one and tap Save map",
             if (folder != null) "https://www.vgmaps.com/Atlas/$folder/index.htm" else "https://www.vgmaps.com/Atlas/index.htm", "MAP", 0xFF3A5A2C,
             fallback = "https://www.vgmaps.com/")
@@ -134,6 +139,71 @@ object Guides {
         return s
     }
 
+    /**
+     * A guide from your own files: .txt as it is, .html / .htm / .xhtml as their text, .epub chapter by chapter (each
+     * chapter's title a section). Null when it can't be read.
+     */
+    fun importFile(ctx: Context, uri: android.net.Uri, root: File, gameId: String): Saved? {
+        val name = runCatching {
+            ctx.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+        }.getOrNull() ?: uri.lastPathSegment?.substringAfterLast('/') ?: "Guide"
+        val ext = name.substringAfterLast('.', "").lowercase()
+        val title = name.substringBeforeLast('.').replace('_', ' ').trim()
+        val bytes = ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
+        if (bytes.size > 40 * 1024 * 1024) return null
+        val (text, html) = when (ext) {
+            "epub" -> (epubText(bytes) ?: return null) to true
+            "html", "htm", "xhtml", "xht" -> htmlText(String(bytes)) to true
+            else -> String(bytes, if (looksUtf8(bytes)) Charsets.UTF_8 else Charsets.ISO_8859_1) to false
+        }
+        if (text.isBlank()) return null
+        return save(root, gameId, title, "Your file", "file:$name", text, html)
+    }
+
+    private fun looksUtf8(b: ByteArray): Boolean = runCatching {
+        java.nio.charset.StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(b)); true
+    }.getOrDefault(false)
+
+    /** A page's text, one paragraph per line (scripts and styles left out). */
+    private fun htmlText(h: String): String {
+        val body = h.replace(Regex("(?is)<(script|style|head)[^>]*>.*?</\\1>"), " ")
+        @Suppress("DEPRECATION")
+        val t = android.text.Html.fromHtml(body).toString()
+        return t.replace('\u00a0', ' ').replace('\uFFFC', ' ').lines().map { it.trim() }.filter { it.isNotEmpty() }.joinToString("\n")
+    }
+
+    /** An EPUB's chapters in reading order (its spine), each led by its title in capitals so it becomes a section. */
+    private fun epubText(bytes: ByteArray): String? = runCatching {
+        val files = HashMap<String, ByteArray>()
+        java.util.zip.ZipInputStream(bytes.inputStream()).use { z ->
+            while (true) {
+                val e = z.nextEntry ?: break
+                if (!e.isDirectory) files[e.name] = z.readBytes()
+            }
+        }
+        val container = files["META-INF/container.xml"]?.let { String(it) } ?: return@runCatching null
+        val opfPath = Regex("full-path=\"([^\"]+)\"").find(container)?.groupValues?.get(1) ?: return@runCatching null
+        val opf = files[opfPath]?.let { String(it) } ?: return@runCatching null
+        val base = opfPath.substringBeforeLast('/', "").let { if (it.isEmpty()) "" else "$it/" }
+        val manifest = Regex("<item\\b[^>]*>").findAll(opf).associate { m ->
+            val tag = m.value
+            (Regex("id=\"([^\"]+)\"").find(tag)?.groupValues?.get(1) ?: "") to (Regex("href=\"([^\"]+)\"").find(tag)?.groupValues?.get(1) ?: "")
+        }
+        val spine = Regex("<itemref\\b[^>]*idref=\"([^\"]+)\"").findAll(opf).map { it.groupValues[1] }.toList()
+        val out = StringBuilder()
+        for (id in spine) {
+            val href = manifest[id]?.substringBefore('#')?.let { java.net.URLDecoder.decode(it, "UTF-8") } ?: continue
+            val x = files[base + href]?.let { String(it) } ?: continue
+            val head = Regex("(?is)<(h1|h2|title)[^>]*>(.*?)</\\1>").find(x)?.groupValues?.get(2)
+                ?.replace(Regex("<[^>]+>"), "")?.trim()?.takeIf { it.isNotBlank() && it.length <= 70 }
+            val body = htmlText(x)
+            if (body.isBlank()) continue
+            if (head != null) out.append("\n").append(head.uppercase()).append("\n")
+            out.append(body).append("\n")
+        }
+        out.toString().ifBlank { null }
+    }.getOrNull()
+
     fun delete(root: File, gameId: String, s: Saved) {
         s.file.delete()
         writeIndex(root, gameId, saved(root, gameId).filter { it.file != s.file })
@@ -158,6 +228,10 @@ object Guides {
     private val COLUMNS = Regex("\\S {3,}\\S")
     private val BOXY = Regex("[|+]-{2,}|-{2,}[|+]|\\|.*\\||[/\\\\]{2,}|[_=]{4,}")
     private val LISTY = Regex("^\\s*([-*•o>+]|\\d{1,3}[.)]|[a-zA-Z][.)]|\\[[ xX]?])\\s+\\S")
+    /** GameFAQs' section codes ("Walkthrough ... [WLK01]", "{1.2}"), which guides tell you to Find. */
+    private val SECTION_CODE = Regex("^.*\\S\\s+[\\[{(][A-Za-z0-9.]{2,8}[\\]})]\\s*$|^\\s*[\\[{(][A-Za-z0-9.]{2,8}[\\]})]\\s+\\S.*$")
+    /** A title between rows of = * ~ # ("=== Chapter 3 ==="). */
+    private val DECORATED = Regex("^\\s*[=*~#]{2,}\\s*\\S.{0,60}?\\s*[=*~#]{2,}\\s*$")
     private val NUMBERED_TITLE = Regex("^\\s*(\\d+(\\.\\d+)*|[IVXLC]+)[.):]?\\s+\\S.{0,60}$")
 
     /**
@@ -199,6 +273,7 @@ object Guides {
         val letters = s.count { it.isLetter() }
         if (letters < 2) return false
         if (underlined) return true
+        if (SECTION_CODE.matches(s) || DECORATED.matches(s)) return true
         val upper = s.count { it.isUpperCase() }
         if (letters >= 3 && upper * 10 >= letters * 8) return true
         return NUMBERED_TITLE.matches(s) && !s.trimEnd().endsWith(".") && s.length <= 48
