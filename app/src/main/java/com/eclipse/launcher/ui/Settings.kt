@@ -1049,6 +1049,15 @@ private fun ToolsTab(vm: EclipseVM) {
                 else -> "$m3u game${if (m3u == 1) "" else "s"} without an up-to-date .m3u. Each shows once, discs swap in the emulator."
             }
         ) { open(1) }
+        // native Android versions of games (Ports & recomps screen)
+        DropSection("Ports & recomps")
+        LaunchedEffect(Unit) { vm.loadPorts() }
+        val installedPorts = vm.ports.count { vm.portPkg(it) != null }
+        ActionRow(
+            "Ports & recomps",
+            if (vm.ports.isEmpty()) "Native Android versions of games: no emulator, widescreen, higher frame rates."
+            else "${vm.ports.size} native Android versions of games" + (if (installedPorts > 0) ", $installedPorts installed" else "") + ". Get them, keep them updated, play them from the game's page."
+        ) { vm.portsFocus = null; vm.portsOpen = true }
         // new discs dropped into the folders you pick become CHDs by themselves
         DropSection("Automatic")
         LaunchedEffect(Unit) { vm.loadChdFolders() }
@@ -2550,6 +2559,7 @@ private fun Credits(vm: EclipseVM) {
     CreditRow(vm, "Zstandard, liblzma, {fmt}, Mbed TLS", "Used by Dolphin's converter \u00b7 BSD, public domain, MIT, Apache 2.0", "https://github.com/dolphin-emu/dolphin/tree/master/Externals")
     CreditRow(vm, "ZArchive (Xbox 360 .zar files)", "Exzap \u00b7 MIT No Attribution", "https://github.com/Exzap/ZArchive")
     CreditRow(vm, "Game Twin (guide and map catalogues, title matching)", "Mert Aslantürk \u00b7 GPL-3.0", "https://github.com/alpha-minus/game-twin")
+    CreditRow(vm, "Awesome Android Native Ports (the Ports & recomps list)", "abduznik \u00b7 CC0-1.0", "https://github.com/abduznik/awesome-android-native-ports")
     CreditRow(vm, "jcifs-ng (network shares)", "AgNO3 & contributors \u00b7 LGPL 2.1", "https://github.com/AgNO3/jcifs-ng")
     CreditRow(vm, "Jetpack Compose, AndroidX & Material icons", "Google \u00b7 Apache License 2.0", "https://developer.android.com/jetpack/androidx")
     CreditRow(vm, "Kotlin & kotlinx.coroutines", "JetBrains \u00b7 Apache License 2.0", "https://github.com/Kotlin/kotlinx.coroutines")

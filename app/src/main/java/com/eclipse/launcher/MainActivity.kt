@@ -500,7 +500,8 @@ class MainActivity : ComponentActivity() {
                 if (e.action == KeyEvent.ACTION_DOWN && e.repeatCount == 0) {
                     // a game's page: the previous / next game in the list it was opened from
                     // a game's page: its tabs (L2 / R2 go to the previous / next game)
-                    if (vm.menuGame != null && vm.artGame == null && vm.emuMenu == null) {
+                    if (vm.portsOpen) GamepadFocus.pageTab?.invoke(if (e.keyCode == KeyEvent.KEYCODE_BUTTON_L1) -1 else 1)
+                    else if (vm.menuGame != null && vm.artGame == null && vm.emuMenu == null) {
                         val d = if (e.keyCode == KeyEvent.KEYCODE_BUTTON_L1) -1 else 1
                         vm.menuTabStep(d)
                     }

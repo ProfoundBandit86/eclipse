@@ -1,0 +1,2114 @@
+{
+ "about": "Native Android ports and recompilations, for Eclipse's Ports & recomps screen. Built from abduznik/awesome-android-native-ports (CC0-1.0), with the system each game came from added. pkg = the app's Android id, when known.",
+ "source": "https://github.com/abduznik/awesome-android-native-ports",
+ "version": 1,
+ "ports": [
+  {
+   "id": "elasota/aerofoil",
+   "name": "Aerofoil (Glider PRO)",
+   "game": "Aerofoil",
+   "sys": "windows",
+   "repo": "elasota/Aerofoil",
+   "author": "elasota",
+   "desc": "Multiplatform port of the classic Macintosh paper-airplane game Glider PRO, with an Android APK in releases.",
+   "kind": "port"
+  },
+  {
+   "id": "pyrdacor/ambermoon.net",
+   "name": "Ambermoon",
+   "game": "Ambermoon",
+   "sys": "amiga",
+   "repo": "Pyrdacor/Ambermoon.net",
+   "author": "Pyrdacor",
+   "desc": "C# rewrite of the Amiga RPG Ambermoon with an Android APK in releases; needs your original game files.",
+   "kind": "port"
+  },
+  {
+   "id": "differentnet/barony-android-port",
+   "name": "Barony",
+   "game": "Barony",
+   "sys": "windows",
+   "repo": "DifferentNet/barony-android-port",
+   "author": "DifferentNet",
+   "desc": "Beta native Android port of Barony; code-only APK that requires a purchased Barony v5.0.2 installation.",
+   "kind": "port"
+  },
+  {
+   "id": "openblack/openblack",
+   "name": "Black & White",
+   "game": "Black & White",
+   "sys": "windows",
+   "repo": "openblack/openblack",
+   "author": "openblack",
+   "desc": "Open-source reimplementation of Black & White (2001) in modern C++ with an Android APK package built by CI.",
+   "kind": "port"
+  },
+  {
+   "id": "bvschaik/julius",
+   "name": "Caesar III",
+   "game": "Caesar III",
+   "sys": "windows",
+   "repo": "bvschaik/julius",
+   "author": "bvschaik",
+   "desc": "Open-source re-implementation of Caesar III with an Android release on Google Play and APKs on GitHub.",
+   "kind": "port"
+  },
+  {
+   "id": "keriew/augustus",
+   "name": "Caesar III (Augustus)",
+   "game": "Caesar III",
+   "sys": "windows",
+   "repo": "Keriew/augustus",
+   "author": "Keriew",
+   "desc": "Julius-based Caesar III re-implementation with extra gameplay features and Android APKs in releases.",
+   "kind": "port"
+  },
+  {
+   "id": "link4electronics/carpocalypse2",
+   "name": "Carmageddon 2",
+   "game": "Carmageddon 2",
+   "sys": "windows",
+   "repo": "Link4Electronics/Carpocalypse2",
+   "author": "Link4Electronics",
+   "desc": "Decompilation and native port of Carmageddon 2 with armv7 Android APKs; needs the original game data.",
+   "kind": "decomp"
+  },
+  {
+   "id": "scummvm/scummvm",
+   "name": "Classic adventure games (ScummVM)",
+   "game": "Classic adventure games",
+   "sys": "scummvm",
+   "repo": "scummvm/scummvm",
+   "author": "scummvm",
+   "desc": "Engine reimplementation for point-and-click adventures and RPGs with an official Android backend; you supply the game data.",
+   "kind": "port"
+  },
+  {
+   "id": "pablocpas/opencmr2",
+   "name": "Colin McRae Rally 2.0",
+   "game": "Colin McRae Rally 2.0",
+   "sys": "windows",
+   "repo": "pablocpas/OpenCMR2",
+   "author": "pablocpas",
+   "desc": "Native SDL3 port built from the CMR2Decomp decompilation, running on Android with no game data included.",
+   "kind": "decomp"
+  },
+  {
+   "id": "molotovgit/cnc-generals-zerohour-android",
+   "name": "Command & Conquer: Generals - Zero Hour",
+   "game": "Command & Conquer: Generals - Zero Hour",
+   "sys": "windows",
+   "repo": "molotovgit/CnC-Generals-ZeroHour-Android",
+   "author": "molotovgit",
+   "desc": "Early arm64 Android port built on the GeneralsX engine with SDL3 and DXVK (Direct3D 8 to Vulkan) and touch controls.",
+   "kind": "port"
+  },
+  {
+   "id": "dk8827/ra-port",
+   "name": "Command & Conquer: Red Alert",
+   "game": "Command & Conquer: Red Alert",
+   "sys": "windows",
+   "repo": "dk8827/ra-port",
+   "author": "dk8827",
+   "desc": "Native SDL2 source port of Red Alert for Android, iOS, Linux and macOS, with the Android build produced as a local debug APK.",
+   "kind": "port"
+  },
+  {
+   "id": "dk8827/cnc-port",
+   "name": "Command & Conquer: Tiberian Dawn",
+   "game": "Command & Conquer: Tiberian Dawn",
+   "sys": "windows",
+   "repo": "dk8827/cnc-port",
+   "author": "dk8827",
+   "desc": "Unofficial native port of Tiberian Dawn running on iOS, Android and macOS; no game assets included.",
+   "kind": "port"
+  },
+  {
+   "id": "cesarus85/tiberian-dawn-for-android-and-meta-quest",
+   "name": "Command & Conquer: Tiberian Dawn (Android and Quest)",
+   "game": "Command & Conquer: Tiberian Dawn",
+   "sys": "windows",
+   "repo": "Cesarus85/Tiberian-Dawn-for-Android-and-Meta-Quest",
+   "author": "Cesarus85",
+   "desc": "Prototype Android and Meta Quest 3 port of Tiberian Dawn with APKs in releases and no game data included.",
+   "kind": "port"
+  },
+  {
+   "id": "velaron/cs16-client",
+   "name": "Counter-Strike 1.6",
+   "game": "Counter-Strike 1.6",
+   "sys": "windows",
+   "repo": "Velaron/cs16-client",
+   "author": "Velaron",
+   "desc": "Reverse-engineered Counter-Strike 1.6 client for Xash3D FWGS with a continuous Android APK build.",
+   "kind": "port"
+  },
+  {
+   "id": "diasurgical/devilutionx",
+   "name": "Diablo & Hellfire",
+   "game": "Diablo & Hellfire",
+   "sys": "windows",
+   "repo": "diasurgical/DevilutionX",
+   "author": "diasurgical",
+   "desc": "Port of Diablo and Hellfire with engine improvements and an Android APK attached to every release.",
+   "kind": "port"
+  },
+  {
+   "id": "glkarin/com.n0n3m4.diii4a",
+   "name": "DOOM 3, Quake 4, Prey and more (idTech4A++)",
+   "game": "DOOM 3, Quake 4, Prey and more",
+   "sys": "windows",
+   "repo": "glKarin/com.n0n3m4.diii4a",
+   "author": "glKarin",
+   "desc": "OpenGL ES port of the idTech 4 games plus Quake 1-3, RTCW, GZDoom, OpenJK and others, with APKs and F-Droid builds.",
+   "kind": "port"
+  },
+  {
+   "id": "sandstranger/com.mobilerpgpack.phone",
+   "name": "Doom, Wolfenstein RPG, Quake and more (Mobile RPG Pack)",
+   "game": "Doom, Wolfenstein RPG, Quake and more",
+   "sys": "dos",
+   "repo": "sandstranger/com.mobilerpgpack.phone",
+   "author": "sandstranger",
+   "desc": "Collection of unofficial Android ports of classic engines including Doom, the Wolfenstein RPG series, Doom 64 EX+, UZDoom and Red Alert.",
+   "kind": "port"
+  },
+  {
+   "id": "adamkulik/pocket-wormhole",
+   "name": "FTL: Faster Than Light",
+   "game": "FTL: Faster Than Light",
+   "sys": "windows",
+   "repo": "adamkulik/pocket-wormhole",
+   "author": "adamkulik",
+   "desc": "Native Android port of Project Wormhole, a reimplementation of the FTL engine.",
+   "kind": "port"
+  },
+  {
+   "id": "try/opengothic",
+   "name": "Gothic II",
+   "game": "Gothic II",
+   "sys": "windows",
+   "repo": "Try/OpenGothic",
+   "author": "Try",
+   "desc": "Reimplementation of the Gothic 1 and 2 client, compatible with the original game data and mods, with an Android APK build target.",
+   "kind": "port"
+  },
+  {
+   "id": "fwgs/xash3d-fwgs",
+   "name": "Half-Life (Xash3D FWGS)",
+   "game": "Half-Life",
+   "sys": "windows",
+   "repo": "FWGS/xash3d-fwgs",
+   "author": "FWGS",
+   "desc": "Custom GoldSrc-compatible engine that runs Half-Life and its mods, with a continuous Android APK build.",
+   "kind": "port"
+  },
+  {
+   "id": "ihhub/fheroes2",
+   "name": "Heroes of Might and Magic II",
+   "game": "Heroes of Might and Magic II",
+   "sys": "windows",
+   "repo": "ihhub/fheroes2",
+   "author": "ihhub",
+   "desc": "Recreation of the Heroes II engine with an Android project and Android packages published alongside releases.",
+   "kind": "port"
+  },
+  {
+   "id": "vcmi/vcmi",
+   "name": "Heroes of Might and Magic III",
+   "game": "Heroes of Might and Magic III",
+   "sys": "windows",
+   "repo": "vcmi/vcmi",
+   "author": "vcmi",
+   "desc": "Open-source engine for Heroes III with arm64 and armv7 Android APKs in every release.",
+   "kind": "port"
+  },
+  {
+   "id": "ja2-stracciatella/ja2-stracciatella",
+   "name": "Jagged Alliance 2",
+   "game": "Jagged Alliance 2",
+   "sys": "windows",
+   "repo": "ja2-stracciatella/ja2-stracciatella",
+   "author": "ja2-stracciatella",
+   "desc": "Continuation of the JA2 Stracciatella port, adding stability fixes, a mod platform and an Android APK.",
+   "kind": "port"
+  },
+  {
+   "id": "alistert/openjazz",
+   "name": "Jazz Jackrabbit",
+   "game": "Jazz Jackrabbit",
+   "sys": "dos",
+   "repo": "AlisterT/openjazz",
+   "author": "AlisterT",
+   "desc": "Free, open-source engine for the classic Jazz Jackrabbit games with continuous Android builds.",
+   "kind": "port"
+  },
+  {
+   "id": "deathkiller/jazz2-native",
+   "name": "Jazz Jackrabbit 2",
+   "game": "Jazz Jackrabbit 2",
+   "sys": "windows",
+   "repo": "deathkiller/jazz2-native",
+   "author": "deathkiller",
+   "desc": "Jazz² Resurrection, a native C++ reimplementation of Jazz Jackrabbit 2 with an Android build that needs the original game files.",
+   "kind": "port"
+  },
+  {
+   "id": "youkaicountry/yknytt",
+   "name": "Knytt Stories",
+   "game": "Knytt Stories",
+   "sys": "windows",
+   "repo": "youkaicountry/yknytt",
+   "author": "youkaicountry",
+   "desc": "Open-source Godot (C#) implementation of Knytt Stories with an Android APK in releases.",
+   "kind": "port"
+  },
+  {
+   "id": "isledecomp/isle-portable",
+   "name": "LEGO Island",
+   "game": "LEGO Island",
+   "sys": "windows",
+   "repo": "isledecomp/isle-portable",
+   "author": "isledecomp",
+   "desc": "Portable version of LEGO Island (1997) built on the decompilation, with Android builds from CI.",
+   "kind": "decomp"
+  },
+  {
+   "id": "lbalab/lba2-classic-community",
+   "name": "Little Big Adventure 2",
+   "game": "Little Big Adventure 2",
+   "sys": "dos",
+   "repo": "LBALab/lba2-classic-community",
+   "author": "LBALab",
+   "desc": "Community source port of the LBA2 engine with Android and Android TV builds (7.0 and newer).",
+   "kind": "port"
+  },
+  {
+   "id": "nautilusbits/mdk-sdl",
+   "name": "MDK",
+   "game": "MDK",
+   "sys": "dos",
+   "repo": "nautilusbits/mdk-sdl",
+   "author": "nautilusbits",
+   "desc": "C# and SDL3 port of MDK based on reverse engineering, with Android builds and a Cardboard stereo 3D viewer.",
+   "kind": "port"
+  },
+  {
+   "id": "ds17f/andropolis",
+   "name": "Micropolis",
+   "game": "Micropolis",
+   "sys": "windows",
+   "repo": "ds17f/andropolis",
+   "author": "ds17f",
+   "desc": "Native Android port of Micropolis built on the MicropolisCore C++ engine via NDK and JNI.",
+   "kind": "port"
+  },
+  {
+   "id": "openenroth/openenroth",
+   "name": "Might and Magic VI-VIII",
+   "game": "Might and Magic VI-VIII",
+   "sys": "windows",
+   "repo": "OpenEnroth/OpenEnroth",
+   "author": "OpenEnroth",
+   "desc": "Open reimplementation of the Might and Magic VI, VII and VIII engine with nightly universal Android APKs.",
+   "kind": "port"
+  },
+  {
+   "id": "andiweli/openmw-android",
+   "name": "Morrowind (OpenMW)",
+   "game": "Morrowind",
+   "sys": "windows",
+   "repo": "Andiweli/OpenMW-Android",
+   "author": "Andiweli",
+   "desc": "OpenMW for Android and ChromeOS, extended with optimizations and new shaders on top of Cavebros' port.",
+   "kind": "port"
+  },
+  {
+   "id": "zaps166/nfsiise",
+   "name": "Need for Speed II SE",
+   "game": "Need for Speed II SE",
+   "sys": "windows",
+   "repo": "zaps166/NFSIISE",
+   "author": "zaps166",
+   "desc": "Cross-platform wrapper for NFS II SE with 3D acceleration and TCP multiplayer, with 32-bit ARM Android builds in releases.",
+   "kind": "port"
+  },
+  {
+   "id": "gurrhack/nethack-android",
+   "name": "NetHack",
+   "game": "NetHack",
+   "sys": "dos",
+   "repo": "gurrhack/NetHack-Android",
+   "author": "gurrhack",
+   "desc": "Android port of NetHack.",
+   "kind": "port"
+  },
+  {
+   "id": "sdlpal/sdlpal",
+   "name": "PAL (Legend of Sword and Fairy)",
+   "game": "PAL",
+   "sys": "windows",
+   "repo": "sdlpal/sdlpal",
+   "author": "sdlpal",
+   "desc": "SDL-based reimplementation of the classic Chinese RPG PAL with an Android APK in releases.",
+   "kind": "port"
+  },
+  {
+   "id": "missingno7/pre2_port",
+   "name": "Prehistorik 2",
+   "game": "Prehistorik 2",
+   "sys": "dos",
+   "repo": "missingno7/pre2_port",
+   "author": "missingno7",
+   "desc": "Python source port reconstructed piece by piece from PRE2.EXE, with an arm64 Android APK in releases.",
+   "kind": "port"
+  },
+  {
+   "id": "themuffinator/openq4",
+   "name": "Quake 4",
+   "game": "Quake 4",
+   "sys": "windows",
+   "repo": "themuffinator/openQ4",
+   "author": "themuffinator",
+   "desc": "Open-source engine for Quake 4 with an experimental ARM64 Android APK and source build.",
+   "kind": "port"
+  },
+  {
+   "id": "skynettx/raptor",
+   "name": "Raptor: Call of the Shadows",
+   "game": "Raptor: Call of the Shadows",
+   "sys": "dos",
+   "repo": "skynettx/raptor",
+   "author": "skynettx",
+   "desc": "Reverse-engineered source port of Raptor with an Android APK in releases.",
+   "kind": "port"
+  },
+  {
+   "id": "lhr0909/richman4-remastered",
+   "name": "Richman 4",
+   "game": "Richman 4",
+   "sys": "windows",
+   "repo": "lhr0909/richman4-remastered",
+   "author": "lhr0909",
+   "desc": "Native C++20 and SDL3 reimplementation of Richman 4 for macOS, Android and iOS using your own Steam copy.",
+   "kind": "port"
+  },
+  {
+   "id": "h4mu/rott94",
+   "name": "Rise of the Triad",
+   "game": "Rise of the Triad",
+   "sys": "dos",
+   "repo": "h4mu/rott94",
+   "author": "h4mu",
+   "desc": "SDL2 source port of Rise of the Triad for Android and WinRT with touch controls.",
+   "kind": "port"
+  },
+  {
+   "id": "openrct2/openrct2",
+   "name": "RollerCoaster Tycoon 2 (OpenRCT2)",
+   "game": "RollerCoaster Tycoon 2",
+   "sys": "windows",
+   "repo": "OpenRCT2/OpenRCT2",
+   "author": "OpenRCT2",
+   "desc": "Open-source re-implementation of RollerCoaster Tycoon 2 with an Android APK attached to each release.",
+   "kind": "port"
+  },
+  {
+   "id": "easyrpg/player",
+   "name": "RPG Maker 2000/2003 (EasyRPG)",
+   "game": "RPG Maker 2000/2003",
+   "sys": "rpgmaker",
+   "repo": "EasyRPG/Player",
+   "author": "EasyRPG",
+   "desc": "Interpreter for RPG Maker 2000/2003 games that includes an Android build project.",
+   "kind": "port"
+  },
+  {
+   "id": "pyrdacor/freeserf.net",
+   "name": "The Settlers",
+   "game": "The Settlers",
+   "sys": "windows",
+   "repo": "Pyrdacor/freeserf.net",
+   "author": "Pyrdacor",
+   "desc": "Authentic C# remake of The Settlers I with an Android APK; needs your original game data.",
+   "kind": "port"
+  },
+  {
+   "id": "konovalov-aleks/resl",
+   "name": "Shortline",
+   "game": "Shortline",
+   "sys": "windows",
+   "repo": "konovalov-aleks/reSL",
+   "author": "konovalov-aleks",
+   "desc": "Reversed source code of the ShortLine railroad game with an Android APK in releases.",
+   "kind": "port"
+  },
+  {
+   "id": "eukaryot/sonic3air",
+   "name": "Sonic 3 & Knuckles (Sonic 3 A.I.R.)",
+   "game": "Sonic 3 & Knuckles",
+   "sys": "genesis",
+   "repo": "Eukaryot/sonic3air",
+   "author": "Eukaryot",
+   "desc": "Source and Oxygen Engine for the Sonic 3 A.I.R. fan remaster, with Android APKs in releases.",
+   "kind": "port"
+  },
+  {
+   "id": "thegreatbbd94-ux/srb2-android-port",
+   "name": "Sonic Robo Blast 2",
+   "game": "Sonic Robo Blast 2",
+   "sys": "windows",
+   "repo": "thegreatbbd94-ux/SRB2-Android-Port",
+   "author": "thegreatbbd94-ux",
+   "desc": "Unofficial Android port of SRB2 v2.2.15 with touch controls, online multiplayer and Lua addon support.",
+   "kind": "port"
+  },
+  {
+   "id": "yancharkin/spelunkyclassichd",
+   "name": "Spelunky Classic HD",
+   "game": "Spelunky Classic HD",
+   "sys": "windows",
+   "repo": "yancharkin/SpelunkyClassicHD",
+   "author": "yancharkin",
+   "desc": "Modified Spelunky Classic built from the published GameMaker source, with a universal Android APK.",
+   "kind": "port"
+  },
+  {
+   "id": "imjustadudegamer/voyagersp-android",
+   "name": "Star Trek: Voyager - Elite Force",
+   "game": "Star Trek: Voyager - Elite Force",
+   "sys": "windows",
+   "repo": "imjustadudegamer/VoyagerSP-Android",
+   "author": "imjustadudegamer",
+   "desc": "Android single-player port of Elite Force on idTech 3 and Quake3e with a Vulkan renderer.",
+   "kind": "port"
+  },
+  {
+   "id": "imjustadudegamer/voyagerhm-android",
+   "name": "Star Trek: Voyager - Elite Force Holomatch",
+   "game": "Star Trek: Voyager - Elite Force Holomatch",
+   "sys": "windows",
+   "repo": "imjustadudegamer/VoyagerHM-Android",
+   "author": "imjustadudegamer",
+   "desc": "Android port of the Elite Force Holomatch multiplayer with a Vulkan renderer, touch controls and gamepad support.",
+   "kind": "port"
+  },
+  {
+   "id": "raposomiguel50/system-shock-android",
+   "name": "System Shock",
+   "game": "System Shock",
+   "sys": "dos",
+   "repo": "raposomiguel50/system-shock-android",
+   "author": "raposomiguel50",
+   "desc": "Native Android arm64 port of System Shock based on Shockolate, validated on the Retroid Pocket 5.",
+   "kind": "port"
+  },
+  {
+   "id": "xproger/openlara",
+   "name": "Tomb Raider I-III (OpenLara)",
+   "game": "Tomb Raider I-III",
+   "sys": "windows",
+   "repo": "XProger/OpenLara",
+   "author": "XProger",
+   "desc": "Classic Tomb Raider engine with an Android app project in the tree.",
+   "kind": "port"
+  },
+  {
+   "id": "andyvand/opentyrian2000",
+   "name": "Tyrian 2000",
+   "game": "Tyrian 2000",
+   "sys": "dos",
+   "repo": "andyvand/opentyrian2000",
+   "author": "andyvand",
+   "desc": "Open-source port of the DOS shoot-em-up Tyrian with an Android zip in releases.",
+   "kind": "port"
+  },
+  {
+   "id": "synthwave-pixel/ultima5",
+   "name": "Ultima V",
+   "game": "Ultima V",
+   "sys": "dos",
+   "repo": "synthwave-pixel/ultima5",
+   "author": "synthwave-pixel",
+   "desc": "TypeScript engine for Ultima V that plays your own copy, with an Android APK in releases.",
+   "kind": "port"
+  },
+  {
+   "id": "exult/exult",
+   "name": "Ultima VII (Exult)",
+   "game": "Ultima VII",
+   "sys": "dos",
+   "repo": "exult/exult",
+   "author": "exult",
+   "desc": "Engine recreation that plays Ultima VII with its original data, with Android snapshot APKs.",
+   "kind": "port"
+  },
+  {
+   "id": "andiweli/unreal-android",
+   "name": "Unreal",
+   "game": "Unreal",
+   "sys": "windows",
+   "repo": "Andiweli/Unreal-Android",
+   "author": "Andiweli",
+   "desc": "Port of Unreal (v200) to Android 8 and newer, 32 and 64-bit, with controller, touch and keyboard support.",
+   "kind": "port"
+  },
+  {
+   "id": "andiweli/ut99-android",
+   "name": "Unreal Tournament 99",
+   "game": "Unreal Tournament 99",
+   "sys": "windows",
+   "repo": "Andiweli/UT99-Android",
+   "author": "Andiweli",
+   "desc": "Unofficial UT99 (v400) port for Android with 32 and 64-bit builds; no game data included.",
+   "kind": "port"
+  },
+  {
+   "id": "fataldecomp/roller",
+   "name": "Whiplash / Fatal Racing",
+   "game": "Whiplash / Fatal Racing",
+   "sys": "dos",
+   "repo": "FatalDecomp/ROLLER",
+   "author": "FatalDecomp",
+   "desc": "Reverse engineering and partial rewrite of the 1995 racer, with an Android release APK.",
+   "kind": "port"
+  },
+  {
+   "id": "reflectionhle/reflectionhle",
+   "name": "Wolfenstein 3D, Keen and Catacomb (ReflectionHLE)",
+   "game": "Wolfenstein 3D, Keen and Catacomb",
+   "sys": "dos",
+   "repo": "ReflectionHLE/ReflectionHLE",
+   "author": "ReflectionHLE",
+   "desc": "Source ports of Keen Dreams, the Catacomb games, Wolfenstein 3D and related DOS titles, with an Android APK.",
+   "kind": "port"
+  },
+  {
+   "id": "jjmhalew/woodyre",
+   "name": "Woody Woodpecker: Escape from Buzz Buzzard Park",
+   "game": "Woody Woodpecker: Escape from Buzz Buzzard Park",
+   "sys": "windows",
+   "repo": "jjmhalew/WoodyRE",
+   "author": "jjmhalew",
+   "desc": "Engine reimplementation that plays the original game from your own CD, with an Android APK.",
+   "kind": "port"
+  },
+  {
+   "id": "zwaetschge/acgc-android-port",
+   "name": "Animal Crossing (GameCube)",
+   "game": "Animal Crossing",
+   "sys": "gc",
+   "repo": "zwaetschge/ACGC-Android-Port",
+   "author": "zwaetschge",
+   "desc": "Android port of the Animal Crossing PC port built on the ac-decomp decompilation; bring your own disc.",
+   "kind": "decomp"
+  },
+  {
+   "id": "igawa6/ctr-native-android",
+   "name": "Crash Team Racing (Dual Screen)",
+   "game": "Crash Team Racing",
+   "sys": "ps1",
+   "repo": "igawa6/ctr-native-android",
+   "author": "igawa6",
+   "desc": "Android fork of CTR Native adding a second screen, a 64-bit build and graphics and frame-rate options.",
+   "dual": true,
+   "kind": "decomp"
+  },
+  {
+   "id": "andiweli/haloce-android-aaos",
+   "name": "Halo: Combat Evolved (Android and AAOS)",
+   "game": "Halo: Combat Evolved",
+   "sys": "windows",
+   "repo": "Andiweli/HaloCE-Android-AAOS",
+   "author": "Andiweli",
+   "desc": "Halo CE port for Android phones, handhelds and Android Automotive OS with controller and touch support.",
+   "kind": "decomp"
+  },
+  {
+   "id": "fulgernet/halo-ce-android",
+   "name": "Halo: Combat Evolved (Android)",
+   "game": "Halo: Combat Evolved",
+   "sys": "windows",
+   "repo": "FulGerNet/halo-ce-android",
+   "author": "FulGerNet",
+   "desc": "Halo CE decompilation port with a dedicated Android build and APK releases.",
+   "kind": "decomp"
+  },
+  {
+   "id": "chupathingyce/chupathingyce",
+   "name": "Halo: Combat Evolved (Chupathingy)",
+   "game": "Halo: Combat Evolved",
+   "sys": "windows",
+   "repo": "ChupathingyCE/chupathingyce",
+   "author": "ChupathingyCE",
+   "desc": "Halo CE decompilation port for Windows, macOS, Linux and Android, built for stability and community multiplayer.",
+   "kind": "decomp"
+  },
+  {
+   "id": "opencommunityedition/opence",
+   "name": "Halo: Combat Evolved (OpenCE)",
+   "game": "Halo: Combat Evolved",
+   "sys": "xbox",
+   "repo": "OpenCommunityEdition/OpenCE",
+   "author": "OpenCommunityEdition",
+   "desc": "Decompilation-based Halo CE port for Windows, Linux, Android and the web, built from an early Xbox development build.",
+   "kind": "decomp"
+  },
+  {
+   "id": "nathanialf/ico-pc",
+   "name": "ICO",
+   "game": "ICO",
+   "sys": "ps2",
+   "repo": "nathanialf/ico-pc",
+   "author": "nathanialf",
+   "desc": "Native ICO (PS2) port for PC, Steam Deck, Android and Apple devices built on the decompilation; no game data included.",
+   "kind": "decomp"
+  },
+  {
+   "id": "matymeatboy/rekhcom",
+   "name": "Kingdom Hearts: Chain of Memories",
+   "game": "Kingdom Hearts: Chain of Memories",
+   "sys": "gba",
+   "repo": "MatyMeatBoy/ReKHCoM",
+   "author": "MatyMeatBoy",
+   "desc": "PC and browser port built on the matching decompilation, with an Android alpha APK.",
+   "kind": "decomp"
+  },
+  {
+   "id": "doutorraposo/moonpearl",
+   "name": "The Legend of Zelda: A Link to the Past (moonpearl)",
+   "game": "The Legend of Zelda: A Link to the Past",
+   "sys": "snes",
+   "repo": "DoutorRaposo/moonpearl",
+   "author": "DoutorRaposo",
+   "desc": "Native Android port of the zelda3 reimplementation with widescreen, save states, rewind and controller support.",
+   "kind": "decomp"
+  },
+  {
+   "id": "999sian/tmc",
+   "name": "The Legend of Zelda: The Minish Cap (Project Picori)",
+   "game": "The Legend of Zelda: The Minish Cap",
+   "sys": "gba",
+   "repo": "999sian/tmc",
+   "author": "999sian",
+   "desc": "Native port built on the zeldaret decompilation, with Android APKs in releases.",
+   "kind": "decomp"
+  },
+  {
+   "id": "igawa6/dusklight",
+   "name": "The Legend of Zelda: Twilight Princess (Dusklight dual screen)",
+   "game": "The Legend of Zelda: Twilight Princess",
+   "sys": "gc",
+   "repo": "igawa6/dusklight",
+   "author": "igawa6",
+   "desc": "Dusklight Android fork with a second-screen layout for dual-screen handhelds such as the AYN Thor.",
+   "dual": true,
+   "kind": "decomp"
+  },
+  {
+   "id": "twilitrealm/dusklight",
+   "name": "The Legend of Zelda: Twilight Princess (Dusklight)",
+   "game": "The Legend of Zelda: Twilight Princess",
+   "sys": "gc",
+   "repo": "TwilitRealm/dusklight",
+   "author": "TwilitRealm",
+   "desc": "Reverse-engineered Twilight Princess reimplementation with official Android arm64 APKs in releases.",
+   "kind": "decomp"
+  },
+  {
+   "id": "linkzenic/2ship2harkinian-android",
+   "name": "Majora's Mask (2 Ship 2 Harkinian, linkzenic fork)",
+   "game": "Majora's Mask",
+   "sys": "n64",
+   "repo": "linkzenic/2ship2harkinian-Android",
+   "author": "linkzenic",
+   "desc": "Unofficial Android fork of 2 Ship 2 Harkinian with recent releases.",
+   "kind": "decomp"
+  },
+  {
+   "id": "izzy2lost/spaghettikart",
+   "name": "Mario Kart 64 (SpaghettiKart)",
+   "game": "Mario Kart 64",
+   "sys": "n64",
+   "repo": "izzy2lost/SpaghettiKart",
+   "author": "izzy2lost",
+   "desc": "Android port of SpaghettiKart with APK releases; bring your own ROM.",
+   "kind": "decomp"
+  },
+  {
+   "id": "mariopartyrd/partyboard",
+   "name": "Mario Party 4",
+   "game": "Mario Party 4",
+   "sys": "gc",
+   "repo": "mariopartyrd/partyboard",
+   "author": "mariopartyrd",
+   "desc": "Work-in-progress Party Board port of Mario Party 4 with an Android arm64 alpha.",
+   "kind": "decomp"
+  },
+  {
+   "id": "zeranemesis/marioparty4",
+   "name": "Mario Party 4 (phone and Quest)",
+   "game": "Mario Party 4",
+   "sys": "gc",
+   "repo": "zeranemesis/Marioparty4",
+   "author": "zeranemesis",
+   "desc": "Party Board port of Mario Party 4 with phone and Quest APKs and online play for up to four players.",
+   "kind": "decomp"
+  },
+  {
+   "id": "iirg4x/mp6-native-port",
+   "name": "Mario Party 6",
+   "game": "Mario Party 6",
+   "sys": "gc",
+   "repo": "iirg4x/mp6-native-port",
+   "author": "iirg4x",
+   "desc": "Native Windows and Android port of Mario Party 6 built on the byte-accurate GameCube decompilation.",
+   "kind": "decomp"
+  },
+  {
+   "id": "odrannnn/metroidprimeport",
+   "name": "Metroid Prime",
+   "game": "Metroid Prime",
+   "sys": "gc",
+   "repo": "Odrannnn/MetroidPrimePort",
+   "author": "Odrannnn",
+   "desc": "Native port built from the PrimeDecomp decompilation for Linux, Windows and Android; no game assets included.",
+   "kind": "decomp"
+  },
+  {
+   "id": "linkzenic/shipwright-android",
+   "name": "Ocarina of Time (Ship of Harkinian, linkzenic fork)",
+   "game": "Ocarina of Time",
+   "sys": "n64",
+   "repo": "linkzenic/Shipwright-Android",
+   "author": "linkzenic",
+   "desc": "Actively updated Android fork of Ship of Harkinian.",
+   "kind": "decomp"
+  },
+  {
+   "id": "kirby-letsgo/oracles-decomp",
+   "name": "Oracle of Ages and Oracle of Seasons",
+   "game": "Oracle of Ages and Oracle of Seasons",
+   "sys": "gbc",
+   "repo": "kirby-letsgo/oracles-decomp",
+   "author": "kirby-letsgo",
+   "desc": "Native macOS, Windows, Linux and Android versions of both Oracle games rebuilt from their own code in C.",
+   "kind": "decomp"
+  },
+  {
+   "id": "thibautbus/top",
+   "name": "Oracle of Ages and Oracle of Seasons (The Oracles Project)",
+   "game": "Oracle of Ages and Oracle of Seasons",
+   "sys": "gbc",
+   "repo": "thibautbus/top",
+   "author": "thibautbus",
+   "desc": "Faithful, moddable port of both Oracle games for PC, macOS and Android that runs your own ROM.",
+   "kind": "decomp"
+  },
+  {
+   "id": "izzy2lost/perfect_dark",
+   "name": "Perfect Dark",
+   "game": "Perfect Dark",
+   "sys": "n64",
+   "repo": "izzy2lost/perfect_dark",
+   "author": "izzy2lost",
+   "desc": "Android port of the work-in-progress Perfect Dark PC port with arm64, armv7 and x86 builds.",
+   "kind": "decomp"
+  },
+  {
+   "id": "ssunnking/open-nectar---pikmin-native-pc-mobile-port",
+   "name": "Pikmin and Pikmin 2 (Open Nectar)",
+   "game": "Pikmin and Pikmin 2",
+   "sys": "gc",
+   "repo": "SSunnKing/Open-Nectar---Pikmin-Native-PC-Mobile-Port",
+   "author": "SSunnKing",
+   "desc": "Native ports of both GameCube Pikmin games for Linux, Windows and Android, playable start to finish.",
+   "kind": "decomp"
+  },
+  {
+   "id": "slickamogus/silent-hill-decomp",
+   "name": "Silent Hill",
+   "game": "Silent Hill",
+   "sys": "ps1",
+   "repo": "SlickAmogus/silent-hill-decomp",
+   "author": "SlickAmogus",
+   "desc": "Feature-rich beta port of Silent Hill 1 based on the PSX decompilation, with Android APKs in releases.",
+   "kind": "decomp"
+  },
+  {
+   "id": "rsdkmodding/rsdkv3-decompilation",
+   "name": "Sonic CD (Retro Engine v3)",
+   "game": "Sonic CD",
+   "sys": "windows",
+   "repo": "RSDKModding/RSDKv3-Decompilation",
+   "author": "RSDKModding",
+   "desc": "Complete decompilation of Sonic CD and Retro Engine v3 with Android builds in releases.",
+   "kind": "decomp"
+  },
+  {
+   "id": "rsdkmodding/rsdkv5-decompilation",
+   "name": "Sonic Mania (Retro Engine v5)",
+   "game": "Sonic Mania",
+   "sys": "windows",
+   "repo": "RSDKModding/RSDKv5-Decompilation",
+   "author": "RSDKModding",
+   "desc": "Decompilation of Retro Engine v5, the engine behind Sonic Mania, with an Android project and builds in releases.",
+   "kind": "decomp"
+  },
+  {
+   "id": "zinexda/sonic-r-android",
+   "name": "Sonic R",
+   "game": "Sonic R",
+   "sys": "windows",
+   "repo": "ZinexDa/sonic-r-android",
+   "author": "ZinexDa",
+   "desc": "Android port of the Sonic R decompilation with a GLES2 renderer, touch controls and SAF asset installation.",
+   "kind": "decomp"
+  },
+  {
+   "id": "rsdkmodding/rsdkv4-decompilation",
+   "name": "Sonic the Hedgehog 1 and 2 (Retro Engine v4)",
+   "game": "Sonic the Hedgehog 1 and 2",
+   "sys": "windows",
+   "repo": "RSDKModding/RSDKv4-Decompilation",
+   "author": "RSDKModding",
+   "desc": "Complete decompilation of the 2013 Sonic 1 and 2 releases and Retro Engine v4 with Android builds.",
+   "kind": "decomp"
+  },
+  {
+   "id": "pakompom/spacerangershd_fpc",
+   "name": "Space Rangers HD: A War Apart",
+   "game": "Space Rangers HD: A War Apart",
+   "sys": "windows",
+   "repo": "pakompom/SpaceRangersHD_FPC",
+   "author": "pakompom",
+   "desc": "Experimental Free Pascal port based on the recovered Delphi source, with an Android arm64 APK.",
+   "kind": "decomp"
+  },
+  {
+   "id": "izzy2lost/starship",
+   "name": "Star Fox 64 (Starship)",
+   "game": "Star Fox 64",
+   "sys": "n64",
+   "repo": "izzy2lost/Starship",
+   "author": "izzy2lost",
+   "desc": "Android port of the Starship Star Fox 64 PC port with APK releases.",
+   "kind": "decomp"
+  },
+  {
+   "id": "harbourmasters/ghostship",
+   "name": "Super Mario 64 (Ghostship)",
+   "game": "Super Mario 64",
+   "sys": "n64",
+   "repo": "HarbourMasters/Ghostship",
+   "author": "HarbourMasters",
+   "desc": "Super Mario 64 PC port whose releases include Android alpha builds that extract your ROM on the device.",
+   "kind": "decomp"
+  },
+  {
+   "id": "openport-labs/galaxy-android",
+   "name": "Super Mario Galaxy",
+   "game": "Super Mario Galaxy",
+   "sys": "wii",
+   "repo": "OpenPort-Labs/Galaxy-Android",
+   "author": "OpenPort-Labs",
+   "desc": "Native arm64 Android port with OpenGL ES 3.2, AAudio, ultrawide support and touch controls.",
+   "kind": "decomp"
+  },
+  {
+   "id": "jrickey/battleship",
+   "name": "Super Smash Bros. (N64)",
+   "game": "Super Smash Bros.",
+   "sys": "n64",
+   "repo": "JRickey/BattleShip",
+   "author": "JRickey",
+   "desc": "PC port of Super Smash Bros. for N64 built on the ssb-decomp-re decompilation, with an armv7 Android APK.",
+   "kind": "decomp"
+  },
+  {
+   "id": "999sian/melee-pc",
+   "name": "Super Smash Bros. Melee",
+   "game": "Super Smash Bros. Melee",
+   "sys": "gc",
+   "repo": "999sian/melee-pc",
+   "author": "999sian",
+   "desc": "Beta native port built from doldecomp/melee with an Android arm64 APK; bring your own disc.",
+   "kind": "decomp"
+  },
+  {
+   "id": "cntianqi233/th06-sdl2",
+   "name": "Touhou 6: The Embodiment of Scarlet Devil",
+   "game": "Touhou 6: The Embodiment of Scarlet Devil",
+   "sys": "windows",
+   "repo": "CNTianQi233/th06-sdl2",
+   "author": "CNTianQi233",
+   "desc": "SDL2 and OpenGL port of the community decompilation with Android builds that use a Vulkan renderer.",
+   "kind": "decomp"
+  },
+  {
+   "id": "alondero/aerogauge-recomp",
+   "name": "AeroGauge",
+   "game": "AeroGauge",
+   "sys": "n64",
+   "repo": "alondero/aerogauge-recomp",
+   "author": "alondero",
+   "desc": "Recompiled PC version of the N64 racer with an Android arm64 APK in releases.",
+   "kind": "recomp"
+  },
+  {
+   "id": "alondero/automobililamborghini-recomp",
+   "name": "Automobili Lamborghini",
+   "game": "Automobili Lamborghini",
+   "sys": "n64",
+   "repo": "alondero/automobililamborghini-recomp",
+   "author": "alondero",
+   "desc": "In-development native port of the North American N64 game with an Android arm64 APK.",
+   "kind": "recomp"
+  },
+  {
+   "id": "aureliob/banjorecomp-android",
+   "name": "Banjo-Kazooie",
+   "game": "Banjo-Kazooie",
+   "sys": "n64",
+   "repo": "AurelioB/BanjoRecomp-Android",
+   "author": "AurelioB",
+   "desc": "Experimental Android port of Banjo: Recompiled with APKs in releases.",
+   "kind": "recomp"
+  },
+  {
+   "id": "wootbeer/btgarecomp",
+   "name": "BattleTanx: Global Assault",
+   "game": "BattleTanx: Global Assault",
+   "sys": "n64",
+   "repo": "wootbeer/btgarecomp",
+   "author": "wootbeer",
+   "desc": "Recompilation and port of the 1999 N64 game with an Android APK in releases.",
+   "kind": "recomp"
+  },
+  {
+   "id": "codepdbh/cbfd-recompiled-android-evolved",
+   "name": "Conker's Bad Fur Day",
+   "game": "Conker's Bad Fur Day",
+   "sys": "n64",
+   "repo": "codepdbh/CBFD-Recompiled-Android-Evolved",
+   "author": "codepdbh",
+   "desc": "Native Android port of Conker's Bad Fur Day Recompiled with touch controls and mod support.",
+   "kind": "recomp"
+  },
+  {
+   "id": "thatguymcd/dkr-r",
+   "name": "Diddy Kong Racing",
+   "game": "Diddy Kong Racing",
+   "sys": "n64",
+   "repo": "ThatGuyMcd/DKR-R",
+   "author": "ThatGuyMcd",
+   "desc": "Diddy Kong Racing recompiled for Windows, Linux and Android with mod support.",
+   "kind": "recomp"
+  },
+  {
+   "id": "deivid22srk/dk64-recomp-android",
+   "name": "Donkey Kong 64",
+   "game": "Donkey Kong 64",
+   "sys": "n64",
+   "repo": "deivid22srk/dk64-recomp-android",
+   "author": "deivid22srk",
+   "desc": "Android NDK port of Donkey Kong 64: Recompiled using RT64, Vulkan and SDL2.",
+   "kind": "recomp"
+  },
+  {
+   "id": "igawa6/harvestmoon64recomp",
+   "name": "Harvest Moon 64",
+   "game": "Harvest Moon 64",
+   "sys": "n64",
+   "repo": "igawa6/HarvestMoon64Recomp",
+   "author": "igawa6",
+   "desc": "Android port of Harvest Moon 64: Recompiled with touch controls, a launcher and a file picker.",
+   "kind": "recomp"
+  },
+  {
+   "id": "linkzenic/zelda64recomp-android",
+   "name": "Majora's Mask",
+   "game": "Majora's Mask",
+   "sys": "n64",
+   "repo": "linkzenic/Zelda64Recomp-Android",
+   "author": "linkzenic",
+   "desc": "Android port of Zelda64 Recompiled with APK releases.",
+   "kind": "recomp"
+  },
+  {
+   "id": "ogdanimal/goemon64recomp-android",
+   "name": "Mystical Ninja Starring Goemon",
+   "game": "Mystical Ninja Starring Goemon",
+   "sys": "n64",
+   "repo": "ogdanimal/Goemon64Recomp-Android",
+   "author": "ogdanimal",
+   "desc": "Android port of the Goemon recompilation with RT64 Vulkan rendering; bring your own ROM.",
+   "kind": "recomp"
+  },
+  {
+   "id": "thatguymcd/rocket-r",
+   "name": "Rocket: Robot on Wheels",
+   "game": "Rocket: Robot on Wheels",
+   "sys": "n64",
+   "repo": "ThatGuyMcd/Rocket-R",
+   "author": "ThatGuyMcd",
+   "desc": "Recompiled version for Windows, Linux and Android with higher resolutions and smoother frame rates.",
+   "kind": "recomp"
+  },
+  {
+   "id": "mikesemicolond/roguesquadron64recomp",
+   "name": "Star Wars: Rogue Squadron",
+   "game": "Star Wars: Rogue Squadron",
+   "sys": "n64",
+   "repo": "MikeSemicolonD/RogueSquadron64Recomp",
+   "author": "MikeSemicolonD",
+   "desc": "AI-assisted recompilation for Windows, Linux and Android with touch controls and optional gyro steering.",
+   "kind": "recomp"
+  },
+  {
+   "id": "n0madic/starcraft64-recomp",
+   "name": "StarCraft 64",
+   "game": "StarCraft 64",
+   "sys": "n64",
+   "repo": "n0madic/StarCraft64-recomp",
+   "author": "n0madic",
+   "desc": "Native desktop and Android port playable with mouse, keyboard, gamepad or touch screen.",
+   "kind": "recomp"
+  },
+  {
+   "id": "dyzz/srw64-recomp",
+   "name": "Super Robot Wars 64",
+   "game": "Super Robot Wars 64",
+   "sys": "n64",
+   "repo": "dyzz/srw64-recomp",
+   "author": "dyzz",
+   "desc": "Experimental recompilation (Marchwind 64) for Windows, macOS, Linux, Steam Deck and Android with English and Chinese text.",
+   "kind": "recomp"
+  },
+  {
+   "id": "nycolazs/eowrecomp",
+   "name": "Echoes of Wisdom",
+   "game": "Echoes of Wisdom",
+   "sys": "switch",
+   "repo": "Nycolazs/EoWRecomp",
+   "author": "Nycolazs",
+   "desc": "Alpha static recompilation of the Switch game with an Android arm64 APK and no game files included.",
+   "kind": "recomp"
+  },
+  {
+   "id": "chrissotraidis/bluewake",
+   "name": "The Legend of Zelda: The Wind Waker",
+   "game": "The Legend of Zelda: The Wind Waker",
+   "sys": "gc",
+   "repo": "chrissotraidis/bluewake",
+   "author": "chrissotraidis",
+   "desc": "GameCube Wind Waker recompilation for Apple platforms, Windows, Linux and an experimental build-your-own Android APK.",
+   "kind": "recomp"
+  },
+  {
+   "id": "zeldawwhdrecomp/zeldawwhdrecomp",
+   "name": "The Legend of Zelda: The Wind Waker HD",
+   "game": "The Legend of Zelda: The Wind Waker HD",
+   "sys": "wiiu",
+   "repo": "ZeldaWWHDRecomp/ZeldaWWHDRecomp",
+   "author": "ZeldaWWHDRecomp",
+   "desc": "Wii U Wind Waker HD static recompilation with Android arm64 and x86_64 APKs in releases.",
+   "kind": "recomp"
+  },
+  {
+   "id": "ssunnking/zeldawwhdrecompandroid---enhanced",
+   "name": "The Legend of Zelda: The Wind Waker HD (Enhanced)",
+   "game": "The Legend of Zelda: The Wind Waker HD",
+   "sys": "wiiu",
+   "repo": "SSunnKing/ZeldaWWHDRecompAndroid---ENHANCED",
+   "author": "SSunnKing",
+   "desc": "Enhanced Android fork with native widescreen, fixed shadows and a pinch-to-zoom camera.",
+   "kind": "recomp"
+  },
+  {
+   "id": "greennaugahyde/zeldawwhdrecompandroid",
+   "name": "The Legend of Zelda: The Wind Waker HD (GreenNaugahyde)",
+   "game": "The Legend of Zelda: The Wind Waker HD",
+   "sys": "wiiu",
+   "repo": "GreenNaugahyde/ZeldaWWHDRecompAndroid",
+   "author": "GreenNaugahyde",
+   "desc": "Earlier Android fork of the Wind Waker HD recompilation with APK releases.",
+   "kind": "recomp"
+  },
+  {
+   "id": "nycolazs/windwakerhd-android-plus",
+   "name": "The Legend of Zelda: The Wind Waker HD (Plus)",
+   "game": "The Legend of Zelda: The Wind Waker HD",
+   "sys": "wiiu",
+   "repo": "Nycolazs/WindWakerHD-Android-Plus",
+   "author": "Nycolazs",
+   "desc": "Android build of the Wind Waker HD recompilation with a Portuguese translation and a HUD editor.",
+   "kind": "recomp"
+  },
+  {
+   "id": "nycolazs/lasrecomp-android-plus",
+   "name": "Link's Awakening (Switch)",
+   "game": "Link's Awakening",
+   "sys": "switch",
+   "repo": "Nycolazs/LASRecomp-Android-Plus",
+   "author": "Nycolazs",
+   "desc": "Native Android port of LAS Recomp with touch controls and 60 fps frame generation, set up from your own game on the phone.",
+   "kind": "recomp"
+  },
+  {
+   "id": "dorpxp/driftdroid",
+   "name": "Mario Kart Wii (DriftDroid)",
+   "game": "Mario Kart Wii",
+   "sys": "wii",
+   "repo": "dorPXP/driftdroid",
+   "author": "dorPXP",
+   "desc": "Native Android port of Mario Kart Wii and Retro Rewind.",
+   "kind": "recomp"
+  },
+  {
+   "id": "chrissotraidis/kartpad",
+   "name": "Mario Kart Wii (KartPad)",
+   "game": "Mario Kart Wii",
+   "sys": "wii",
+   "repo": "chrissotraidis/kartpad",
+   "author": "chrissotraidis",
+   "desc": "Mario Kart Wii and Retro Rewind on Android and Apple platforms through the WiiCompiled static recompilation.",
+   "kind": "recomp"
+  },
+  {
+   "id": "aabrole/huntersrecomp",
+   "name": "Metroid Prime Hunters",
+   "game": "Metroid Prime Hunters",
+   "sys": "nds",
+   "repo": "aabrole/HuntersRecomp",
+   "author": "aabrole",
+   "desc": "Native dual-screen Android port of the Hunters recompilation for the AYN Thor with twin-stick controls.",
+   "dual": true,
+   "kind": "recomp"
+  },
+  {
+   "id": "witherblitz/nsmb-wii-multiplayer-recompilation",
+   "name": "New Super Mario Bros. Wii",
+   "game": "New Super Mario Bros. Wii",
+   "sys": "wii",
+   "repo": "WitherBlitz/NSMB-Wii-Multiplayer-Recompilation",
+   "author": "WitherBlitz",
+   "desc": "Static recompilation built on WiiCompiled that runs natively on Android and Windows; bring your own game.",
+   "kind": "recomp"
+  },
+  {
+   "id": "clickingmaster/ssrecomp",
+   "name": "Pokémon SoulSilver",
+   "game": "Pokémon SoulSilver",
+   "sys": "nds",
+   "repo": "ClickingMaster/ssrecomp",
+   "author": "ClickingMaster",
+   "desc": "Native single-screen recomp of Pokémon SoulSilver with an experimental Android build produced by the setup program.",
+   "kind": "recomp"
+  },
+  {
+   "id": "ogdanimal/skiesofarcadialegends-recomp",
+   "name": "Skies of Arcadia Legends",
+   "game": "Skies of Arcadia Legends",
+   "sys": "gc",
+   "repo": "ogdanimal/SkiesOfArcadiaLegends-Recomp",
+   "author": "ogdanimal",
+   "desc": "Beta native port for Windows, Linux, macOS and Android; bring your own disc.",
+   "kind": "recomp"
+  },
+  {
+   "id": "belmantegu/supermariowonderrecomp",
+   "name": "Super Mario Bros. Wonder",
+   "game": "Super Mario Bros. Wonder",
+   "sys": "switch",
+   "repo": "BelmanteGu/SuperMarioWonderRecomp",
+   "author": "BelmanteGu",
+   "desc": "Static recompilation of the Switch game with an Android arm64 build tested on a Galaxy S23; build from source.",
+   "kind": "recomp"
+  },
+  {
+   "id": "pauloubirajara/asuras-wrath-recomp",
+   "name": "Asura's Wrath",
+   "game": "Asura's Wrath",
+   "sys": "xbox360",
+   "repo": "PauloUbirajara/asuras-wrath-recomp",
+   "author": "PauloUbirajara",
+   "desc": "Work-in-progress ReXGlue recompilation with an Android APK in releases.",
+   "kind": "recomp"
+  },
+  {
+   "id": "shipa-2/xerenge",
+   "name": "Burnout Revenge",
+   "game": "Burnout Revenge",
+   "sys": "xbox360",
+   "repo": "shipa-2/Xerenge",
+   "author": "shipa-2",
+   "desc": "Recompilation with a standalone Vulkan renderer and an Android arm64 APK in releases.",
+   "kind": "recomp"
+  },
+  {
+   "id": "openport-labs/mw2-android",
+   "name": "Call of Duty: Modern Warfare 2",
+   "game": "Call of Duty: Modern Warfare 2",
+   "sys": "xbox360",
+   "repo": "OpenPort-Labs/mw2-android",
+   "author": "OpenPort-Labs",
+   "desc": "Experimental Android arm64, Linux and Windows port with Vulkan rendering, touch and controller input.",
+   "kind": "recomp"
+  },
+  {
+   "id": "dfdx047/dragon-burst",
+   "name": "Dragon Ball Z: Burst Limit",
+   "game": "Dragon Ball Z: Burst Limit",
+   "sys": "xbox360",
+   "repo": "dfdx047/Dragon-Burst",
+   "author": "dfdx047",
+   "desc": "Experimental native Android port of the ReXGlue Burst Limit recompilation.",
+   "kind": "recomp"
+  },
+  {
+   "id": "birabittoh/eternalsonatareprise",
+   "name": "Eternal Sonata",
+   "game": "Eternal Sonata",
+   "sys": "xbox360",
+   "repo": "birabittoh/EternalSonataReprise",
+   "author": "birabittoh",
+   "desc": "Static recompilation with Android arm64 APKs and troubleshooting notes for older Adreno drivers.",
+   "kind": "recomp"
+  },
+  {
+   "id": "arcanite24/pinyon-shift",
+   "name": "Forza Horizon",
+   "game": "Forza Horizon",
+   "sys": "xbox360",
+   "repo": "arcanite24/pinyon-shift",
+   "author": "arcanite24",
+   "desc": "Playable Pinyon Shift preview for desktop and Steam Deck with an Android alpha for Snapdragon handhelds.",
+   "kind": "recomp"
+  },
+  {
+   "id": "gabrick75/fh2-recompiled",
+   "name": "Forza Horizon 2",
+   "game": "Forza Horizon 2",
+   "sys": "xbox360",
+   "repo": "Gabrick75/fh2-recompiled",
+   "author": "Gabrick75",
+   "desc": "Unofficial static recompilation for Android, with APK releases.",
+   "kind": "recomp"
+  },
+  {
+   "id": "freefrank/lostodysseyrecomp",
+   "name": "Lost Odyssey",
+   "game": "Lost Odyssey",
+   "sys": "xbox360",
+   "repo": "freefrank/LostOdysseyRecomp",
+   "author": "freefrank",
+   "desc": "Experimental native port with Android arm64 APKs in releases; no game assets included.",
+   "kind": "recomp"
+  },
+  {
+   "id": "masterllgod/naruto-storm-3-full-burst-port-nativo",
+   "name": "Naruto Shippuden: Ultimate Ninja Storm 3 Full Burst",
+   "game": "Naruto Shippuden: Ultimate Ninja Storm 3 Full Burst",
+   "sys": "xbox360",
+   "repo": "Masterllgod/naruto-storm-3-full-burst-port-nativo",
+   "author": "Masterllgod",
+   "desc": "Static recompilation for Android arm64 and Windows with APK releases.",
+   "kind": "recomp"
+  },
+  {
+   "id": "masterllgod/naruto-storm-generations-port-nativo",
+   "name": "Naruto Shippuden: Ultimate Ninja Storm Generations",
+   "game": "Naruto Shippuden: Ultimate Ninja Storm Generations",
+   "sys": "xbox360",
+   "repo": "Masterllgod/naruto-storm-generations-port-nativo",
+   "author": "Masterllgod",
+   "desc": "Static recompilation running natively on Android arm64 and Windows with no CPU emulator.",
+   "kind": "recomp"
+  },
+  {
+   "id": "masterllgod/naruto-rise-of-a-ninja-port-nativo",
+   "name": "Naruto: Rise of a Ninja",
+   "game": "Naruto: Rise of a Ninja",
+   "sys": "xbox360",
+   "repo": "Masterllgod/naruto-rise-of-a-ninja-port-nativo",
+   "author": "Masterllgod",
+   "desc": "Native Android arm64 port with Vulkan rendering and 360p to 4K output.",
+   "kind": "recomp"
+  },
+  {
+   "id": "codepdbh/nfs-carbon-360-android-recomp",
+   "name": "Need for Speed: Carbon",
+   "game": "Need for Speed: Carbon",
+   "sys": "xbox360",
+   "repo": "codepdbh/NFS-CARBON-360-ANDROID-RECOMP",
+   "author": "codepdbh",
+   "desc": "Experimental ReXGlue recompilation for Android arm64 and Windows with APK releases.",
+   "kind": "recomp"
+  },
+  {
+   "id": "sampreeth004/nfs-carbon-recomp",
+   "name": "Need for Speed: Carbon (Sampreeth004)",
+   "game": "Need for Speed: Carbon",
+   "sys": "xbox360",
+   "repo": "Sampreeth004/nfs-carbon-recomp",
+   "author": "Sampreeth004",
+   "desc": "Static recompilation of the Xbox 360 game via ReXGlue with debug Android APKs.",
+   "kind": "recomp"
+  },
+  {
+   "id": "madelrandel-blip/nfsmw-recompiled",
+   "name": "Need for Speed: Most Wanted (2005, Xbox 360)",
+   "game": "Need for Speed: Most Wanted",
+   "sys": "xbox360",
+   "repo": "madelrandel-blip/NFSMW-Recompiled",
+   "author": "madelrandel-blip",
+   "desc": "Native recompilation of the Xbox 360 version on ReXGlue with an Android release APK.",
+   "kind": "recomp"
+  },
+  {
+   "id": "tokeneffortports/recompiledsteel",
+   "name": "Real Steel",
+   "game": "Real Steel",
+   "sys": "xbox360",
+   "repo": "tokeneffortports/ReCompiledSteel",
+   "author": "tokeneffortports",
+   "desc": "Native port for Windows, Linux and Android with a Vulkan renderer, online play and mods.",
+   "kind": "recomp"
+  },
+  {
+   "id": "buku313/skate3-mobile",
+   "name": "Skate 3",
+   "game": "Skate 3",
+   "sys": "xbox360",
+   "repo": "Buku313/Skate3-Mobile",
+   "author": "Buku313",
+   "desc": "Native ARM64 recompilation with Vulkan rendering; install one APK and select your own ISO.",
+   "kind": "recomp"
+  },
+  {
+   "id": "andrewnakas/skate3-android",
+   "name": "Skate 3 (Android shell)",
+   "game": "Skate 3",
+   "sys": "xbox360",
+   "repo": "andrewnakas/skate3-android",
+   "author": "andrewnakas",
+   "desc": "App shell around the Skate 3 recompilation with APK releases; bring your own disc image.",
+   "kind": "recomp"
+  },
+  {
+   "id": "yuutatsubasa/free-riders-recompiled",
+   "name": "Sonic Free Riders",
+   "game": "Sonic Free Riders",
+   "sys": "xbox360",
+   "repo": "YuutaTsubasa/Free-Riders-Recompiled",
+   "author": "YuutaTsubasa",
+   "desc": "Static recompilation for Windows, Linux and Android with controller and keyboard support and custom VRM avatars.",
+   "kind": "recomp"
+  },
+  {
+   "id": "sansnope/unleashedrecomp-android",
+   "name": "Sonic Unleashed",
+   "game": "Sonic Unleashed",
+   "sys": "xbox360",
+   "repo": "SansNope/UnleashedRecomp-Android",
+   "author": "SansNope",
+   "desc": "Unofficial Android port of Unleashed Recompiled with APK releases.",
+   "kind": "recomp"
+  },
+  {
+   "id": "kaikoclanworth1/wwe-svr2011-pc",
+   "name": "WWE SmackDown vs. Raw 2011",
+   "game": "WWE SmackDown vs. Raw 2011",
+   "sys": "xbox360",
+   "repo": "KaikoClanworth1/wwe-svr2011-pc",
+   "author": "KaikoClanworth1",
+   "desc": "Native port with an Android APK that has rearrangeable on-screen controls.",
+   "kind": "recomp"
+  },
+  {
+   "id": "ranggacasper/black-android",
+   "name": "Black (Xbox)",
+   "game": "Black",
+   "sys": "xbox",
+   "repo": "RanggaCasper/Black-Android",
+   "author": "RanggaCasper",
+   "desc": "Native Android port of the Xbox game with touch controls, gyroscope aiming and controller support.",
+   "kind": "recomp"
+  },
+  {
+   "id": "kaikoclanworth1/buffy-chaos-bleeds-pc",
+   "name": "Buffy the Vampire Slayer: Chaos Bleeds",
+   "game": "Buffy the Vampire Slayer: Chaos Bleeds",
+   "sys": "xbox",
+   "repo": "KaikoClanworth1/buffy-chaos-bleeds-pc",
+   "author": "KaikoClanworth1",
+   "desc": "Native port of the Xbox game for Windows with an Android APK; bring your own disc.",
+   "kind": "recomp"
+  },
+  {
+   "id": "xenophobentx/takedawn",
+   "name": "Burnout 3: Takedown",
+   "game": "Burnout 3: Takedown",
+   "sys": "xbox",
+   "repo": "xenophobentx/takedawn",
+   "author": "xenophobentx",
+   "desc": "Static recompilation for desktop, Steam Deck and Android handhelds with touch controls.",
+   "kind": "recomp"
+  },
+  {
+   "id": "dr3amyberry/callofrecomp",
+   "name": "Call of Duty 1.5",
+   "game": "Call of Duty 1.5",
+   "sys": "windows",
+   "repo": "Dr3amyBerry/callofrecomp",
+   "author": "Dr3amyBerry",
+   "desc": "Experimental static recompilation of the PC game for Android; bring your own original files.",
+   "kind": "recomp"
+  },
+  {
+   "id": "matteo842/crashbandicoot-launcher",
+   "name": "Crash Bandicoot",
+   "game": "Crash Bandicoot",
+   "sys": "ps1",
+   "repo": "Matteo842/CrashBandicoot-Launcher",
+   "author": "Matteo842",
+   "desc": "Static recompilation of the 1996 PS1 original with widescreen, high frame rates and a native Android build; no game assets included.",
+   "kind": "recomp"
+  },
+  {
+   "id": "arnaldolima1/gow-ghost-of-sparta-pc",
+   "name": "God of War: Ghost of Sparta",
+   "game": "God of War: Ghost of Sparta",
+   "sys": "psp",
+   "repo": "arnaldolima1/gow-ghost-of-sparta-pc",
+   "author": "arnaldolima1",
+   "desc": "PSP static recompilation on PortableKit with Vulkan and an Android arm64 APK.",
+   "kind": "recomp"
+  },
+  {
+   "id": "codepdbh/psprecomp-lcs-android",
+   "name": "GTA: Liberty City Stories",
+   "game": "GTA: Liberty City Stories",
+   "sys": "psp",
+   "repo": "codepdbh/PSPRecomp-LCS-Android",
+   "author": "codepdbh",
+   "desc": "Beta native Android port based on PSPRecomp static recompilation; no game data included.",
+   "kind": "recomp"
+  },
+  {
+   "id": "codepdbh/psprecomp-vcs-android",
+   "name": "GTA: Vice City Stories",
+   "game": "GTA: Vice City Stories",
+   "sys": "psp",
+   "repo": "codepdbh/PSPRecomp-VCS-Android",
+   "author": "codepdbh",
+   "desc": "Experimental Android arm64 port with Vulkan rendering, widescreen and a low-end 30 FPS mode.",
+   "kind": "recomp"
+  },
+  {
+   "id": "jumatt/jetsetradiofuture-unleashed",
+   "name": "Jet Set Radio Future",
+   "game": "Jet Set Radio Future",
+   "sys": "xbox",
+   "repo": "JuMatt/JetSetRadioFuture-Unleashed",
+   "author": "JuMatt",
+   "desc": "Statically recompiled Jet Set Radio Future for desktop, Android and Apple devices.",
+   "kind": "recomp"
+  },
+  {
+   "id": "teamgdb/yakumo",
+   "name": "Monster Hunter Portable 3rd HD Ver.",
+   "game": "Monster Hunter Portable 3rd HD Ver.",
+   "sys": "psp",
+   "repo": "TeamGDB/Yakumo",
+   "author": "TeamGDB",
+   "desc": "Static recompilation of the PSP game running on a reimplementation of the PSP system software, with Android APKs.",
+   "kind": "recomp"
+  },
+  {
+   "id": "ranggacasper/shaolinmonks-android",
+   "name": "Mortal Kombat: Shaolin Monks",
+   "game": "Mortal Kombat: Shaolin Monks",
+   "sys": "xbox",
+   "repo": "RanggaCasper/ShaolinMonks-Android",
+   "author": "RanggaCasper",
+   "desc": "Unofficial Android arm64 port of the Xbox game via XboxXBERecomp with Vulkan rendering.",
+   "kind": "recomp"
+  },
+  {
+   "id": "zloikiller/nfs3recompiled-android",
+   "name": "Need for Speed III: Hot Pursuit",
+   "game": "Need for Speed III: Hot Pursuit",
+   "sys": "windows",
+   "repo": "ZloiKILLER/nfs3recompiled-android",
+   "author": "ZloiKILLER",
+   "desc": "Recompiled PC port of the 1998 game running natively on 64-bit ARM Android phones.",
+   "kind": "recomp"
+  },
+  {
+   "id": "codepdbh/nfs3-hp-androidevolved",
+   "name": "Need for Speed III: Hot Pursuit (Android Evolved)",
+   "game": "Need for Speed III: Hot Pursuit",
+   "sys": "windows",
+   "repo": "codepdbh/NFS3-HP-AndroidEvolved",
+   "author": "codepdbh",
+   "desc": "Native arm64 community port based on motor-dev/nfs-recompiled.",
+   "kind": "recomp"
+  },
+  {
+   "id": "codepdbh/nfsmwpc-recompiled",
+   "name": "Need for Speed: Most Wanted (2005, PC recomp)",
+   "game": "Need for Speed: Most Wanted",
+   "sys": "windows",
+   "repo": "codepdbh/nfsmwpc-recompiled",
+   "author": "codepdbh",
+   "desc": "Static recompilation of the PC version for Windows and Android arm64 and armv7.",
+   "kind": "recomp"
+  },
+  {
+   "id": "codepdbh/nfsmw-android",
+   "name": "Need for Speed: Most Wanted (2005, PC)",
+   "game": "Need for Speed: Most Wanted",
+   "sys": "windows",
+   "repo": "codepdbh/nfsmw-android",
+   "author": "codepdbh",
+   "desc": "Need for Speed: Most Wanted (2005) for Android ARM64 with APK releases.",
+   "kind": "recomp"
+  },
+  {
+   "id": "codepdbh/nfsu1-recompiled",
+   "name": "Need for Speed: Underground",
+   "game": "Need for Speed: Underground",
+   "sys": "windows",
+   "repo": "codepdbh/nfsu1-recompiled",
+   "author": "codepdbh",
+   "desc": "Static recompilation for Windows and Android; requires your own copy of the game.",
+   "kind": "recomp"
+  },
+  {
+   "id": "codepdbh/nfsu2-recompiled",
+   "name": "Need for Speed: Underground 2",
+   "game": "Need for Speed: Underground 2",
+   "sys": "windows",
+   "repo": "codepdbh/nfsu2-recompiled",
+   "author": "codepdbh",
+   "desc": "Static recompilation of SPEED2.EXE with Android arm64 and armv7 APKs.",
+   "kind": "recomp"
+  },
+  {
+   "id": "fulgernet/repop",
+   "name": "Prince of Persia: The Sands of Time (Xbox)",
+   "game": "Prince of Persia: The Sands of Time",
+   "sys": "xbox",
+   "repo": "FulGerNet/rePOP",
+   "author": "FulGerNet",
+   "desc": "Static recompilation of the Xbox builds to Windows and an Android app, with device validation in progress.",
+   "kind": "recomp"
+  },
+  {
+   "id": "silentsudin/roadtripadventure-recomp",
+   "name": "Road Trip (Choro Q HG 2)",
+   "game": "Road Trip",
+   "sys": "ps2",
+   "repo": "silentsudin/RoadTripAdventure-recomp",
+   "author": "silentsudin",
+   "desc": "PS2 static recompilation for Windows, macOS and Android with HD texture packs and a second-screen map.",
+   "dual": true,
+   "kind": "recomp"
+  },
+  {
+   "id": "dorakyuraduang/whitealbum2-android",
+   "name": "WHITE ALBUM2",
+   "game": "WHITE ALBUM2",
+   "sys": "windows",
+   "repo": "dorakyuraduang/whitealbum2-Android",
+   "author": "dorakyuraduang",
+   "desc": "Shared static recompilation project for Windows x64 and Android ARM64.",
+   "kind": "recomp"
+  },
+  {
+   "id": "sangraphic/apotris-android",
+   "name": "Apotris",
+   "game": "Apotris",
+   "sys": "windows",
+   "repo": "SanGraphic/Apotris-Android",
+   "author": "SanGraphic",
+   "desc": "Unofficial native Android port of the GBA-style block game, built from the arm64 Linux version.",
+   "kind": "recomp"
+  },
+  {
+   "id": "jorge262007/fftarecomp",
+   "name": "Final Fantasy Tactics Advance",
+   "game": "Final Fantasy Tactics Advance",
+   "sys": "gba",
+   "repo": "Jorge262007/FFTARecomp",
+   "author": "Jorge262007",
+   "desc": "Recompilation from your own ROM with an Android arm64 APK in releases.",
+   "kind": "recomp"
+  },
+  {
+   "id": "james2doyle/ffta-recomp",
+   "name": "Final Fantasy Tactics Advance (gbarecomp)",
+   "game": "Final Fantasy Tactics Advance",
+   "sys": "gba",
+   "repo": "james2doyle/ffta-recomp",
+   "author": "james2doyle",
+   "desc": "Static recompilation on the gbarecomp framework for Linux, Windows, Android and Steam Deck.",
+   "kind": "recomp"
+  },
+  {
+   "id": "lordingard/sacredstonesrecomp",
+   "name": "Fire Emblem: The Sacred Stones",
+   "game": "Fire Emblem: The Sacred Stones",
+   "sys": "gba",
+   "repo": "Lordingard/SacredStonesRecomp",
+   "author": "Lordingard",
+   "desc": "Playable Windows and Android arm64 recompilation.",
+   "kind": "recomp"
+  },
+  {
+   "id": "sergiomanzur/issd-native",
+   "name": "International Superstar Soccer Deluxe",
+   "game": "International Superstar Soccer Deluxe",
+   "sys": "snes",
+   "repo": "sergiomanzur/issd-native",
+   "author": "sergiomanzur",
+   "desc": "Beta native recompilation of the SNES game with an Android APK.",
+   "kind": "recomp"
+  },
+  {
+   "id": "yuutatsubasa/chaotixrecompiled",
+   "name": "Knuckles' Chaotix",
+   "game": "Knuckles' Chaotix",
+   "sys": "32x",
+   "repo": "YuutaTsubasa/ChaotixRecompiled",
+   "author": "YuutaTsubasa",
+   "desc": "Static recompilation of the 32X game for Windows, Linux, macOS and Android with true widescreen.",
+   "kind": "recomp"
+  },
+  {
+   "id": "troyedwardsjr/z2rs",
+   "name": "The Legend of Zelda II",
+   "game": "The Legend of Zelda II",
+   "sys": "nes",
+   "repo": "troyedwardsjr/z2rs",
+   "author": "troyedwardsjr",
+   "desc": "Clean-room reconstruction in Rust, checked frame by frame against the ROM, running on desktop, browser and Android.",
+   "kind": "recomp"
+  },
+  {
+   "id": "shoegazessb/ooa-godot",
+   "name": "The Legend of Zelda: Oracle of Ages (Godot)",
+   "game": "The Legend of Zelda: Oracle of Ages",
+   "sys": "gbc",
+   "repo": "SHOEGAZEssb/ooa-godot",
+   "author": "SHOEGAZEssb",
+   "desc": "In-progress Godot and C# reconstruction based on the disassembly with an Android arm64 APK.",
+   "kind": "recomp"
+  },
+  {
+   "id": "josiahg2502-glitch/mother3recomp",
+   "name": "MOTHER 3",
+   "game": "MOTHER 3",
+   "sys": "gba",
+   "repo": "josiahg2502-glitch/Mother3Recomp",
+   "author": "josiahg2502-glitch",
+   "desc": "Recompilation for Windows, Linux and Android with fan translation patch support.",
+   "kind": "recomp"
+  },
+  {
+   "id": "mstan/emeraldrecomp",
+   "name": "Pokémon Emerald",
+   "game": "Pokémon Emerald",
+   "sys": "gba",
+   "repo": "mstan/EmeraldRecomp",
+   "author": "mstan",
+   "desc": "Static recompilation on gbarecomp with an Android arm64 APK in releases.",
+   "kind": "recomp"
+  },
+  {
+   "id": "underdecoded/gen2recomped",
+   "name": "Pokémon Gold, Silver and Crystal (Gen2Recomped)",
+   "game": "Pokémon Gold, Silver and Crystal",
+   "sys": "gbc",
+   "repo": "UNDERdecoded/Gen2Recomped",
+   "author": "UNDERdecoded",
+   "desc": "Gen 2 recreation forked from Gen1Recomp with dual-screen support and Android APKs.",
+   "dual": true,
+   "kind": "recomp"
+  },
+  {
+   "id": "bryanthaboi/gen1recomp",
+   "name": "Pokémon Red, Blue, Yellow, Gold, Silver, Crystal and more",
+   "game": "Pokémon Red, Blue, Yellow, Gold, Silver, Crystal and more",
+   "sys": "gb",
+   "repo": "bryanthaboi/gen1recomp",
+   "author": "bryanthaboi",
+   "desc": "Lua and LOVE2D recreation of Generations 1 to 3 built from a ROM you supply, with Android APKs in releases.",
+   "kind": "recomp"
+  },
+  {
+   "id": "sergiomanzur/regaiden-recomp",
+   "name": "Resident Evil Gaiden",
+   "game": "Resident Evil Gaiden",
+   "sys": "gbc",
+   "repo": "sergiomanzur/regaiden-recomp",
+   "author": "sergiomanzur",
+   "desc": "Native recompilation of the Game Boy Color game with widescreen, dynamic lighting and an Android APK.",
+   "kind": "recomp"
+  },
+  {
+   "id": "edwin2929/sma3-recomp-android.",
+   "name": "Super Mario Advance 3: Yoshi's Island",
+   "game": "Super Mario Advance 3: Yoshi's Island",
+   "sys": "gba",
+   "repo": "Edwin2929/sma3-recomp-android.",
+   "author": "Edwin2929",
+   "desc": "Experimental gbarecomp-based recompilation for Android ARM64 with an APK in releases.",
+   "kind": "recomp"
+  },
+  {
+   "id": "mstan/supermarioland2recomp",
+   "name": "Super Mario Land 2: 6 Golden Coins",
+   "game": "Super Mario Land 2: 6 Golden Coins",
+   "sys": "gb",
+   "repo": "mstan/SuperMarioLand2Recomp",
+   "author": "mstan",
+   "desc": "Static recompilation with adaptive widescreen and an Android arm64 APK.",
+   "kind": "recomp"
+  },
+  {
+   "id": "darhkfox/busterbustsloose",
+   "name": "Tiny Toon Adventures: Buster Busts Loose!",
+   "game": "Tiny Toon Adventures: Buster Busts Loose!",
+   "sys": "snes",
+   "repo": "Darhkfox/BusterBustsLoose",
+   "author": "Darhkfox",
+   "desc": "Port of the SNES game with true widescreen and an Android APK.",
+   "kind": "recomp"
+  },
+  {
+   "id": "gabrielnnk/bigodao",
+   "name": "Wario Land: Super Mario Land 3",
+   "game": "Wario Land: Super Mario Land 3",
+   "sys": "gb",
+   "repo": "GABRIELNNK/Bigodao",
+   "author": "GABRIELNNK",
+   "desc": "Static recompilation study with native widescreen and an arm64 Android APK.",
+   "kind": "recomp"
+  },
+  {
+   "id": "mstan/wariowaretwistedrecomp",
+   "name": "WarioWare: Twisted!",
+   "game": "WarioWare: Twisted!",
+   "sys": "gba",
+   "repo": "mstan/WarioWareTwistedRecomp",
+   "author": "mstan",
+   "desc": "Static recompilation with Windows and Android gyro support.",
+   "kind": "recomp"
+  },
+  {
+   "id": "am2r-android/am2r-autopatcher-android",
+   "name": "AM2R: Another Metroid 2 Remake",
+   "game": "AM2R: Another Metroid 2 Remake",
+   "sys": "windows",
+   "repo": "am2r-android/AM2R-Autopatcher-Android",
+   "author": "am2r-android",
+   "desc": "Android app that patches your AM2R 1.1 zip into a native Android build.",
+   "kind": "port"
+  },
+  {
+   "id": "whylurking/isaacrecomp",
+   "name": "The Binding of Isaac",
+   "game": "The Binding of Isaac",
+   "sys": "windows",
+   "repo": "whylurking/IsaacRecomp",
+   "author": "whylurking",
+   "desc": "Native C++ recompilation of the Flash-era game with an Android APK; requires the original game from Steam.",
+   "kind": "recomp"
+  },
+  {
+   "id": "belmantegu/celesteandroid",
+   "name": "Celeste",
+   "game": "Celeste",
+   "sys": "windows",
+   "repo": "BelmanteGu/CelesteAndroid",
+   "author": "BelmanteGu",
+   "desc": "Native Android port of Celeste that runs your own PC copy on .NET, FNA, SDL3, Vulkan and FMOD.",
+   "kind": "port"
+  },
+  {
+   "id": "butterscotchrunner/butterscotch",
+   "name": "GameMaker games (Butterscotch)",
+   "game": "GameMaker games",
+   "sys": "windows",
+   "repo": "ButterscotchRunner/Butterscotch",
+   "author": "ButterscotchRunner",
+   "desc": "Open-source re-implementation of the GameMaker: Studio runner with Android builds from CI.",
+   "kind": "port"
+  },
+  {
+   "id": "igawa6/dualsouls",
+   "name": "Hollow Knight",
+   "game": "Hollow Knight",
+   "sys": "windows",
+   "repo": "igawa6/dualsouls",
+   "author": "igawa6",
+   "desc": "Native Android port of Hollow Knight for the AYN Thor dual-screen handheld, provisioned from your own copy.",
+   "dual": true,
+   "kind": "port"
+  },
+  {
+   "id": "jakobkhansen/silksongandroid",
+   "name": "Hollow Knight: Silksong",
+   "game": "Hollow Knight: Silksong",
+   "sys": "windows",
+   "repo": "jakobkhansen/SilksongAndroid",
+   "author": "jakobkhansen",
+   "desc": "Dual-screen Android port with optional Steam integration for game files and cloud saves.",
+   "dual": true,
+   "kind": "port"
+  },
+  {
+   "id": "wszqkzqk/pvz-portable",
+   "name": "Plants vs. Zombies",
+   "game": "Plants vs. Zombies",
+   "sys": "windows",
+   "repo": "wszqkzqk/PvZ-Portable",
+   "author": "wszqkzqk",
+   "desc": "Cross-platform reimplementation of the GOTY edition with an Android arm64 APK.",
+   "kind": "port"
+  },
+  {
+   "id": "modinmobilests/sts2mobilelauncher",
+   "name": "Slay the Spire 2 (Mobile Launcher)",
+   "game": "Slay the Spire 2",
+   "sys": "windows",
+   "repo": "ModinMobileSTS/Sts2MobileLauncher",
+   "author": "ModinMobileSTS",
+   "desc": "Experimental Android launcher that imports your own PC files, with mod support and mobile controls.",
+   "kind": "port"
+  },
+  {
+   "id": "ekyso/sts2-launcher",
+   "name": "Slay the Spire 2 (StS2-Launcher)",
+   "game": "Slay the Spire 2",
+   "sys": "windows",
+   "repo": "Ekyso/StS2-Launcher",
+   "author": "Ekyso",
+   "desc": "Unofficial Android launcher built on a custom Godot 4.5.1 .NET engine.",
+   "kind": "port"
+  },
+  {
+   "id": "rohanbhattacharyya/osbm",
+   "name": "Starbound (OpenStarbound Mobile)",
+   "game": "Starbound",
+   "sys": "windows",
+   "repo": "RohanBhattacharyya/oSBM",
+   "author": "RohanBhattacharyya",
+   "desc": "OpenStarbound port to mobile devices; you must own Starbound.",
+   "kind": "port"
+  },
+  {
+   "id": "ekyso/cinderbox",
+   "name": "Stardew Valley",
+   "game": "Stardew Valley",
+   "sys": "windows",
+   "repo": "Ekyso/Cinderbox",
+   "author": "Ekyso",
+   "desc": "Native launcher that runs Desktop Stardew Valley on Android.",
+   "kind": "port"
+  },
+  {
+   "id": "strrationalism/cpymo",
+   "name": "Visual novels (CPyMO)",
+   "game": "Visual novels",
+   "sys": "windows",
+   "repo": "Strrationalism/CPyMO",
+   "author": "Strrationalism",
+   "desc": "C implementation of the PyMO AVG engine for running owned visual novels, with an Android build.",
+   "kind": "port"
+  },
+  {
+   "id": "abduznik/zumaportable",
+   "name": "Zuma Deluxe",
+   "game": "Zuma Deluxe",
+   "sys": "windows",
+   "repo": "abduznik/ZumaPortable",
+   "author": "abduznik",
+   "desc": "Open-source SDL2 port of Zuma Deluxe for Android, Windows and Linux.",
+   "kind": "port"
+  },
+  {
+   "id": "bilgincoskun/brogue-android-port",
+   "name": "Brogue",
+   "game": "Brogue",
+   "sys": "windows",
+   "repo": "bilgincoskun/brogue-android-port",
+   "author": "bilgincoskun",
+   "desc": "Brogue Android port.",
+   "kind": "port"
+  },
+  {
+   "id": "alexbatalov/fallout1-ce",
+   "name": "Fallout",
+   "game": "Fallout",
+   "sys": "windows",
+   "repo": "alexbatalov/fallout1-ce",
+   "author": "alexbatalov",
+   "desc": "Fully working re-implementation of Fallout with engine bug fixes and an Android APK in releases.",
+   "kind": "port"
+  },
+  {
+   "id": "alexbatalov/fallout2-ce",
+   "name": "Fallout 2",
+   "game": "Fallout 2",
+   "sys": "windows",
+   "repo": "alexbatalov/fallout2-ce",
+   "author": "alexbatalov",
+   "desc": "Fully working re-implementation of Fallout 2 with engine bug fixes and an Android APK in releases.",
+   "kind": "port"
+  },
+  {
+   "id": "exl/gish",
+   "name": "Gish",
+   "game": "Gish",
+   "sys": "windows",
+   "repo": "EXL/Gish",
+   "author": "EXL",
+   "desc": "Port of Gish using SDL2, OpenAL, Ogg Vorbis and GL4ES.",
+   "kind": "port"
+  },
+  {
+   "id": "exl/kenlab3d",
+   "name": "Ken's Labyrinth",
+   "game": "Ken's Labyrinth",
+   "sys": "dos",
+   "repo": "EXL/KenLab3d",
+   "author": "EXL",
+   "desc": "Port of Ken's Labyrinth using SDL2.",
+   "kind": "port"
+  },
+  {
+   "id": "waterdish/zelda3-android",
+   "name": "The Legend of Zelda: A Link to the Past (zelda3 Android)",
+   "game": "The Legend of Zelda: A Link to the Past",
+   "sys": "snes",
+   "repo": "Waterdish/zelda3-android",
+   "author": "Waterdish",
+   "desc": "Android port of the zelda3 reimplementation with APK releases.",
+   "kind": "port"
+  },
+  {
+   "id": "waterdish/2ship2harkinian-android",
+   "name": "Majora's Mask (2 Ship 2 Harkinian)",
+   "game": "Majora's Mask",
+   "sys": "n64",
+   "repo": "Waterdish/2ship2harkinian-Android",
+   "author": "Waterdish",
+   "desc": "Android port of 2 Ship 2 Harkinian with APK releases.",
+   "kind": "port"
+  },
+  {
+   "id": "daniele-rapagnani/alephone-android",
+   "name": "Marathon",
+   "game": "Marathon",
+   "sys": "windows",
+   "repo": "daniele-rapagnani/alephone-android",
+   "author": "daniele-rapagnani",
+   "desc": "Port of the Aleph One Marathon engine to Android.",
+   "kind": "port"
+  },
+  {
+   "id": "waterdish/shipwright-android",
+   "name": "Ocarina of Time (Ship of Harkinian)",
+   "game": "Ocarina of Time",
+   "sys": "n64",
+   "repo": "Waterdish/Shipwright-Android",
+   "author": "Waterdish",
+   "desc": "Android port of Ship of Harkinian with APK releases; bring your own ROM.",
+   "kind": "port"
+  },
+  {
+   "id": "pelya/openttd-android",
+   "name": "OpenTTD",
+   "game": "OpenTTD",
+   "sys": "windows",
+   "repo": "pelya/openttd-android",
+   "author": "pelya",
+   "desc": "OpenTTD for Android.",
+   "kind": "port"
+  },
+  {
+   "id": "sfalexrog/openxcom-android",
+   "name": "OpenXcom",
+   "game": "OpenXcom",
+   "sys": "windows",
+   "repo": "sfalexrog/openxcom-android",
+   "author": "sfalexrog",
+   "desc": "Android Studio project for compiling OpenXcom.",
+   "kind": "port"
+  },
+  {
+   "id": "aarcangeli/serious-sam-android",
+   "name": "Serious Sam: The Second Encounter",
+   "game": "Serious Sam: The Second Encounter",
+   "sys": "windows",
+   "repo": "aarcangeli/Serious-Sam-Android",
+   "author": "aarcangeli",
+   "desc": "Port of Serious Sam Classic: The Second Encounter to Android.",
+   "kind": "port"
+  },
+  {
+   "id": "iscle/spacecadetpinball",
+   "name": "Space Cadet Pinball",
+   "game": "Space Cadet Pinball",
+   "sys": "windows",
+   "repo": "iscle/SpaceCadetPinball",
+   "author": "iscle",
+   "desc": "Android port of 3D Pinball for Windows - Space Cadet.",
+   "kind": "port"
+  },
+  {
+   "id": "exl/spout",
+   "name": "Spout",
+   "game": "Spout",
+   "sys": "windows",
+   "repo": "EXL/Spout",
+   "author": "EXL",
+   "desc": "Port of Spout using OpenGL ES.",
+   "kind": "port"
+  },
+  {
+   "id": "vdavid003/sm64-port-android-base",
+   "name": "Super Mario 64",
+   "game": "Super Mario 64",
+   "sys": "n64",
+   "repo": "VDavid003/sm64-port-android-base",
+   "author": "VDavid003",
+   "desc": "Base project for building the sm64-port for Android.",
+   "kind": "port"
+  },
+  {
+   "id": "alanwoolley/corsixth-android",
+   "name": "Theme Hospital",
+   "game": "Theme Hospital",
+   "sys": "windows",
+   "repo": "alanwoolley/CorsixTH-Android",
+   "author": "alanwoolley",
+   "desc": "Port of CorsixTH to Android.",
+   "kind": "port"
+  },
+  {
+   "id": "blairisme/warcraft",
+   "name": "Warcraft II",
+   "game": "Warcraft II",
+   "sys": "windows",
+   "repo": "blairisme/warcraft",
+   "author": "blairisme",
+   "desc": "Warcraft II port for Android, Windows and macOS.",
+   "kind": "port"
+  }
+ ]
+}

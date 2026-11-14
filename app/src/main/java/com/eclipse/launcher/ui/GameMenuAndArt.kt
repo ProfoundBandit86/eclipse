@@ -82,6 +82,11 @@ fun GameMenu(vm: EclipseVM, g: Game) = Glass {
         withFrameNanos { }; runCatching { if (discOpen) discPickFr.requestFocus() else discFr.requestFocus() }
     }
     val screenPickFr = remember { FocusRequester() }
+    // a native port installed for this game: Play starts it, the emulator, or asks (Options → Plays with)
+    var playWithOpen by remember(g.id) { mutableStateOf(false) }
+    val playWithFr = remember { FocusRequester() }
+    val playWithPickFr = remember { FocusRequester() }
+    LaunchedEffect(playWithOpen) { if (playWithOpen) { withFrameNanos { }; runCatching { playWithPickFr.requestFocus() } } }
     // an Android app (a port or a recomp): which system's page it shows on
     var sysOpen by remember(g.id) { mutableStateOf(false) }
     val sysFr = remember { FocusRequester() }
@@ -307,6 +312,8 @@ fun GameMenu(vm: EclipseVM, g: Game) = Glass {
                             metaLine.uppercase(), color = C.x(0xFFF0EDE6L), fontSize = 10.sp, letterSpacing = 1.6.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(top = 8.dp)
                         )
+                        // a native Android port of this game: Get / Update / installed, and More
+                        if (!g.isApp && !vm.isRommEntry(g)) PortCard(vm, g, Modifier.padding(top = 10.dp))
                     }
                     val p = ra
                     // from the page's middle line down (in this box's own terms): the buttons, the description beside them
@@ -315,7 +322,11 @@ fun GameMenu(vm: EclipseVM, g: Game) = Glass {
                         // Play takes the room the disc choice had (that's under Options now)
                         // a RomM game not on this device: Install only (it doesn't start by itself)
                         if (vm.isRommEntry(g)) PagePill("↓  Install", gold = true, fr = playFocus) { close(); vm.rommOpen(g, "download") }
-                        else PagePill("▶  Play", gold = true, fr = playFocus) { close(); vm.play(g) }
+                        else PagePill(
+                            "▶  Play", gold = true, fr = playFocus,
+                            // with a port installed: which way Play starts it (Options → Plays with)
+                            value = vm.installedPortFor(g)?.let { when (vm.playWith[g.id] ?: "port") { "emu" -> "Emulator"; "ask" -> "Ask"; else -> "Port" } }
+                        ) { close(); vm.play(g) }
                         if (!g.id.startsWith("rm:")) PagePill(if (vm.isFavGame(g)) "♥  Favourite" else "♡  Favourite", on = vm.isFavGame(g)) { vm.toggleFavGame(g) }
                         // guides and manuals for this game (on the bottom screen when it's showing)
                         if (g.platform != "android") PagePill("\uD83D\uDCD6  Companion") { vm.openCompanion(g) }
@@ -422,6 +433,9 @@ fun GameMenu(vm: EclipseVM, g: Game) = Glass {
                             val cur = rDiscs.indexOfFirst { it.id == vm.rommDiscPick[rDiscs.first().id] }.takeIf { it >= 0 } ?: 0
                             OptRow("Disc", "${cur + 1} of ${rDiscs.size} \u25BE", fr = discFr) { discOpen = true }
                         }
+                        vm.installedPortFor(g)?.let { (port, _) -> val f = first(); opts += {
+                            OptRow("Plays with", when (vm.playWith[g.id] ?: "port") { "emu" -> "Emulator"; "ask" -> "Ask each time"; else -> port.title } + " \u25BE", fr = f ?: playWithFr) { playWithOpen = true }
+                        } }
                         if (g.isApp && g.id.startsWith("a_")) { val f = first(); opts += {
                             OptRow("Show under", (Platforms.byId(g.platform)?.short?.takeIf { g.platform != "android" } ?: "Android") + " \u25BE", fr = f ?: sysFr) { sysOpen = true }
                         } }
@@ -492,6 +506,17 @@ fun GameMenu(vm: EclipseVM, g: Game) = Glass {
                 }
             }
         }
+        if (playWithOpen) {
+            val port = vm.installedPortFor(g)?.first
+            MenuSheet("Plays with", g.name, "What Play starts. A port is its own app: it asks for the game's file the first time.", onDismiss = { playWithOpen = false }) {
+                val cur = vm.playWith[g.id] ?: "port"
+                listOf("port" to (port?.title ?: "Port"), "emu" to (vm.emuFor(g)?.label ?: "Emulator"), "ask" to "Ask each time").forEach { (k, label) ->
+                    MenuRow(label, value = when (k) { "port" -> "Port"; "emu" -> "Emulator"; else -> null }, selected = k == cur, fr = if (k == cur) playWithPickFr else null) {
+                        vm.choosePlayWith(g, k); playWithOpen = false
+                    }
+                }
+            }
+        }
         if (sysOpen) {
             MenuSheet("Show under", g.name, "A port or recomp installed as an app can sit on its system's page. It still starts as an app.", onDismiss = { sysOpen = false }) {
                 SystemChoices(vm, g.path, sysPickFr) { vm.setAppSystem(g.path, it); sysOpen = false; vm.menuGame = null }
@@ -537,7 +562,7 @@ private fun PagePill(label: String, value: String? = null, gold: Boolean = false
                 label.uppercase(), color = if (gold) C.onAccent else if (danger) rose else C.x(0xFFE6E3DAL), fontSize = if (height > 40.dp) 15.sp else 10.sp, letterSpacing = 1.5.sp,
                 fontWeight = if (gold) FontWeight.Bold else FontWeight.Normal, maxLines = 1, softWrap = false, modifier = Modifier.weight(1f)
             )
-            if (value != null) Text(value.uppercase(), color = C.accent, fontSize = 9.sp, letterSpacing = 1.2.sp, maxLines = 1, softWrap = false, modifier = Modifier.padding(start = 8.dp))
+            if (value != null) Text(value.uppercase(), color = if (gold) C.onAccent.copy(alpha = 0.75f) else C.accent, fontSize = 9.sp, letterSpacing = 1.2.sp, maxLines = 1, softWrap = false, modifier = Modifier.padding(start = 8.dp))
         }
     }
 }
@@ -564,7 +589,7 @@ private fun DescriptionPreview(text: String, modifier: Modifier, onOpen: () -> U
 
 /** The whole description over the page: Up / Down (or the right stick) scroll it, B, A or a tap outside close it. */
 @Composable
-private fun DescriptionPopup(title: String, text: String, onClose: () -> Unit) {
+internal fun DescriptionPopup(title: String, text: String, onClose: () -> Unit) {
     val sc = rememberScrollState()
     RightStick.Register(sc)
     val scope = rememberCoroutineScope()

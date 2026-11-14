@@ -31,6 +31,10 @@ From Game Twin (https://github.com/alpha-minus/game-twin), Copyright 2026 Mert A
   - The idea and endpoint for achievement tips (RetroAchievements comments) and the checklist requests the Assistant
     is given (data/CompanionData.kt), adapted. Game Twin's name, logo and artwork are not used.
 
+From Awesome Android Native Ports (https://github.com/abduznik/awesome-android-native-ports), by abduznik, CC0-1.0:
+  - catalog/ports.json and app/src/main/assets/ports/ports.json (the Ports & recomps list: each port's name,
+    repository, author and description), with the system each game came from added by Eclipse.
+
 Other material
 --------------
 

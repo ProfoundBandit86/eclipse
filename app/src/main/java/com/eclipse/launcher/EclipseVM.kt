@@ -710,6 +710,133 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     /** Ports and recomps installed as Android apps, shown under another system: package → system id. */
     var appSystem by mutableStateOf(store.map("app_system"))
         private set
+    // ---- Ports & recomps (data/Ports.kt): native Android versions of games, from the list in Eclipse's repository ----
+    /** The list (loaded in the background the first time it's needed). */
+    var ports by mutableStateOf<List<com.eclipse.launcher.data.Ports.Port>>(emptyList())
+        private set
+    private var portsLoading = false
+    /** The Ports & recomps screen, and the port it opens on (from a game page's "More"). */
+    var portsOpen by mutableStateOf(false)
+    var portsFocus by mutableStateOf<String?>(null)
+    /** port id → the app's Android id, learned when Eclipse installs it or spots it installed. */
+    var portPkgs by mutableStateOf(store.map("port_pkgs"))
+        private set
+    /** port id → its newest release (as last checked); a missing key = not checked yet. */
+    val portRels = mutableStateMapOf<String, com.eclipse.launcher.data.Ports.Release?>()
+    /** port id → download progress (0..1, -1 = size unknown) while one downloads. */
+    val portProgress = mutableStateMapOf<String, Float>()
+    /** game id → how Play starts it when a port is installed: "port" (default), "emu" or "ask". */
+    var playWith by mutableStateOf(store.map("play_with"))
+        private set
+    /** A game whose Play asks which way to start it (Play with: Ask each time). */
+    var playAsk by mutableStateOf<Game?>(null)
+
+    fun loadPorts() {
+        if (ports.isNotEmpty() || portsLoading) return
+        portsLoading = true
+        viewModelScope.launch(Dispatchers.IO) {
+            val l = com.eclipse.launcher.data.Ports.load(ctx)
+            withContext(Dispatchers.Main) {
+                ports = l; portsLoading = false
+                l.forEach { p -> com.eclipse.launcher.data.Ports.cached(ctx, p)?.let { portRels[p.id] = it } }
+                scanInstalledApps()
+            }
+            // a newer list, once a day
+            com.eclipse.launcher.data.Ports.refresh(ctx)?.let { n -> withContext(Dispatchers.Main) { ports = n; scanInstalledApps() } }
+        }
+    }
+
+    /** X on the Ports screen: the newest list, and the newest release of [p], straight away. */
+    fun checkPortsNow(p: com.eclipse.launcher.data.Ports.Port?) {
+        viewModelScope.launch {
+            com.eclipse.launcher.data.Ports.refresh(ctx, force = true)?.let { ports = it; scanInstalledApps() }
+            if (p != null) checkPort(p, force = true)
+            if (com.eclipse.launcher.data.Ports.limited()) message = "GitHub asks to wait a while before checking again"
+        }
+    }
+
+    /** Looks up [p]'s newest release (from the 12-hour cache unless [force]). */
+    fun checkPort(p: com.eclipse.launcher.data.Ports.Port, force: Boolean = false) {
+        viewModelScope.launch { com.eclipse.launcher.data.Ports.latest(ctx, p, force)?.let { portRels[p.id] = it } }
+    }
+
+    /** The installed app for [p], if any. */
+    fun portPkg(p: com.eclipse.launcher.data.Ports.Port): String? =
+        (portPkgs[p.id] ?: p.pkg)?.takeIf { pk -> apps.any { it.pkg == pk } }
+
+    /** Remembers which installed apps are ports: by a known id, else by the app's name. */
+    private fun learnPortPkgs() {
+        if (ports.isEmpty() || apps.isEmpty()) return
+        val known = (portPkgs.values + ports.mapNotNull { it.pkg }).toHashSet()
+        val add = HashMap<String, String>()
+        for (p in ports) {
+            if (portPkgs[p.id] != null || p.pkg != null) continue
+            val a = apps.firstOrNull { it.pkg !in known && com.eclipse.launcher.data.Ports.looksLike(p, it.label) } ?: continue
+            add[p.id] = a.pkg; known += a.pkg
+        }
+        if (add.isNotEmpty()) { portPkgs = portPkgs + add; store.putMap("port_pkgs", portPkgs) }
+    }
+
+    /** The installed version of [p], or null when it isn't installed. */
+    fun portVersion(p: com.eclipse.launcher.data.Ports.Port): String? = portPkg(p)?.let { com.eclipse.launcher.data.Ports.installedVersion(ctx, it) }
+
+    /** Whether [p] is installed and its newest release is newer. */
+    fun portHasUpdate(p: com.eclipse.launcher.data.Ports.Port): Boolean {
+        val have = portVersion(p) ?: return false
+        val r = portRels[p.id] ?: return false
+        if (r.apkUrl == null || r.version.isBlank()) return false
+        val a = r.version.filter { it.isDigit() || it == '.' }.trim('.'); val b = have.filter { it.isDigit() || it == '.' }.trim('.')
+        if (a.isBlank() || b.isBlank()) return false
+        return Updater.isNewer(a, b)
+    }
+
+    /** Ports of [g] (same system, same game), installed ones first. Not for apps or RomM entries. */
+    fun portsFor(g: Game): List<com.eclipse.launcher.data.Ports.Port> {
+        if (g.isApp || ports.isEmpty()) return emptyList()
+        return ports.filter { com.eclipse.launcher.data.Ports.matches(it, g.name, g.platform) }.sortedBy { if (portPkg(it) != null) 0 else 1 }
+    }
+
+    /** The installed port [g] plays with, when there is one. */
+    fun installedPortFor(g: Game): Pair<com.eclipse.launcher.data.Ports.Port, String>? =
+        portsFor(g).firstNotNullOfOrNull { p -> portPkg(p)?.let { p to it } }
+
+    fun choosePlayWith(g: Game, how: String) { playWith = playWith + (g.id to how); store.putMap("play_with", playWith) }
+
+    /** Get / Update: downloads [p]'s APK and hands it to Android's installer. */
+    fun installPort(p: com.eclipse.launcher.data.Ports.Port) {
+        if (portProgress.containsKey(p.id)) return
+        if (!Updater.canInstall(ctx)) {
+            message = "Allow Eclipse to install apps, then press Get again"
+            Updater.askInstallPermission(ctx); return
+        }
+        portProgress[p.id] = 0f
+        viewModelScope.launch {
+            try {
+                val r = portRels[p.id]?.takeIf { it.apkUrl != null } ?: com.eclipse.launcher.data.Ports.latest(ctx, p, force = true)?.also { portRels[p.id] = it }
+                if (r?.apkUrl == null) {
+                    message = if (com.eclipse.launcher.data.Ports.limited()) "GitHub asks to wait a while, try again later"
+                        else "No APK in ${p.title}'s releases: opening its page"
+                    if (!com.eclipse.launcher.data.Ports.limited()) openUrl(r?.page?.ifBlank { null } ?: p.url)
+                    return@launch
+                }
+                val f = com.eclipse.launcher.data.Ports.download(ctx, p, r) { v -> mainHandler.post { portProgress[p.id] = v } }
+                if (f == null) { message = "Couldn't download ${p.title}"; return@launch }
+                com.eclipse.launcher.data.Ports.apkInfo(ctx, f)?.let { (pkg, _) ->
+                    portPkgs = portPkgs + (p.id to pkg); store.putMap("port_pkgs", portPkgs)
+                }
+                if (!Updater.install(ctx, f)) message = "Couldn't open Android's installer"
+            } finally { portProgress.remove(p.id) }
+        }
+    }
+
+    /** Starts [g] with its installed port. */
+    private fun launchPort(g: Game, pkg: String) {
+        val err = AppsLoader.launch(ctx, pkg, activityOf(pkg))
+        if (err == null) { startSession(g); sessionPort = pkg } else message = "Couldn't open the port: $err"
+    }
+    /** The port app the running session started (its game is the ROM's). */
+    private var sessionPort: String? = null
+
     /** Shows an app under [id]'s system page (it becomes a game if it wasn't one); "android" puts it back. */
     fun setAppSystem(pkg: String, id: String) {
         appSystem = if (id == "android") appSystem - pkg else appSystem + (pkg to id)
@@ -1957,11 +2084,24 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
      */
     fun scanInstalledApps(manual: Boolean = false) {
         if (apps.isEmpty() || !loaded) return
+        loadPorts()
+        learnPortPkgs()
+        // installed ports: on their game's system page, or (when that game is in the library) only as its Play choice
+        val portSys = HashMap<String, String>()
+        val portOfRom = HashSet<String>()
+        if (ports.isNotEmpty()) {
+            val roms = games.filter { !it.isApp }
+            for (p in ports) {
+                val pk = portPkg(p) ?: continue
+                portSys[pk] = p.sys
+                if (pk !in appSystem && roms.any { com.eclipse.launcher.data.Ports.matches(p, it.name, it.platform) }) portOfRom += pk
+            }
+        }
         val found = apps.filter { a ->
-            !Platforms.isEmulator(a.pkg) &&
+            !Platforms.isEmulator(a.pkg) && a.pkg !in portOfRom &&
                 !a.label.contains("emulator", ignoreCase = true) &&
-                (a.pkg in appSystem || (cats[a.pkg]?.let { it == "Games" } ?: a.isGame))
-        }.map { Game("a_" + it.pkg, nameOf(it), appSystem[it.pkg]?.takeIf { id -> com.eclipse.launcher.data.Platforms.byId(id) != null } ?: "android", it.pkg) }
+                (a.pkg in appSystem || a.pkg in portSys || (cats[a.pkg]?.let { it == "Games" } ?: a.isGame))
+        }.map { Game("a_" + it.pkg, nameOf(it), (appSystem[it.pkg] ?: portSys[it.pkg])?.takeIf { id -> com.eclipse.launcher.data.Platforms.byId(id) != null } ?: "android", it.pkg) }
         val merged = games.filter { !it.isApp } + found
         if (merged != games) {
             games = merged
@@ -1970,7 +2110,8 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         if (manual) message = "Found ${detectedEmulators().size} emulators and ${found.size} Android games"
     }
 
-    fun play(g: Game) {
+    /** [how]: "port" / "emu" to skip the Play with choice (the Ask sheet); null = as chosen for the game. */
+    fun play(g: Game, how: String? = null) {
         if (System.currentTimeMillis() - lastNavMs < 450) return // the press that opened this screen
         // a RomM game that isn't on this device: what Settings → RomM says (or ask)
         if (isRommEntry(g)) {
@@ -1979,6 +2120,13 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
             if (how == "ask") { rommAsk = g; return }
             rommOpen(g, how)
             return
+        }
+        // a native port is installed for this game: Play starts it (or asks), unless you chose the emulator
+        if (!g.isApp) installedPortFor(g)?.let { (_, pkg) ->
+            when (how ?: playWith[g.id] ?: "port") {
+                "port" -> { launchPort(g, pkg); return }
+                "ask" -> { playAsk = g; return }
+            }
         }
         val rid = rommIdFor(g)
         if (rid != null && !g.isApp && flag("romm_saves", false) && rommConn() != null) {
@@ -3693,7 +3841,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     private var pendingEnd: Runnable? = null
 
     /** Package that runs the current game: the Android game itself, or its emulator. */
-    private fun sessionPkg(): String? = session?.game?.let { g -> if (g.isApp) g.path else emuFor(g)?.pkg }
+    private fun sessionPkg(): String? = session?.game?.let { g -> if (sessionPort != null) sessionPort else if (g.isApp) g.path else emuFor(g)?.pkg }
 
     private val overlayPkgs = setOf("com.android.systemui", "com.google.android.gms", "com.google.android.play.games", "android")
 
@@ -3759,6 +3907,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     } catch (e: Exception) { emptySet() }
 
     private fun startSession(g: Game) {
+        sessionPort = null
         sessionSeen = false
         pendingEnd?.let { mainHandler.removeCallbacks(it) }
         pendingEnd = null

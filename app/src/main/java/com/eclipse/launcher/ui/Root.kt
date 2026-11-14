@@ -91,7 +91,7 @@ fun Root(vm: EclipseVM, pickFolder: () -> Unit, pickImage: () -> Unit) {
 
     val autoHide = vm.flag("dock_autohide")
     val overlayOpen = vm.menuGame != null || vm.artGame != null || vm.platArtScreen != null || vm.dockMenu != null ||
-        vm.setupOpen || vm.platReorder || vm.companionTop != null || vm.appearancePicker != null || vm.appMenu != null || vm.platformMenu != null || vm.emuMenu != null || vm.sysEdit != null || vm.viewMenu || vm.searchOpen || vm.onDeckRemove != null || vm.hiddenScreen || vm.storeDelete != null || vm.gameDelete != null || vm.updateShowing || vm.colorPicker != null || vm.themeImport != null || vm.smbBrowse != null || vm.packImport != null || vm.rommAsk != null || vm.rommDiscAsk != null || vm.toolsOpen || !vm.splashDone
+        vm.setupOpen || vm.platReorder || vm.companionTop != null || vm.appearancePicker != null || vm.appMenu != null || vm.platformMenu != null || vm.emuMenu != null || vm.sysEdit != null || vm.viewMenu || vm.searchOpen || vm.onDeckRemove != null || vm.hiddenScreen || vm.storeDelete != null || vm.gameDelete != null || vm.updateShowing || vm.colorPicker != null || vm.themeImport != null || vm.smbBrowse != null || vm.packImport != null || vm.rommAsk != null || vm.rommDiscAsk != null || vm.toolsOpen || vm.portsOpen || vm.playAsk != null || !vm.splashDone
     // when the last menu closes, put the controller back where it was
     // leaving a page: its right panel opens on its first row again next time
     LaunchedEffect(vm.screen, vm.homeSection, vm.platformSel) { vm.drawerMemory.clear() }
@@ -371,6 +371,9 @@ fun Root(vm: EclipseVM, pickFolder: () -> Unit, pickImage: () -> Unit) {
         vm.gameDelete?.let { UninstallGame(vm, it) }
         if (vm.updateShowing) vm.update?.let { UpdateSheet(vm, it) }
         if (vm.smbBrowse != null) SmbBrowser(vm)
+        // Ports & recomps (over a game's page when its "More" opened it), and Play with: Ask each time
+        if (vm.portsOpen) PortsScreen(vm)
+        vm.playAsk?.let { PlayWithSheet(vm, it) }
         // the tour of Home, once: after setup and the opening animation, when Home is up with the library loaded
         LaunchedEffect(vm.splashDone, vm.setupOpen, vm.screen, vm.loaded) {
             if (!vm.tutorialOpen && !vm.flag("tutorial_done", false) && vm.splashDone && !vm.setupOpen && vm.screen == Screen.HOME && vm.loaded) {
