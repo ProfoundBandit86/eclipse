@@ -3,7 +3,10 @@ package com.eclipse.launcher.data
 import android.graphics.Bitmap
 import androidx.compose.ui.graphics.ImageBitmap
 
-data class Game(val id: String, val name: String, val platform: String, val path: String)
+data class Game(val id: String, val name: String, val platform: String, val path: String) {
+    /** An installed Android app (a port or recomp can be shown under another system, but it still starts as an app). */
+    val isApp: Boolean get() = platform == "android" || id.startsWith("a_")
+}
 
 /** [icon] is converted to a bitmap once, in the background, when the app list loads. */
 data class AppEntry(

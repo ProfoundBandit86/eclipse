@@ -668,7 +668,7 @@ private fun NowPlayingPage(
                         ) {
                             Text(game.name, color = C.ink, fontSize = 19.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 22.sp)
                             NpRow("System", plat?.short ?: if (game.platform == "android") "Android" else game.platform)
-                            val emu = if (game.platform == "android") null else vm.emuFor(game)?.label
+                            val emu = if (game.isApp) null else vm.emuFor(game)?.label
                             if (emu != null) NpRow("Emulator", emu)
                             NpRow("This session", sessionClock(elapsed))
                             NpRow("Total", fmtDuration(vm.playedSeconds(game) + elapsed))

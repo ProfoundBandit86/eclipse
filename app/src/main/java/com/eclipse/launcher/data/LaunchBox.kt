@@ -84,7 +84,7 @@ object LaunchBox {
     private fun keyOf(g: Game): String = if (g.platform in arcadeSystems) "m:" + stem(g) else fold(g.name)
 
     /** Games LaunchBox hasn't been searched for yet (added since the index was built). */
-    fun unlooked(games: List<Game>): List<Game> = games.filter { it.platform != "android" && keyOf(it) !in looked }
+    fun unlooked(games: List<Game>): List<Game> = games.filter { !it.isApp && keyOf(it) !in looked }
 
     val loaded: Boolean get() = index.isNotEmpty()
     val gameCount: Int get() = index.values.sumOf { it.size }

@@ -217,7 +217,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         val shown = games.filter { (it.id !in hiddenGames || showHidden()) && (!romOnly || it.id in rommLink) }
         val local = shown.groupingBy { it.platform }.eachCount() +
             (com.eclipse.launcher.data.Platforms.FAVORITES to shown.count { it.id in favGames }) +
-            (com.eclipse.launcher.data.Platforms.ALL to shown.count { it.platform != "android" })
+            (com.eclipse.launcher.data.Platforms.ALL to shown.count { !it.isApp })
         if ((platSource != "romm" && !romOnly) || !rommOn()) return local
         val remote = rommCatalog.filter { installedRom(it.id) == null }.groupingBy { it.bp }.eachCount()
         val all = (local.keys + remote.keys).associateWith { (local[it] ?: 0) + (remote[it] ?: 0) }
@@ -427,7 +427,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         setupScrapeStarted = true
         viewModelScope.launch {
             while (scanning) delay(1000)
-            if (games.any { it.platform != "android" } && artProviders().isNotEmpty()) scrapeAll(false)
+            if (games.any { !it.isApp } && artProviders().isNotEmpty()) scrapeAll(false)
         }
     }
 
@@ -600,7 +600,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
                 else if (list.isNotEmpty() && loaded) {
                     // an Android game you uninstalled leaves the library even with auto-scan off
                     val have = list.map { it.pkg }.toSet()
-                    val kept = games.filter { it.platform != "android" || it.path in have }
+                    val kept = games.filter { !it.isApp || it.path in have }
                     if (kept.size != games.size) { games = kept; persistGames() }
                 }
             }
@@ -706,6 +706,18 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     }
 
     fun setCat(pkg: String, cat: String) { cats = cats + (pkg to cat); store.putMap("cats", cats) }
+
+    /** Ports and recomps installed as Android apps, shown under another system: package → system id. */
+    var appSystem by mutableStateOf(store.map("app_system"))
+        private set
+    /** Shows an app under [id]'s system page (it becomes a game if it wasn't one); "android" puts it back. */
+    fun setAppSystem(pkg: String, id: String) {
+        appSystem = if (id == "android") appSystem - pkg else appSystem + (pkg to id)
+        store.putMap("app_system", appSystem)
+        scanInstalledApps()
+        val name = com.eclipse.launcher.data.Platforms.byId(id)?.name ?: id
+        message = if (id == "android") "Back under Android" else "Now under $name"
+    }
 
     private fun activityOf(pkg: String): String? = apps.firstOrNull { it.pkg == pkg }?.activity
 
@@ -1263,7 +1275,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
 
     /** A game's page: can this one game be turned into a CHD? (an .iso or .cue with no .chd beside it yet) */
     fun canConvertToChd(g: Game): Boolean {
-        if (g.platform == "android" || g.id.startsWith("rm:")) return false
+        if (g.isApp || g.id.startsWith("rm:")) return false
         return romItem(g) != null || chdDiscsOf(g).isNotEmpty()
     }
 
@@ -1546,7 +1558,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) {
             val found = scanAll()
             withContext(Dispatchers.Main) {
-                val apps = games.filter { it.platform == "android" && it.id.startsWith("a_") }
+                val apps = games.filter { it.isApp && it.id.startsWith("a_") }
                 if (full) {
                     val had = games.map { it.path }.toHashSet()
                     games = withoutRemoved(found + apps)
@@ -1937,7 +1949,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     fun possibleEmulators(): List<String> =
         apps.filter { !Platforms.isEmulator(it.pkg) && it.label.contains("emulator", ignoreCase = true) }.map { it.label }.sorted()
 
-    fun androidGameCount(): Int = games.count { it.platform == "android" }
+    fun androidGameCount(): Int = games.count { it.isApp }
 
     /**
      * Android games = apps flagged as games by the system (or that you moved to the Games category),
@@ -1948,9 +1960,9 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         val found = apps.filter { a ->
             !Platforms.isEmulator(a.pkg) &&
                 !a.label.contains("emulator", ignoreCase = true) &&
-                (cats[a.pkg]?.let { it == "Games" } ?: a.isGame)
-        }.map { Game("a_" + it.pkg, nameOf(it), "android", it.pkg) }
-        val merged = games.filter { it.platform != "android" } + found
+                (a.pkg in appSystem || (cats[a.pkg]?.let { it == "Games" } ?: a.isGame))
+        }.map { Game("a_" + it.pkg, nameOf(it), appSystem[it.pkg]?.takeIf { id -> com.eclipse.launcher.data.Platforms.byId(id) != null } ?: "android", it.pkg) }
+        val merged = games.filter { !it.isApp } + found
         if (merged != games) {
             games = merged
             persistGames()
@@ -1969,7 +1981,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
             return
         }
         val rid = rommIdFor(g)
-        if (rid != null && g.platform != "android" && flag("romm_saves", false) && rommConn() != null) {
+        if (rid != null && !g.isApp && flag("romm_saves", false) && rommConn() != null) {
             // bring down newer saves from RomM first (never holds up the launch for more than a few seconds)
             viewModelScope.launch {
                 withTimeoutOrNull(8_000) { rommPullSaves(g, rid) }
@@ -1992,7 +2004,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
 
     /** A multi-disc game's discs: what its .m3u lists, or the "(Disc 1)", "(Disc 2)" … files beside it. */
     fun discsOf(g: Game): List<java.io.File> {
-        if (g.platform == "android" || g.path.startsWith("romm:")) return emptyList()
+        if (g.isApp || g.path.startsWith("romm:")) return emptyList()
         val f = java.io.File(g.path)
         val dir = f.parentFile ?: return emptyList()
         if (f.extension.equals("m3u", true)) return runCatching { f.readLines() }.getOrDefault(emptyList())
@@ -2029,7 +2041,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     private fun launchNow(g0: Game) {
         // the disc you chose for this game (if it's still there)
         val g = discPick[g0.id]?.takeIf { java.io.File(it).isFile }?.let { g0.copy(path = it) } ?: g0
-        if (g.platform == "android") {
+        if (g.isApp) {
             val err = AppsLoader.launch(ctx, g.path, activityOf(g.path))
             if (err == null) startSession(g) else message = "Couldn't open ${g.name}: $err"
             return
@@ -3022,7 +3034,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     /** Can [g] be uploaded? A file on this device that RomM doesn't have yet. */
     fun canUploadToRomm(g: Game): Boolean =
         // (not PC games: Steam / Windows entries are shortcuts, not files RomM can hold)
-        isConfigured("romm") && g.platform !in setOf("android", "steam", "windows", "ps3", "xbox360") && !g.id.startsWith("rm:") && rommIdFor(g) == null && File(g.path).isFile
+        isConfigured("romm") && !g.isApp && g.platform !in setOf("android", "steam", "windows", "ps3", "xbox360") && !g.id.startsWith("rm:") && rommIdFor(g) == null && File(g.path).isFile
 
     /** Copies the game (every disc of a multi-disc game) into RomM's library; RomM adds it on its next scan. */
     fun uploadToRomm(g: Game) {
@@ -3326,7 +3338,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
             val slugs = HashMap(rommFolders)
             val links = HashMap(rommLink)
             var skipped = 0
-            val local = games.filter { it.platform != "android" }
+            val local = games.filter { !it.isApp }
             val byFile = local.associateBy { it.platform + "|" + File(it.path).name.lowercase() }
             val byFolder = local.associateBy { it.platform + "|" + (File(it.path).parentFile?.name ?: "").lowercase() }
             val byStem = local.associateBy { it.platform + "|" + File(it.path).nameWithoutExtension.lowercase() }
@@ -3518,7 +3530,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     /** What "Uninstall" does to this game, or null when there's nothing on this device to remove (a RomM entry). */
     fun uninstallKind(g: Game): String? = when {
         g.id.startsWith("rm:") || g.path.startsWith("romm:") -> null
-        g.platform == "android" -> "app"
+        g.isApp -> "app"
         rommIdFor(g)?.toIntOrNull()?.let { installedRom(it)?.id == g.id } == true -> "romm"
         else -> "files"
     }
@@ -3663,7 +3675,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     }
 
     private fun rommPushSaves(g: Game, sinceMs: Long) {
-        if (!flag("romm_saves", false) || g.platform == "android") return
+        if (!flag("romm_saves", false) || g.isApp) return
         val c = rommConn() ?: return
         val id = rommIdFor(g)?.toIntOrNull() ?: return
         val emu = emuFor(g)?.label?.lowercase()?.replace(Regex("[^a-z0-9]+"), "-")?.trim('-')?.ifEmpty { null } ?: "eclipse"
@@ -3681,7 +3693,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     private var pendingEnd: Runnable? = null
 
     /** Package that runs the current game: the Android game itself, or its emulator. */
-    private fun sessionPkg(): String? = session?.game?.let { g -> if (g.platform == "android") g.path else emuFor(g)?.pkg }
+    private fun sessionPkg(): String? = session?.game?.let { g -> if (g.isApp) g.path else emuFor(g)?.pkg }
 
     private val overlayPkgs = setOf("com.android.systemui", "com.google.android.gms", "com.google.android.play.games", "android")
 
@@ -4060,7 +4072,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     /** Signed in and switched on: ScreenScraper is used for artwork, descriptions, details and manuals. */
     fun ssReady(): Boolean = ssBuilt && flag("p_ss") && key("ss_user").isNotBlank() && key("ss_pass").isNotBlank()
     private suspend fun ssEntry(g: Game): com.eclipse.launcher.data.ScreenScraper.Entry? =
-        if (!ssReady() || g.platform == "android") null
+        if (!ssReady() || g.isApp) null
         else com.eclipse.launcher.data.ScreenScraper.lookup(key("ss_user"), key("ss_pass"), g.platform, g.path, queryGame(g).name)
     /** The Companion's Manual tab: the address of [g]'s manual on ScreenScraper, or null. */
     suspend fun ssManual(g: Game): String? = ssEntry(g)?.let { com.eclipse.launcher.data.ScreenScraper.manual(it) }
@@ -4139,7 +4151,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     // ---- Hasheous: identify games from the ROM file itself ----
     /** The Hasheous match for this game (hashing the file the first time), or null. Cached per game. */
     suspend fun hasheousFor(g: Game): Hasheous.Match? {
-        if (g.platform == "android") return null
+        if (g.isApp) return null
         hashInfo[g.id]?.let { return Hasheous.decode(it) }
         val (answered, m) = try { Hasheous.identify(g.path) } catch (e: Exception) { false to null }
         if (answered) {
@@ -4342,7 +4354,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
 
     /** What a game is missing that can be drawn: its disc / cartridge (systems with a template) and its 3D box. */
     private fun fillableKinds(g: Game): List<ArtKind> {
-        if (g.platform == "android") return emptyList()
+        if (g.isApp) return emptyList()
         val out = ArrayList<ArtKind>()
         if (artOf(g, ArtKind.MEDIA) == null && com.eclipse.launcher.data.ArtMaker.mediaShape(g.platform) != null) out += ArtKind.MEDIA
         if (artOf(g, ArtKind.BOX3D) == null) out += ArtKind.BOX3D

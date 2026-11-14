@@ -955,7 +955,7 @@ private fun ServiceCard(title: String, status: String, dot: Dot, expanded: Boole
 @Composable
 private fun Library(vm: EclipseVM, pickFolder: () -> Unit) {
     val counts = remember(vm.games) { vm.games.groupingBy { it.platform }.eachCount() }
-    val romCount = vm.games.count { it.platform != "android" }
+    val romCount = vm.games.count { !it.isApp }
     TwoColumns({
         DropSection("Scan")
         BigNumber(romCount.toString(), (if (romCount == 1) "game found" else "games found") + if (vm.scanning) " \u00b7 scanning\u2026" else "")
@@ -1465,7 +1465,7 @@ private fun ScrapeSection(vm: EclipseVM) {
         Note(s.current)
         Pill("Cancel", Modifier.fillMaxWidth()) { vm.cancelScrape() }
     } else {
-        val pool = vm.games.filter { it.platform != "android" }
+        val pool = vm.games.filter { !it.isApp }
         val withArt = pool.count { vm.artOf(it, com.eclipse.launcher.data.ArtKind.BOX) != null }
         BigNumber("$withArt", "of ${pool.size} have art")
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -2327,7 +2327,7 @@ private fun SetupPageBody(vm: EclipseVM, page: SetupPage, first: Boolean, isLast
                     }
                     Reveal(n++) { ActionRow(if (vm.romFolders().isEmpty()) "Add a folder" else "Add another folder", null) { vm.folderTarget = null; pickFolder() } }
                     if (vm.romFolders().isNotEmpty()) Reveal(n++) {
-                        InfoRow("Games found", vm.games.count { it.platform != "android" }.toString() + if (vm.scanning) "  (scanning…)" else "")
+                        InfoRow("Games found", vm.games.count { !it.isApp }.toString() + if (vm.scanning) "  (scanning…)" else "")
                     }
                     if (!vm.hasAllFiles()) Reveal(n++) { ActionRow("All-files access", "Needed to read your games. Tap to allow.") { vm.requestAllFiles() } }
                     Reveal(n++) { ToggleRow("Add Android games too", "Installed apps that are games.", vm.flag("auto_scan", true)) { vm.setFlag("auto_scan", it) } }
@@ -2385,8 +2385,8 @@ private fun SetupPageBody(vm: EclipseVM, page: SetupPage, first: Boolean, isLast
                     }
                 }
                 else -> {
-                    val games = vm.games.count { it.platform != "android" }
-                    val systems = vm.games.filter { it.platform != "android" }.map { it.platform }.distinct().size
+                    val games = vm.games.count { !it.isApp }
+                    val systems = vm.games.filter { !it.isApp }.map { it.platform }.distinct().size
                     Reveal(n++) {
                         SetupLine(
                             (if (games == 0) "No games found yet. Add a folder any time in Settings → Library."

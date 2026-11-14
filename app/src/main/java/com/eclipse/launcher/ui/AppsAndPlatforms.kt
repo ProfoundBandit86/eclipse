@@ -293,7 +293,7 @@ fun AppMenu(vm: EclipseVM, pkg: String) {
         return
     }
     MenuSheet(
-        if (mode == "cat") "Category" else "App", vm.nameOf(app),
+        when (mode) { "cat" -> "Category"; "system" -> "Show under"; else -> "App" }, vm.nameOf(app),
         if (mode == "main") vm.catOf(app) else null,
         onDismiss = { if (mode == "main") close() else mode = "main" },
         image = { AppIcon(app, Modifier.size(44.dp).clip(RoundedCornerShape(10.dp))) }
@@ -316,12 +316,18 @@ fun AppMenu(vm: EclipseVM, pkg: String) {
                 }
                 MenuRow("Back", value = "B") { mode = "main" }
             }
+            "system" -> {
+                SystemChoices(vm, app.pkg, first) { vm.setAppSystem(app.pkg, it); close() }
+                MenuRow("Back", value = "B") { mode = "main" }
+            }
             else -> {
                 MenuRow(if (app.pkg in vm.favApps) "Remove from favorites" else "Add to favorites", fr = first) { vm.toggleFav(app.pkg); close() }
                 MenuRow(if (app.pkg in vm.dock) "Unpin app" else "Pin app", note = "Shows in the left dock") { vm.toggleDock(app.pkg); close() }
                 MenuRow(if (app.pkg in vm.dock2) "Remove from second-screen dock" else "Add to second-screen dock") { vm.toggleDock2(app.pkg); close() }
                 MenuRow("Rename") { mode = "rename" }
                 MenuRow("Change category") { mode = "cat" }
+                // ports and recomps that install as apps: show them on their system's page
+                MenuRow("Show under a system", value = vm.appSystem[app.pkg]?.let { Platforms.byId(it)?.short } ?: "Android") { mode = "system" }
                 MenuRow("Uninstall", danger = true) { close(); vm.uninstallApp(app.pkg, app.label) }
             }
         }
@@ -756,5 +762,26 @@ fun GameHeading(vm: EclipseVM, g: Game, modifier: Modifier = Modifier, center: B
             maxLines = if (center) 2 else 1, overflow = TextOverflow.Ellipsis, modifier = modifier,
             textAlign = if (center) TextAlign.Center else TextAlign.Start
         )
+    }
+}
+
+/**
+ * The systems an Android app (a port or a recomp) can be shown under: Android first, then the systems you have games
+ * for, then the rest, A–Z. The current one is marked and gets [fr]. Scrolls inside its menu.
+ */
+@Composable
+fun SystemChoices(vm: EclipseVM, pkg: String, fr: FocusRequester?, onPick: (String) -> Unit) {
+    val cur = vm.appSystem[pkg] ?: "android"
+    val choices = remember(vm.games.size) {
+        val have = vm.games.filter { !it.isApp }.map { it.platform }.toHashSet()
+        val sys = Platforms.all.filter { it.id != Platforms.ALL && it.id != Platforms.FAVORITES && it.id != "android" }
+        val (mine, rest) = sys.partition { it.id in have }
+        listOf("android" to "Android (as an app)") +
+            (mine.sortedBy { it.name.lowercase() } + rest.sortedBy { it.name.lowercase() }).map { it.id to it.name }
+    }
+    Column(Modifier.fillMaxWidth().heightIn(max = 230.dp).menuScroll(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        choices.forEach { (id, name) ->
+            MenuRow(name, selected = id == cur, fr = if (id == cur) fr else null) { onPick(id) }
+        }
     }
 }

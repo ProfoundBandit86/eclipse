@@ -82,6 +82,15 @@ fun GameMenu(vm: EclipseVM, g: Game) = Glass {
         withFrameNanos { }; runCatching { if (discOpen) discPickFr.requestFocus() else discFr.requestFocus() }
     }
     val screenPickFr = remember { FocusRequester() }
+    // an Android app (a port or a recomp): which system's page it shows on
+    var sysOpen by remember(g.id) { mutableStateOf(false) }
+    val sysFr = remember { FocusRequester() }
+    val sysPickFr = remember { FocusRequester() }
+    var sysUsed by remember(g.id) { mutableStateOf(false) }
+    LaunchedEffect(sysOpen) {
+        if (sysOpen) { sysUsed = true; withFrameNanos { }; runCatching { sysPickFr.requestFocus() } }
+        else if (sysUsed) { withFrameNanos { }; runCatching { sysFr.requestFocus() } }
+    }
     LaunchedEffect(screenOpen) {
         if (screenOpen) { screenUsed = true; withFrameNanos { }; runCatching { screenPickFr.requestFocus() } }
         else if (screenUsed) { withFrameNanos { }; runCatching { screenFr.requestFocus() } }
@@ -402,8 +411,8 @@ fun GameMenu(vm: EclipseVM, g: Game) = Glass {
                         var firstFr: FocusRequester? = tabFr
                         fun first(): FocusRequester? = firstFr.also { firstFr = null }
                         val opts = ArrayList<@Composable () -> Unit>()
-                        if (g.platform != "android") { val f = first(); opts += { OptRow("Emulator", vm.emuFor(g)?.label ?: "Choose", fr = f) { vm.emuMenu = g.platform } } }
-                        if (g.platform != "android" && !vm.isRommEntry(g) && remember { vm.bottomDisplayId() } != null)
+                        if (!g.isApp) { val f = first(); opts += { OptRow("Emulator", vm.emuFor(g)?.label ?: "Choose", fr = f) { vm.emuMenu = g.platform } } }
+                        if (!g.isApp && !vm.isRommEntry(g) && remember { vm.bottomDisplayId() } != null)
                             opts += { OptRow("Starts on", if (vm.gameScreen[g.id] == "bottom") "Bottom screen \u25BE" else "Top screen \u25BE", fr = screenFr) { screenOpen = true } }
                         val rDiscs = remember(g.id, vm.rommCatalog) { vm.discsOfRomm(g) }
                         if (discs.size > 1) opts += {
@@ -413,6 +422,9 @@ fun GameMenu(vm: EclipseVM, g: Game) = Glass {
                             val cur = rDiscs.indexOfFirst { it.id == vm.rommDiscPick[rDiscs.first().id] }.takeIf { it >= 0 } ?: 0
                             OptRow("Disc", "${cur + 1} of ${rDiscs.size} \u25BE", fr = discFr) { discOpen = true }
                         }
+                        if (g.isApp && g.id.startsWith("a_")) { val f = first(); opts += {
+                            OptRow("Show under", (Platforms.byId(g.platform)?.short?.takeIf { g.platform != "android" } ?: "Android") + " \u25BE", fr = f ?: sysFr) { sysOpen = true }
+                        } }
                         if (g.id in vm.recent) { val f = first(); opts += { OptRow("Remove from Recently Played", "\u203A", fr = f) { vm.removeFromOnDeck(g) } } }
                         if (!g.id.startsWith("rm:")) { val f = first(); opts += { OptRow("Hide game", "\u203A", fr = f) { close(); vm.setHidden(g, true) } } }
                         OptGrid(opts)
@@ -478,6 +490,11 @@ fun GameMenu(vm: EclipseVM, g: Game) = Glass {
                         }
                     }
                 }
+            }
+        }
+        if (sysOpen) {
+            MenuSheet("Show under", g.name, "A port or recomp installed as an app can sit on its system's page. It still starts as an app.", onDismiss = { sysOpen = false }) {
+                SystemChoices(vm, g.path, sysPickFr) { vm.setAppSystem(g.path, it); sysOpen = false; vm.menuGame = null }
             }
         }
         if (descOpen) DescriptionPopup(g.name, fields[5]) { descOpen = false; GamepadFocus.restoreKey = "page:desc" }
