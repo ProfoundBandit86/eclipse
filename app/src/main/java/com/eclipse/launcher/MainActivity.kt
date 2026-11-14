@@ -271,6 +271,8 @@ class MainActivity : ComponentActivity() {
             vm.cancelPackImport()
             vm.homeSection = com.eclipse.launcher.data.HomeSection.RECENTS
             vm.go(com.eclipse.launcher.data.Screen.HOME)
+            // the Home button lands on the left dock
+            vm.dockRequest++
         }
     }
 

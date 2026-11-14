@@ -83,6 +83,9 @@ fun Root(vm: EclipseVM, pickFolder: () -> Unit, pickImage: () -> Unit) {
             vm.screen != Screen.HOME -> vm.screen = Screen.HOME
             // on Home, B from the platforms or the app drawer slides back up to On Deck
             vm.homeSection != com.eclipse.launcher.data.HomeSection.RECENTS -> vm.homeSection = com.eclipse.launcher.data.HomeSection.RECENTS
+            // on Home with nothing left to close: the left dock (B again from the dock goes back to Home's rows)
+            vm.dockFocused -> GamepadFocus.rescue?.invoke()
+            else -> vm.dockRequest++
         }
     }
 
@@ -162,6 +165,19 @@ fun Root(vm: EclipseVM, pickFolder: () -> Unit, pickImage: () -> Unit) {
             if (dockHasFocus) GamepadFocus.primary?.let { runCatching { it.requestFocus() } }
         }
     }
+    // asked for the dock (the Home button, Back on Home): open it and put the controller on it once the screen has settled
+    LaunchedEffect(vm.dockRequest) {
+        if (vm.dockRequest == 0) return@LaunchedEffect
+        repeat(8) { withFrameNanos { } }
+        if (overlayNow) return@LaunchedEffect
+        vm.dockPeek = true
+        backToDock = true
+        repeat(20) {
+            withFrameNanos { }
+            if (runCatching { dockFocus.requestFocus() }.isSuccess && dockFocused) { backToDock = false; return@LaunchedEffect }
+        }
+        backToDock = false
+    }
     val changing = switching || settled != (vm.screen to overlayOpen)
     // the dock opens only when the controller was sent there (Left, LB, B from Settings): focus that merely falls
     // into it (a menu closing, a game removed from under it) doesn't open it, and is sent straight back
@@ -220,9 +236,13 @@ fun Root(vm: EclipseVM, pickFolder: () -> Unit, pickImage: () -> Unit) {
                 .offset(x = push)
                 .padding(start = if (autoHide) 0.dp else DOCK_RAIL)
                 .onKeyEvent { e ->
-                    // Left at the edge of a screen brings the hidden dock back.
-                    if (autoHide && !overlayOpen && e.type == KeyEventType.KeyDown && e.key == Key.DirectionLeft) {
-                        if (!focusManager.moveFocus(FocusDirection.Left)) runCatching { dockFocus.requestFocus() }
+                    // Left with nowhere further to go (the start of a row, the edge of a screen): the left dock, whether
+                    // it hides or not
+                    if (!overlayOpen && e.type == KeyEventType.KeyDown && e.key == Key.DirectionLeft && !GamepadFocus.held) {
+                        if (!focusManager.moveFocus(FocusDirection.Left)) {
+                            vm.dockPeek = true
+                            runCatching { dockFocus.requestFocus() }
+                        }
                         true
                     } else false
                 }

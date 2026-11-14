@@ -126,6 +126,8 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     val drawerMemory = HashMap<String, String>()
     var dockNav = false                                     // true while Up / Down is moving focus inside the dock
     var dockFocused by mutableStateOf(false)               // the controller is in the left dock (Home previews its rows)
+    /** Bumped to send the controller to the left dock (the Home button, Back on Home): Root does it once the screen settles. */
+    var dockRequest by androidx.compose.runtime.mutableIntStateOf(0)
     var lastPlatform by mutableStateOf<String?>(null)    // platform card the controller was last on
     var platformSel by mutableStateOf<String?>(null)     // platform to open the games screen on
     var platformMenu by mutableStateOf<String?>(null)    // platform card whose menu is open
