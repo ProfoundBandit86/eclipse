@@ -1,0 +1,15 @@
+{
+  "name": "Blood Moon",
+  "author": "Eclipse",
+  "description": "Crimson and black glass with scarlet highlights: a red eclipsed moon rising over volcanic ridges.",
+  "mode": "dark",
+  "accent": "#E8413C",
+  "focus": "#FF6F61",
+  "text": "#F8ECEA",
+  "labels": "#C7A3A0",
+  "glass": "#22090C",
+  "glassStrength": 68,
+  "dim": 26,
+  "wallpaper": "wallpaper.jpg",
+  "bottomWallpaper": "bottom.jpg"
+}
