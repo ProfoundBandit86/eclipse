@@ -81,8 +81,7 @@ object SystemArt {
         "wsv" to "supervision",
         "xbox" to "xbox",
         "xbox360" to "xbox360",
-        "xboxone" to "xboxone",
-        "ps4" to "ps4",
+        // (no art of its own yet: the Switch's)
         "switch2" to "switch"
     )
 
