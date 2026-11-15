@@ -56,6 +56,7 @@ object TaskMoveMain {
     private fun fail(why: String): Int { println("FAIL $why"); return 2 }
 
     /** TaskInfo.displayId is hidden; there are no hidden-API limits in this process, so it's read directly. */
+    @android.annotation.SuppressLint("BlockedPrivateApi") // (that limit is for apps; this runs outside one)
     private fun displayOf(t: ActivityManager.RunningTaskInfo): Int =
         runCatching { Class.forName("android.app.TaskInfo").getDeclaredField("displayId").apply { isAccessible = true }.getInt(t) }.getOrDefault(-1)
 
