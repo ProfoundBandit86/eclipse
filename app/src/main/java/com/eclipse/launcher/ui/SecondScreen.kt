@@ -775,11 +775,12 @@ private fun NpButton(text: String, icon: ImageVector, modifier: Modifier, onLong
     val shape = RoundedCornerShape(9.dp)
     FocusBox(modifier.height(36.dp), shape = shape, onClick = onClick, onLongClick = onLongClick) {
         Row(
-            Modifier.fillMaxSize().background(C.x(0x0FFFFFFFL)).border(1.dp, C.x(0x14FFFFFFL), shape).padding(horizontal = 8.dp),
+            // a solid glass panel like the dock's, so the buttons read over bright cover art
+            Modifier.fillMaxSize().dockPanel(shape).padding(horizontal = 8.dp),
             horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(icon, null, tint = C.accent, modifier = Modifier.size(14.dp))
-            Text(text.uppercase(), color = C.x(0xFFCFCAC0L), fontSize = 9.sp, letterSpacing = 1.2.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 6.dp))
+            Text(text.uppercase(), color = C.ink, fontSize = 9.sp, letterSpacing = 1.2.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 6.dp))
         }
     }
 }
