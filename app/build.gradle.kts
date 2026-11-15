@@ -135,6 +135,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("eu.agno3.jcifs:jcifs-ng:2.1.10") // copies games to your RomM library over a network share (SMB)
     implementation("androidx.profileinstaller:profileinstaller:1.4.1") // installs the baseline profile (precompiled hot code)
+    // Shizuku: shell rights for moving a running app to the other screen (app switcher, Down), when installed
+    implementation("dev.rikka.shizuku:api:13.1.5")
+    implementation("dev.rikka.shizuku:provider:13.1.5")
 }
 
 // Safety check: no build signed with the release key may be debuggable (see the debug build type above).

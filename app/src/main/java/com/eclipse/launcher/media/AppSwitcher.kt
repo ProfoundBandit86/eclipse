@@ -413,7 +413,7 @@ object AppSwitcher {
                         if (up) runCatching { SecondScreenHost.appLeft?.invoke() }
                         else runCatching { SecondScreenHost.hideForApp?.invoke(e.pkg, bottomId); ScreenshotService.markWatchedSeen() }
                     }
-                    is Privileged.Moved.NoRights -> toast(ctx, "Moving a running app needs root rights: AYN's root service (Settings \u2192 App switcher) or a rooted device")
+                    is Privileged.Moved.NoRights -> toast(ctx, "Moving a running app needs Shizuku, AYN's root service (Settings \u2192 App switcher) or a rooted device")
                     is Privileged.Moved.Failed -> toast(ctx, if (r.why == "not running") "${e.label} isn't running" else "Couldn't move ${e.label}: ${r.why}")
                 }
             }

@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit
  * Runs the few things Android only lets the system do (moving a running app to the other screen) with higher
  * rights, through whichever of these the device has:
  *
+ * - **Shizuku**, when it's installed, running and Eclipse is allowed (Settings → App switcher): shell rights.
  * - **AYN's root service** (the Thor's own "Run Script as Root", the binder service "PServerBinder"): on the stock
  *   firmware with "Force SELinux" off, it runs a command as root for any app, with no setup. Eclipse only ever sends
  *   it its own fixed command (start [TaskMoveMain]). Can be turned off: Settings → App switcher.
@@ -58,6 +59,8 @@ object Privileged {
         val apk = ctx.applicationInfo.sourceDir
         if (apk.contains('\'') || args.any { a -> a.any { !(it.isLetterOrDigit() || it == '.' || it == '_' || it == '-') } }) return null
         val line = "CLASSPATH='$apk' app_process /system/bin ${TaskMoveMain::class.java.name} ${args.joinToString(" ")} 2>&1 | grep -m1 -E '^(OK|FAIL)'"
+        // Shizuku first (it runs as the shell, which can't read Eclipse's files: the command goes straight in)
+        if (shizukuAllowed()) shizukuExec(line)?.trim()?.lineSequence()?.firstOrNull { it.startsWith("OK") || it.startsWith("FAIL") }?.let { return it }
         val script = File(ctx.cacheDir, "move_${System.nanoTime()}.sh")
         return try {
             script.writeText(line + "\n")
@@ -66,6 +69,39 @@ object Privileged {
             viaAyn ?: suExec("sh ${script.absolutePath}")?.trim()?.lineSequence()?.firstOrNull { it.startsWith("OK") || it.startsWith("FAIL") }
         } finally { script.delete() }
     }
+
+    // ---- Shizuku ----
+    /** Shizuku is running (Eclipse has its connection). */
+    fun shizukuRunning(): Boolean = runCatching { rikka.shizuku.Shizuku.pingBinder() }.getOrDefault(false)
+    /** Eclipse may use it. */
+    fun shizukuAllowed(): Boolean = shizukuRunning() && runCatching {
+        rikka.shizuku.Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED
+    }.getOrDefault(false)
+    /** Asks Shizuku for permission (its own pop-up); [done] runs with the answer, on the main thread. */
+    fun askShizuku(done: (Boolean) -> Unit) {
+        if (!shizukuRunning()) { done(false); return }
+        if (shizukuAllowed()) { done(true); return }
+        runCatching {
+            val code = 4711
+            val l = object : rikka.shizuku.Shizuku.OnRequestPermissionResultListener {
+                override fun onRequestPermissionResult(requestCode: Int, grantResult: Int) {
+                    if (requestCode != code) return
+                    rikka.shizuku.Shizuku.removeRequestPermissionResultListener(this)
+                    done(grantResult == android.content.pm.PackageManager.PERMISSION_GRANTED)
+                }
+            }
+            rikka.shizuku.Shizuku.addRequestPermissionResultListener(l)
+            rikka.shizuku.Shizuku.requestPermission(code)
+        }.onFailure { done(false) }
+    }
+
+    /** Runs [cmd] with shell rights through Shizuku (its newProcess, which the library keeps private). */
+    private fun shizukuExec(cmd: String): String? = runCatching {
+        val m = rikka.shizuku.Shizuku::class.java.getDeclaredMethod("newProcess", Array<String>::class.java, Array<String>::class.java, String::class.java)
+            .apply { isAccessible = true }
+        val p = m.invoke(null, arrayOf("sh", "-c", cmd), null, null) as Process
+        if (!p.waitFor(15, TimeUnit.SECONDS)) { p.destroy(); null } else p.inputStream.bufferedReader().readText() + p.errorStream.bufferedReader().readText()
+    }.getOrNull()
 
     sealed class Moved {
         object Ok : Moved()

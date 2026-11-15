@@ -423,6 +423,19 @@ private fun AppSwitcherRows(vm: EclipseVM) {
         "Down in the switcher moves the app to the other screen without restarting it. This uses the root service built into the Thor (Settings \u2192 Thor \u2192 Run Script as Root); Eclipse only sends it its own move command. Off: only works on a rooted device.",
         ayn
     ) { ayn = it; com.eclipse.launcher.media.Privileged.setAynAllowed(ctx, it) }
+    // Shizuku: the other way, when it's installed and running (used first when Eclipse is allowed)
+    var shizukuTick by remember { mutableIntStateOf(0) }
+    val running = remember(shizukuTick) { com.eclipse.launcher.media.Privileged.shizukuRunning() }
+    val allowed = remember(shizukuTick) { com.eclipse.launcher.media.Privileged.shizukuAllowed() }
+    StatusRow(
+        "Shizuku",
+        when { allowed -> "Allowed"; running -> "Allow"; else -> "Not running" },
+        if (allowed) Dot.OK else Dot.OFF
+    ) {
+        if (running && !allowed) com.eclipse.launcher.media.Privileged.askShizuku { shizukuTick++ }
+        else shizukuTick++
+    }
+    Note("With Shizuku running and allowed, Eclipse uses it to move apps between the screens (first, before AYN's service).")
 }
 
 /** Settings → General → Permissions: one row with how many are on; A opens the list of them under it. */

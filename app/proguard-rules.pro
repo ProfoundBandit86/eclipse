@@ -6,6 +6,9 @@
 
 # Started on its own by name (app_process, with root rights) to move a running app to the other screen
 -keep class com.eclipse.launcher.media.TaskMoveMain { public static void main(java.lang.String[]); }
+# Shizuku: its newProcess is reached by name (it's private in the library)
+-keep class rikka.shizuku.** { *; }
+-keep class moe.shizuku.** { *; }
 
 # Things the system creates from the manifest by name
 -keep class com.eclipse.launcher.** extends android.app.Service { *; }
