@@ -4,6 +4,9 @@
 -keep class org.slf4j.** { *; }
 -keep class com.caverock.androidsvg.** { *; }
 
+# Started on its own by name (app_process, with root rights) to move a running app to the other screen
+-keep class com.eclipse.launcher.media.TaskMoveMain { public static void main(java.lang.String[]); }
+
 # Things the system creates from the manifest by name
 -keep class com.eclipse.launcher.** extends android.app.Service { *; }
 -keep class com.eclipse.launcher.** extends android.accessibilityservice.AccessibilityService { *; }

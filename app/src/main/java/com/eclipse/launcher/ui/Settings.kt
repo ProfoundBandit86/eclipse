@@ -414,8 +414,15 @@ private fun AppSwitcherRows(vm: EclipseVM) {
     }
     Note(
         if (waiting) "Press the button you want for the app switcher (any but A and the D-pad). Holding it opens the switcher; a quick press of Back, Home or Recents still does its usual job."
-        else "Hold the button anywhere: Left / Right choose an app (past the end goes Home), Up lifts it and Up again closes it, Down puts it back, B stays where you are. A (or the button again) switches."
+        else "Hold the button anywhere: Left / Right choose an app (past the end goes Home), Up lifts it and Up again closes it, Down puts it back, B stays where you are. A (or the button again) switches. Down on an app in the row moves it, still running, to the other screen."
     )
+    // moving a running app between the screens needs root rights: AYN's own root service, or a rooted device
+    var ayn by remember { mutableStateOf(com.eclipse.launcher.media.Privileged.aynAllowed(ctx)) }
+    ToggleRow(
+        "Move apps with AYN's root service",
+        "Down in the switcher moves the app to the other screen without restarting it. This uses the root service built into the Thor (Settings \u2192 Thor \u2192 Run Script as Root); Eclipse only sends it its own move command. Off: only works on a rooted device.",
+        ayn
+    ) { ayn = it; com.eclipse.launcher.media.Privileged.setAynAllowed(ctx, it) }
 }
 
 /** Settings → General → Permissions: one row with how many are on; A opens the list of them under it. */

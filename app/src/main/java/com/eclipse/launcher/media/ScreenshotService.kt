@@ -80,6 +80,9 @@ class ScreenshotService : AccessibilityService() {
             return true
         }
 
+        /** The watched app is already on its screen (moved there while running, so no "it opened" event comes). */
+        fun markWatchedSeen() { if (watchPkg != null) watchSeen = true }
+
         fun stopWatch() {
             watchPkg = null
             watchDisplay = -1

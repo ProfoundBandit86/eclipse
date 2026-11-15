@@ -181,6 +181,7 @@ class MainActivity : ComponentActivity() {
         (getSystemService(DISPLAY_SERVICE) as DisplayManager).registerDisplayListener(displayListener, null)
         SecondScreenHost.owner = this
         SecondScreenHost.hideForApp = { pkg, displayId -> hideForApp(pkg, displayId) }
+        SecondScreenHost.appLeft = { handler.post { restoreAfterApp() } }
         SecondScreenHost.hideForGuide = {
             handler.post {
                 presentation?.let { if (it.isShowing) runCatching { it.hide() } }
@@ -445,6 +446,7 @@ class MainActivity : ComponentActivity() {
         if (current) {
             SecondScreenHost.owner = null
             SecondScreenHost.hideForApp = null
+            SecondScreenHost.appLeft = null
             SecondScreenHost.close = null
             SecondScreenHost.restart = null
             SecondScreenHost.show = null

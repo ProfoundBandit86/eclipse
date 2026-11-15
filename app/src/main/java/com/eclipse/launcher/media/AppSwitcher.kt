@@ -67,7 +67,8 @@ import kotlin.math.sign
  * The app switcher: hold the button you picked (Settings → General → App switcher) anywhere, and the app on the
  * top screen shrinks into a big card in the middle with your other recent apps peeking in at the sides.
  * Left / Right (or L1 / R1) choose; past either end goes Home. Up pushes the chosen card up, Up again closes that app
- * (the card on its right moves in), Down puts it back. B stays where you were; A (or the button again) switches.
+ * (the card on its right moves in), Down puts it back. Down on a card in the row moves that app, still running, to the
+ * other screen (top to bottom, or back up; see [Privileged]). B stays where you were; A (or the button again) switches.
  *
  * Runs inside the Eclipse helper (the accessibility service): it catches the button while open, and the overlay
  * takes focus to read the D-pad (a joystick hat on the Thor). It keeps the list of recent apps from the apps it
@@ -140,6 +141,12 @@ object AppSwitcher {
         var closing by mutableStateOf(false)
         /** the app on screen when the switcher opened */
         var current: String? = null
+        /** the chosen card is sinking off the bottom (Down: moving to the other screen) */
+        var sinking by mutableStateOf(false)
+        /** apps running on the bottom screen right now (Down moves them up instead) */
+        val bottom = mutableStateListOf<String>()
+        /** the bottom screen's display, when there is one */
+        var bottomId: Int? = null
         val shots = mutableStateMapOf<String, ImageBitmap>()
     }
 
@@ -237,17 +244,18 @@ object AppSwitcher {
         when (code) {
             // past either end of the row: Home
             KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_BUTTON_L1 -> when {
-                s.flying -> {}
+                s.flying || s.sinking -> {}
                 s.sel > 0 -> { s.sel--; s.expanded = false }
                 repeat == 0 -> finish(svc, switch = false, goHome = true)
             }
             KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_BUTTON_R1 -> when {
-                s.flying -> {}
+                s.flying || s.sinking -> {}
                 s.sel < s.apps.lastIndex -> { s.sel++; s.expanded = false }
                 repeat == 0 -> finish(svc, switch = false, goHome = true)
             }
-            KeyEvent.KEYCODE_DPAD_UP -> if (repeat == 0 && !s.flying) { if (!s.expanded) s.expanded = true else dismiss(svc) }
-            KeyEvent.KEYCODE_DPAD_DOWN -> if (repeat == 0) s.expanded = false
+            KeyEvent.KEYCODE_DPAD_UP -> if (repeat == 0 && !s.flying && !s.sinking) { if (!s.expanded) s.expanded = true else dismiss(svc) }
+            // Down: a lifted card goes back into the row; a card in the row moves its app to the other screen
+            KeyEvent.KEYCODE_DPAD_DOWN -> if (repeat == 0 && !s.flying && !s.sinking) { if (s.expanded) s.expanded = false else sink(svc) }
             KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BACK -> finish(svc, switch = false)
             KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_DPAD_CENTER -> finish(svc, switch = true)
             else -> {}
@@ -286,11 +294,16 @@ object AppSwitcher {
         loadMru(svc)
         val pm = svc.packageManager
         val now = System.currentTimeMillis()
+        // apps running on the bottom screen get a card too (right after the one on top), so Down can bring them up
+        val bottomId = Screens.companion(svc)?.displayId
+        val onBottom = if (bottomId != null) appsOnDisplay(svc, bottomId) else emptyList()
         // (Eclipse itself never gets a card)
-        val pkgs = mru.filter { it != svc.packageName && pm.getLaunchIntentForPackage(it) != null }.take(MAX_APPS)
+        val pkgs = (mru.take(1) + onBottom + mru.drop(1)).distinct().filter { it != svc.packageName && pm.getLaunchIntentForPackage(it) != null }.take(MAX_APPS)
         if (pkgs.isEmpty()) return
         val st = UiState()
         st.current = mru.firstOrNull()
+        st.bottomId = bottomId
+        st.bottom.addAll(onBottom)
         pkgs.forEachIndexed { i, p ->
             val label = if (p == svc.packageName) "Eclipse" else runCatching { pm.getApplicationLabel(pm.getApplicationInfo(p, 0)).toString() }.getOrDefault(p)
             val icon = runCatching { iconBitmap(pm.getApplicationIcon(p))?.asImageBitmap() }.getOrNull()
@@ -356,6 +369,58 @@ object AppSwitcher {
         val c = android.graphics.Canvas(b)
         d.setBounds(0, 0, size, size); d.draw(c); b
     }.getOrNull()
+
+    /** The apps with a window on display [id] (package names only), newest first. Android 11+. */
+    private fun appsOnDisplay(svc: AccessibilityService, id: Int): List<String> {
+        if (Build.VERSION.SDK_INT < 30) return emptyList()
+        val ws = runCatching { svc.windowsOnAllDisplays.get(id) }.getOrNull() ?: return emptyList()
+        return ws.filter { it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION }.mapNotNull { w ->
+            runCatching { w.root?.let { r -> r.packageName?.toString().also { @Suppress("DEPRECATION") r.recycle() } } }.getOrNull()
+        }.filter { it != svc.packageName && it != "com.android.systemui" }.distinct()
+    }
+
+    /** Down on a card in the row: it sinks off the bottom, then its app moves to the other screen (see [moveChosen]). */
+    private fun sink(svc: AccessibilityService) {
+        val s = state ?: return
+        val e = s.apps.getOrNull(s.sel) ?: return
+        if (s.bottomId == null) { toast(svc, "There's no second screen to move it to"); return }
+        if (e.pkg == svc.packageName) return
+        moveSvc = svc
+        s.sinking = true
+    }
+    private var moveSvc: AccessibilityService? = null
+
+    /**
+     * After the sink: the switcher closes and the app moves, still running, to the other screen. On the bottom screen
+     * Eclipse's own page steps aside for it (and comes back when it closes or moves up again).
+     */
+    private fun moveChosen() {
+        val svc = moveSvc ?: return
+        val s = state ?: return
+        s.sinking = false
+        val e = s.apps.getOrNull(s.sel) ?: return
+        val bottomId = s.bottomId ?: return
+        val up = e.pkg in s.bottom
+        val to = if (up) Screens.mainId else bottomId
+        val from = if (up) bottomId else Screens.mainId
+        if (closed.isEmpty() && !ForceStop.busy) removeOverlay(svc) else finish(svc, switch = false)
+        val ctx = svc.applicationContext
+        Thread {
+            val r = Privileged.moveTask(ctx, e.pkg, to, from)
+            main.post {
+                when (r) {
+                    is Privileged.Moved.Ok -> {
+                        if (up) runCatching { SecondScreenHost.appLeft?.invoke() }
+                        else runCatching { SecondScreenHost.hideForApp?.invoke(e.pkg, bottomId); ScreenshotService.markWatchedSeen() }
+                    }
+                    is Privileged.Moved.NoRights -> toast(ctx, "Moving a running app needs root rights: AYN's root service (Settings \u2192 App switcher) or a rooted device")
+                    is Privileged.Moved.Failed -> toast(ctx, if (r.why == "not running") "${e.label} isn't running" else "Couldn't move ${e.label}: ${r.why}")
+                }
+            }
+        }.start()
+    }
+
+    private fun toast(ctx: Context, text: String) { runCatching { android.widget.Toast.makeText(ctx, text, android.widget.Toast.LENGTH_LONG).show() } }
 
     /** Up on a lifted card: it flies off the top, then the app is closed (see [removeChosen]). */
     private fun dismiss(svc: AccessibilityService) {
@@ -434,7 +499,7 @@ object AppSwitcher {
             setViewTreeLifecycleOwner(o)
             setViewTreeViewModelStoreOwner(o)
             setViewTreeSavedStateRegistryOwner(o)
-            setContent { SwitcherUi(st, onGone = { removeChosen() }) { i -> st.sel = i; finish(svc, switch = true) } }
+            setContent { SwitcherUi(st, onGone = { removeChosen() }, onSunk = { moveChosen() }) { i -> st.sel = i; finish(svc, switch = true) } }
             // focusable, so the D-pad's joystick hat reaches it (see onMotion)
             isFocusable = true
             isFocusableInTouchMode = true
@@ -482,16 +547,18 @@ object AppSwitcher {
 
     // ---- the look (the mock-up): the current app zooms out into a row of cards, the chosen one in gold
     @Composable
-    private fun SwitcherUi(st: UiState, onGone: () -> Unit, onTap: (Int) -> Unit) {
+    private fun SwitcherUi(st: UiState, onGone: () -> Unit, onSunk: () -> Unit, onTap: (Int) -> Unit) {
         val gold = ThemeColors.accent.value
         val ring = ThemeColors.focus.value
         val appear = remember { Animatable(0f) }
         LaunchedEffect(Unit) { appear.animateTo(1f, tween(320)) }
-        // the chosen card's lift: 0 in the row, 1 pushed up (Up), 1.7 gone off the top (Up again)
+        // the chosen card's lift: 0 in the row, 1 pushed up (Up), 1.7 gone off the top (Up again), -1.3 sunk off the
+        // bottom (Down: moving to the other screen)
         val lift = remember { Animatable(0f) }
-        LaunchedEffect(st.expanded, st.flying) {
+        LaunchedEffect(st.expanded, st.flying, st.sinking) {
             when {
                 st.flying -> { lift.animateTo(1.7f, tween(210)); lift.snapTo(0f); onGone() }
+                st.sinking -> { lift.animateTo(-1.3f, tween(230)); onSunk() }
                 st.expanded -> lift.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = 380f))
                 else -> lift.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = 420f))
             }
@@ -534,7 +601,7 @@ object AppSwitcher {
                     if (i == 0) scale += (1f / 0.60f - scale) * (1f - appear.value)
                     val x = if (a <= 1f) step1 * d else (step1 + w * 0.45f * (a - 1f)) * sign(d)
                     val y = -(h * 0.03f) - (if (chosen) h * 0.50f * lift.value else 0.dp)
-                    val alpha = (if (chosen) 1f - (lift.value - 1f).coerceIn(0f, 0.7f) / 0.7f else 0.85f) * (if (i == 0) 1f else appear.value) * (1f - 0.55f * leave)
+                    val alpha = (if (chosen) (1f - (lift.value - 1f).coerceIn(0f, 0.7f) / 0.7f) * (1f - (-lift.value - 0.6f).coerceIn(0f, 0.7f) / 0.7f) else 0.85f) * (if (i == 0) 1f else appear.value) * (1f - 0.55f * leave)
                     val shape = RoundedCornerShape(16.dp)
                     Box(
                         Modifier.align(Alignment.Center).offset(x = x, y = y).size(cardW, cardH).zIndex(if (chosen) 2f else -a)
@@ -565,7 +632,13 @@ object AppSwitcher {
                         Text(e.label, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 7.dp))
                     }
                     Text(
-                        if (st.closing) "CLOSING\u2026" else if (st.expanded) "UP AGAIN TO CLOSE  ·  DOWN TO KEEP" else if (e.pkg == st.current) "JUST NOW" else ago(e.time, now),
+                        when {
+                            st.closing -> "CLOSING\u2026"
+                            st.sinking -> if (e.pkg in st.bottom) "TO THE TOP SCREEN\u2026" else "TO THE BOTTOM SCREEN\u2026"
+                            st.expanded -> "UP AGAIN TO CLOSE  ·  DOWN TO KEEP"
+                            else -> (if (e.pkg in st.bottom) "ON THE BOTTOM SCREEN" else if (e.pkg == st.current) "JUST NOW" else ago(e.time, now)) +
+                                if (st.bottomId != null) (if (e.pkg in st.bottom) "  ·  DOWN: TO THE TOP" else "  ·  DOWN: TO THE BOTTOM") else ""
+                        },
                         color = Color(0xFFC8CAD2), fontSize = 8.5.sp, letterSpacing = 1.6.sp, modifier = Modifier.padding(top = 4.dp)
                     )
                 }

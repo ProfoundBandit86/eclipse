@@ -308,6 +308,9 @@ object SecondScreenHost {
 
     var hideForApp: ((pkg: String, displayId: Int) -> Unit)? = null
 
+    /** The app the bottom screen stepped aside for was moved to the top screen (app switcher, Down): come back. */
+    var appLeft: (() -> Unit)? = null
+
     /** The Companion's browser window is opening on the bottom screen: the overlay steps aside until [guideClosed]. */
     var hideForGuide: (() -> Unit)? = null
     var guideClosed: (() -> Unit)? = null
