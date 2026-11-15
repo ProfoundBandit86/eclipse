@@ -50,7 +50,7 @@ object GuideCatalogs {
         "nes" to setOf("NES"), "fc" to setOf("NES"), "fds" to setOf("FAMICOMDS"), "snes" to setOf("SNES"), "sfc" to setOf("SNES"),
         "gb" to setOf("GAMEBOY", "GB"), "gbc" to setOf("GBC"), "gba" to setOf("GBA"), "n64" to setOf("N64"), "nds" to setOf("DS"),
         "3ds" to setOf("3DS"), "gc" to setOf("GAMECUBE", "GC"), "wii" to setOf("WII"), "wiiu" to setOf("WIIU"), "switch" to setOf("NS", "SWITCH"),
-        "ps1" to setOf("PS"), "ps2" to setOf("PS2"), "ps3" to setOf("PS3"), "psp" to setOf("PSP"), "psvita" to setOf("VITA"),
+        "ps1" to setOf("PS"), "ps2" to setOf("PS2"), "ps3" to setOf("PS3"), "ps4" to setOf("PS4"), "xboxone" to setOf("XONE"), "psp" to setOf("PSP"), "psvita" to setOf("VITA"),
         "genesis" to setOf("GENESIS", "GEN"), "md" to setOf("GENESIS", "GEN"), "sms" to setOf("SMS"), "gg" to setOf("GG", "GAMEGEAR"),
         "saturn" to setOf("SATURN", "SAT"), "dreamcast" to setOf("DREAMCAST", "DC"), "xbox" to setOf("XBOX"), "xbox360" to setOf("X360", "XBOX360"),
         "arcade" to setOf("ARCADE"), "mame" to setOf("ARCADE"), "fbneo" to setOf("ARCADE"), "neogeo" to setOf("NEO", "ARCADE"),

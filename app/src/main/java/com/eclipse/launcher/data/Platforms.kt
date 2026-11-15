@@ -98,7 +98,7 @@ object Platforms {
         "sfc" to 1990, "sg1k" to 1983, "sharpx68000" to 1987, "sms" to 1986, "snes" to 1991, "steam" to 2003, "switch" to 2017,
         "tg16" to 1989, "tgcd" to 1989, "tic80" to 2017, "triforce" to 2002, "uze" to 2008, "vb" to 1995, "vc4k" to 1978, "vect" to 1982,
         "vic20" to 1980, "wasm4" to 2021, "wii" to 2006, "wiiu" to 2012, "windows" to 1985, "ws" to 1999, "wsc" to 2000, "wsv" to 1992,
-        "x1" to 1982, "xbox" to 2001, "xbox360" to 2005, "zx81" to 1981, "zxspectrum" to 1982, "android" to 2008
+        "x1" to 1982, "xbox" to 2001, "xbox360" to 2005, "xboxone" to 2013, "ps4" to 2013, "switch2" to 2025, "zx81" to 1981, "zxspectrum" to 1982, "android" to 2008
     )
     fun year(id: String): Int? = years[id] ?: years[id.removeSuffix("-hacks")]
 

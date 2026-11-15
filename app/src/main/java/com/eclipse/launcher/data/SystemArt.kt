@@ -80,7 +80,10 @@ object SystemArt {
         "wsc" to "wonderswancolor",
         "wsv" to "supervision",
         "xbox" to "xbox",
-        "xbox360" to "xbox360"
+        "xbox360" to "xbox360",
+        "xboxone" to "xboxone",
+        "ps4" to "ps4",
+        "switch2" to "switch"
     )
 
     /** Folders that have a colour logo (the rest fall back to the white one). */

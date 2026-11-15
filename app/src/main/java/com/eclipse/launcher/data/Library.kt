@@ -267,7 +267,10 @@ object Launch {
             if (pkg in safOnly && spec.data?.contains("{uri}") == true && safUri(ctx, pkg, path) == null) {
                 return "${spec.name} needs folder access. Choose your ROM folder again in Settings → Library (once), then try again."
             }
-            intent.setClassName(pkg, spec.activity ?: return "no activity known for ${spec.name}")
+            // no activity in the catalog: the emulator takes no game from outside (Bachata S4), so it just opens
+            val act = spec.activity ?: ctx.packageManager.getLaunchIntentForPackage(pkg)?.component?.className
+                ?: return "no activity known for ${spec.name}"
+            intent.setClassName(pkg, act)
             spec.action?.let { intent.action = it }
             spec.categories.forEach { intent.addCategory(it) }
             val data = spec.data?.let { Uri.parse(fill(it)) }

@@ -3182,7 +3182,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     /** Can [g] be uploaded? A file on this device that RomM doesn't have yet. */
     fun canUploadToRomm(g: Game): Boolean =
         // (not PC games: Steam / Windows entries are shortcuts, not files RomM can hold)
-        isConfigured("romm") && !g.isApp && g.platform !in setOf("android", "steam", "windows", "ps3", "xbox360") && !g.id.startsWith("rm:") && rommIdFor(g) == null && File(g.path).isFile
+        isConfigured("romm") && !g.isApp && g.platform !in setOf("android", "steam", "windows", "ps3", "ps4", "xbox360", "xboxone", "switch2") && !g.id.startsWith("rm:") && rommIdFor(g) == null && File(g.path).isFile
 
     /** Copies the game (every disc of a multi-disc game) into RomM's library; RomM adds it on its next scan. */
     fun uploadToRomm(g: Game) {
