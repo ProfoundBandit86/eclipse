@@ -4204,6 +4204,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         if (flag("p_lb") && LaunchBox.loaded) l.add("lb" to "LaunchBox") // local + offline: checked first
         l.add("has" to "Hasheous") // always on: it identifies the game for everything else
         if (ssReady()) l.add("ss" to "ScreenScraper") // by the ROM's checksum: exact matches, scans of the real box
+        if (iidbReady()) l.add("iidb" to "iiDB") // your own key: box art (also iiSU's style), logos, backgrounds, heroes
         // free, no account: GameTDB (Nintendo discs and cartridges by ID), ArcadeDB (arcade), libretro (everything else)
         if (flag("p_gtdb")) l.add("gtdb" to "GameTDB")
         if (flag("p_adb")) l.add("adb" to "ArcadeDB")
@@ -4212,6 +4213,8 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         if (igdbReady()) l.add("igdb" to "IGDB")
         return l
     }
+
+    private fun iidbReady(): Boolean = flag("p_iidb") && key("iidb").isNotBlank()
 
     private fun igdbReady(): Boolean = flag("p_igdb") && key("igdb_id").isNotBlank() && key("igdb_secret").isNotBlank()
 
@@ -4236,6 +4239,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         "ra" -> key("ra_user").isNotBlank() && key("ra_key").isNotBlank()
         "romm" -> rommConn() != null
         "ss" -> ssBuilt && key("ss_user").isNotBlank() && key("ss_pass").isNotBlank()
+        "iidb" -> key("iidb").isNotBlank()
         "ai" -> aiReady()
         else -> false
     }
@@ -4253,6 +4257,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
                 "ss" -> com.eclipse.launcher.data.ScreenScraper.account(key("ss_user"), key("ss_pass"))?.let { a ->
                     true to ("Signed in as ${a.name}" + if (a.maxPerDay > 0) " \u00b7 ${a.today} of ${a.maxPerDay} lookups today" else "")
                 } ?: (false to "Username or password not accepted, or no connection")
+                "iidb" -> com.eclipse.launcher.data.IiDb.check(key("iidb"))
                 "ai" -> com.eclipse.launcher.data.AiHelper.test(aiProvider, aiKey(), aiModel())?.let { false to it }
                     ?: (true to "Working \u00b7 " + aiName())
                 else -> return@launch
@@ -4295,7 +4300,7 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
         else ok to msg
     }
 
-    fun checkConnections() = listOf("sgdb", "igdb", "ra", "romm", "ss", "ai").forEach { if (isConfigured(it) && it !in connCheck) checkConnection(it) }
+    fun checkConnections() = listOf("sgdb", "igdb", "iidb", "ra", "romm", "ss", "ai").forEach { if (isConfigured(it) && it !in connCheck) checkConnection(it) }
 
     // ---- Hasheous: identify games from the ROM file itself ----
     /** The Hasheous match for this game (hashing the file the first time), or null. Cached per game. */
@@ -4342,7 +4347,8 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
             async(kotlinx.coroutines.Dispatchers.IO) { if (flag("p_lr")) runCatching { com.eclipse.launcher.data.Libretro.search(g.platform, q, ctx.cacheDir) }.getOrDefault(emptyList()) else emptyList() },
             async(kotlinx.coroutines.Dispatchers.IO) { if (LaunchBox.loaded) runCatching { LaunchBox.search(q) }.getOrDefault(emptyList()) else emptyList() },
             async(kotlinx.coroutines.Dispatchers.IO) { if (key("igdb_id").isNotBlank() && key("igdb_secret").isNotBlank()) runCatching { Scrapers.igdbSearch(key("igdb_id"), key("igdb_secret"), q) }.getOrDefault(emptyList()) else emptyList() },
-            async(kotlinx.coroutines.Dispatchers.IO) { if (key("sgdb").isNotBlank()) runCatching { Scrapers.sgdbSearch(key("sgdb"), q) }.getOrDefault(emptyList()) else emptyList() }
+            async(kotlinx.coroutines.Dispatchers.IO) { if (key("sgdb").isNotBlank()) runCatching { Scrapers.sgdbSearch(key("sgdb"), q) }.getOrDefault(emptyList()) else emptyList() },
+            async(kotlinx.coroutines.Dispatchers.IO) { if (iidbReady()) runCatching { com.eclipse.launcher.data.IiDb.search(key("iidb"), q) }.getOrDefault(emptyList()) else emptyList() }
         )
         val all = jobs.flatMap { it.await() }
         val fq = LaunchBox.fold(q)
@@ -4366,6 +4372,8 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
             LaunchBox.art(e, k)
         } ?: emptyList()
         "sgdb" -> Scrapers.sgdb(key("sgdb"), queryGame(g), k)
+        "iidb" -> if (g.isApp) emptyList() else com.eclipse.launcher.data.IiDb.lookup(key("iidb"), g.platform, queryGame(g).name)
+            ?.let { com.eclipse.launcher.data.IiDb.art(it, k) } ?: emptyList()
         "ss" -> ssEntry(g)?.let { e ->
             e.synopsis?.let { saveDesc(g, it) }
             com.eclipse.launcher.data.ScreenScraper.art(e, k)

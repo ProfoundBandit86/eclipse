@@ -1449,6 +1449,13 @@ private fun ScrapeSources(vm: EclipseVM) {
         if (vm.isConfigured("sgdb")) ToggleRow("Use SteamGridDB", null, vm.flag("p_sgdb")) { vm.setFlag("p_sgdb", it) }
         InfoRow("Where to get a key", "steamgriddb.com → sign in → Preferences → API.")
     }
+    // iiDB (iiSU's game database): your own key
+    val (iiDot, iiText) = statusOf(vm, "iidb", "Not set up")
+    ServiceCard("iiDB", iiText, iiDot, openL == "iidb", { toggleL("iidb") }) {
+        FieldRow("API key", vm.key("iidb"), secret = true) { vm.setKey("iidb", it.trim()); vm.checkConnection("iidb") }
+        if (vm.isConfigured("iidb")) ToggleRow("Use iiDB", "Box art (also in iiSU's style, under Poster), logos, backgrounds and heroes.", vm.flag("p_iidb")) { vm.setFlag("p_iidb", it) }
+        InfoRow("Where to get a key", "accounts.iisu.network → sign in → your profile → iiDB API key. How fast it can look games up depends on your iiSU membership.")
+    }
 
     }, {
     DropSection(" ")
@@ -2579,6 +2586,7 @@ private fun Credits(vm: EclipseVM) {
     CreditRow(vm, "Zstandard, liblzma, {fmt}, Mbed TLS", "Used by Dolphin's converter \u00b7 BSD, public domain, MIT, Apache 2.0", "https://github.com/dolphin-emu/dolphin/tree/master/Externals")
     CreditRow(vm, "ZArchive (Xbox 360 .zar files)", "Exzap \u00b7 MIT No Attribution", "https://github.com/Exzap/ZArchive")
     CreditRow(vm, "Game Twin (guide and map catalogues, title matching)", "Mert Aslantürk \u00b7 GPL-3.0", "https://github.com/alpha-minus/game-twin")
+    CreditRow(vm, "iiDB (game artwork, when you add your key)", "Catalog data from iiDB (iisu.network), adapted from the Libretro Database \u00b7 CC BY-SA 4.0", "https://iisu.network/license")
     CreditRow(vm, "Awesome Android Native Ports (the Ports & recomps list)", "abduznik \u00b7 CC0-1.0", "https://github.com/abduznik/awesome-android-native-ports")
     CreditRow(vm, "jcifs-ng (network shares)", "AgNO3 & contributors \u00b7 LGPL 2.1", "https://github.com/AgNO3/jcifs-ng")
     CreditRow(vm, "Jetpack Compose, AndroidX & Material icons", "Google \u00b7 Apache License 2.0", "https://developer.android.com/jetpack/androidx")
