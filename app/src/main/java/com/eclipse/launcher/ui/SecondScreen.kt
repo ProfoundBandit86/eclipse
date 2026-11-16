@@ -52,6 +52,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.blur
@@ -199,20 +200,15 @@ fun SecondaryContent(vm: EclipseVM, displayId: Int) {
                 }
             }
             if (dockOn && pager.currentPage == 0) {
-                BottomDock(vm, launch, { drawer = true }, Modifier.align(Alignment.BottomCenter).padding(bottom = 22.dp))
-                // the grab handle under the dock: swipe up (or tap) for the app drawer
-                Box(
-                    Modifier.align(Alignment.BottomCenter).fillMaxWidth(0.5f).height(20.dp)
-                        .pointerInput(Unit) { detectTapGestures { drawer = true } }
-                        .pointerInput(Unit) {
-                            var acc = 0f
-                            detectVerticalDragGestures(onDragEnd = { acc = 0f }, onDragCancel = { acc = 0f }) { _, dy ->
-                                acc += dy
-                                if (acc < -30f) { acc = 0f; drawer = true }
-                            }
-                        },
-                    contentAlignment = Alignment.Center
-                ) { Box(Modifier.size(36.dp, 4.dp).clip(RoundedCornerShape(2.dp)).background(C.x(0x66FFFFFFL))) }
+                // (no grab handle under it any more: swiping up on the dock, or its middle button, opens the app drawer)
+                // its height is measured, so the page above (and its buttons) always sit clear of it, whatever the
+                // dock's size setting
+                val dens = androidx.compose.ui.platform.LocalDensity.current
+                BottomDock(
+                    vm, launch, { drawer = true },
+                    Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp)
+                        .onSizeChanged { dockHeight.value = with(dens) { it.height.toDp() } + 10.dp }
+                )
             }
             // something is playing: a chip on the main page that jumps to the media controls
             val playing by vm.media.info.collectAsState()
@@ -281,6 +277,9 @@ fun SecondaryContent(vm: EclipseVM, displayId: Int) {
  * Hold an icon and drag it to another slot to move it; hold without moving to remove it. Its look (glass, solid,
  * floating icons or a full-width bar) and icon size come from Settings → Dual screen.
  */
+/** The bottom dock's height (with its margin) as last measured: the page above keeps its buttons clear of it. */
+private val dockHeight = androidx.compose.runtime.mutableStateOf(96.dp)
+
 @Composable
 private fun BottomDock(vm: EclipseVM, launch: (String) -> Unit, openDrawer: () -> Unit, modifier: Modifier) {
     var removePkg by remember { mutableStateOf<String?>(null) }
@@ -587,7 +586,8 @@ private fun NowPlayingPage(
     }
     var ra by remember(s?.game?.id) { mutableStateOf<RaProgress?>(null) }
     LaunchedEffect(s?.game?.id) { ra = s?.game?.let { vm.loadRa(it) } }
-    val bottomPad = if (dockOn) 104.dp else 24.dp
+    // clear of the dock (its measured height, see dockHeight), with a small gap
+    val bottomPad = if (dockOn) (dockHeight.value + 8.dp).coerceAtLeast(84.dp) else 24.dp
     // the buttons also show with no game running, unless that's turned off (and there's at least one button)
     val idleButtons = vm.flag("np_idle_buttons", true) && (vm.flag("npb_shot") || openMirror != null || vm.flag("npb_walk"))
 
