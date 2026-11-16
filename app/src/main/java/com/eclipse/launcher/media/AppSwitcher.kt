@@ -224,8 +224,9 @@ object AppSwitcher {
         // the let-go of the press that chose the button: not a "quick press" (that would go Back in Settings)
         if (e.keyCode == swallowUp) { if (e.action == KeyEvent.ACTION_UP) swallowUp = 0; return true }
         val code = keyCode(svc)
-        // Home (or the controller's Home button) held: the apps on the two screens swap places; a quick press is Home
-        if ((e.keyCode == KeyEvent.KEYCODE_HOME || e.keyCode == KeyEvent.KEYCODE_BUTTON_MODE) && e.keyCode != code && !isOpen &&
+        // Home held: the apps on the two screens swap places; a quick press is Home. Only Android's Home key: the
+        // controller's own button (BUTTON_MODE, the AYN button on the Thor) keeps its usual job
+        if (e.keyCode == KeyEvent.KEYCODE_HOME && e.keyCode != code && !isOpen &&
             homeSwap(svc) && Screens.companion(svc) != null) {
             when (e.action) {
                 KeyEvent.ACTION_DOWN -> if (e.repeatCount == 0) {
