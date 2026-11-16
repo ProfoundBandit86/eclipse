@@ -262,7 +262,7 @@ private val SETTINGS_INDEX: List<Triple<String, Int, String>> = listOf(
     Triple("24-hour clock", 4, "time"), Triple("Auto-hide dock", 4, "left dock"), Triple("Compact dock", 4, "icons only"), Triple("Pages", 4, "left dock order hide move search recent systems apps scopes"),
     Triple("Clock panel", 4, "time wifi corner"),
     Triple("Default launcher", 5, "home app"), Triple("Daily test builds", 5, "update channel stable daily beta pre-release"), Triple("Run setup again", 5, "wizard first run"),
-    Triple("Use second screen", 4, "dual bottom display"), Triple("Dim the bottom screen", 4, "dim sleep dark idle battery timeout level"), Triple("Media controls page", 4, "music playback"), Triple("Screen mirror page", 4, "mirror"), Triple("Transfers page", 4, "romm download upload chd progress"), Triple("Show finished transfers", 4, "romm history done"),
+    Triple("Use second screen", 4, "dual bottom display"), Triple("Apps cover the bottom screen", 4, "overlay app window covers bottom screen under apps"), Triple("Dim the bottom screen", 4, "dim sleep dark idle battery timeout level"), Triple("Media controls page", 4, "music playback"), Triple("Screen mirror page", 4, "mirror"), Triple("Transfers page", 4, "romm download upload chd progress"), Triple("Show finished transfers", 4, "romm history done"),
     Triple("Dock on second screen", 4, "bottom dock"), Triple("Where apps open", 4, "which screen"), Triple("Now Playing buttons", 4, "screenshot walkthrough"),
     Triple("Show Now Playing", 4, "bottom screen game running"), Triple("Buttons when no game runs", 4, "now playing screenshot mirror companion idle hide"),
     Triple("LaunchBox", 3, "artwork database scraper"), Triple("Save as WebP", 1, "webp lossless png space compress images"), Triple("Generate missing art", 1, "generate draw media physical cart 3d box missing"),
@@ -492,6 +492,12 @@ private fun DualScreen(vm: EclipseVM) {
     TwoColumns({
         DropSection("Second screen")
         ToggleRow("Use second screen", "Now Playing, media and the dock on the bottom display.", on) { vm.setFlag("dual", it) }
+        // the bottom screen as an app screen (apps opened or moved there cover it) or the old overlay
+        ToggleRow(
+            "Apps cover the bottom screen",
+            "On: Eclipse's bottom screen sits underneath any app opened or moved there, and is back when the app goes. Off: the old overlay, which hides for apps Eclipse opens.",
+            vm.flag("bottom_app", true)
+        ) { vm.setFlag("bottom_app", it) }
         // everything else here greys out (and can't be reached) while it's off
         Box(Modifier.fillMaxWidth()) {
         Column(

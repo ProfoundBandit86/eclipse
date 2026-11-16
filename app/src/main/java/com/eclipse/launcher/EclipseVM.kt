@@ -189,7 +189,11 @@ class EclipseVM(app: Application) : AndroidViewModel(app) {
     var companionTop by mutableStateOf<Game?>(null)
     /** A game's page → Companion: on the bottom screen when it's showing, else over this one. */
     fun openCompanion(g: Game) {
-        if (com.eclipse.launcher.media.SecondaryPresentation.current != null) { companionBottom = g; message = "Companion opened on the bottom screen" }
+        val bottom = com.eclipse.launcher.media.BottomScreen.current
+        if (bottom != null && (bottom.isShowing || bottom.stacksUnderApps)) {
+            companionBottom = g; message = "Companion opened on the bottom screen"
+            bottom.bringToFront() // (an app on the bottom screen: Eclipse's screen comes in front of it)
+        }
         else companionTop = g
     }
     var onDeckRemove by mutableStateOf<Game?>(null)       // "remove from Recently Played?" (Select on an On Deck game)

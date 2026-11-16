@@ -227,9 +227,9 @@ fun CompanionHub(vm: EclipseVM, g: Game, close: () -> Unit) {
      * only used if Android won't open the window.
      */
     fun openSite(site: Guides.Site) {
-        val pres = com.eclipse.launcher.media.SecondaryPresentation.current
+        val pres = com.eclipse.launcher.media.BottomScreen.current
         val onBottom = pres != null && vm.companionBottom?.id == g.id
-        val display = if (onBottom) pres?.display?.displayId else null
+        val display = if (onBottom) pres?.displayId else null
         if (!GuideBrowserActivity.open(ctx, site, g.id, display, onBottom) { browser = site }) browser = site
     }
     var mapView by remember { mutableStateOf<CompanionData.GameMap?>(null) }
@@ -629,9 +629,9 @@ private fun HubSearch(g: Game, onCancel: () -> Unit, onGo: (String) -> Unit) {
     val fr = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     // the bottom screen's window takes focus while typing (it can't get the keyboard otherwise)
-    DisposableEffect(Unit) { onDispose { com.eclipse.launcher.media.SecondaryPresentation.current?.setTyping(false) } }
+    DisposableEffect(Unit) { onDispose { com.eclipse.launcher.media.BottomScreen.current?.setTyping(false) } }
     LaunchedEffect(Unit) {
-        com.eclipse.launcher.media.SecondaryPresentation.current?.setTyping(true)
+        com.eclipse.launcher.media.BottomScreen.current?.setTyping(true)
         delay(80)
         runCatching { fr.requestFocus() }
         keyboard?.show()
@@ -847,9 +847,9 @@ private fun BlockView(b: Guides.Block, size: Int, query: String, isHit: Boolean,
 private fun FindBar(query: String, matches: List<Int>, hit: Int, onQuery: (String) -> Unit, onStep: (Int) -> Unit, onClose: () -> Unit) {
     val fr = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
-    DisposableEffect(Unit) { onDispose { com.eclipse.launcher.media.SecondaryPresentation.current?.setTyping(false) } }
+    DisposableEffect(Unit) { onDispose { com.eclipse.launcher.media.BottomScreen.current?.setTyping(false) } }
     LaunchedEffect(Unit) {
-        com.eclipse.launcher.media.SecondaryPresentation.current?.setTyping(true)
+        com.eclipse.launcher.media.BottomScreen.current?.setTyping(true)
         delay(80)
         runCatching { fr.requestFocus() }
         keyboard?.show()
@@ -1063,9 +1063,9 @@ private fun HubInput(title: String, hint: String, button: String, start: String 
     val fr = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     // the bottom screen's window takes focus while typing (it can't get the keyboard otherwise)
-    DisposableEffect(Unit) { onDispose { com.eclipse.launcher.media.SecondaryPresentation.current?.setTyping(false) } }
+    DisposableEffect(Unit) { onDispose { com.eclipse.launcher.media.BottomScreen.current?.setTyping(false) } }
     LaunchedEffect(Unit) {
-        com.eclipse.launcher.media.SecondaryPresentation.current?.setTyping(true)
+        com.eclipse.launcher.media.BottomScreen.current?.setTyping(true)
         delay(80)
         runCatching { fr.requestFocus() }
         keyboard?.show()
@@ -1708,14 +1708,14 @@ private fun AskTab(vm: EclipseVM, g: Game, root: File, open: (Guides.Site) -> Un
     LaunchedEffect(msgs.size, busy) { if (msgs.isNotEmpty()) runCatching { list.animateScrollToItem(msgs.size + (if (busy) 1 else 0)) } }
     // the bottom screen's window takes focus only while typing (it can't get the keyboard otherwise)
     LaunchedEffect(typing) {
-        val p = com.eclipse.launcher.media.SecondaryPresentation.current
+        val p = com.eclipse.launcher.media.BottomScreen.current
         if (typing) { p?.setTyping(true); delay(80); runCatching { fr.requestFocus() }; keyboard?.show() }
         else { keyboard?.hide(); p?.setTyping(false) }
     }
     val recognizer = remember { mutableStateOf<android.speech.SpeechRecognizer?>(null) }
     DisposableEffect(Unit) {
         onDispose {
-            com.eclipse.launcher.media.SecondaryPresentation.current?.setTyping(false)
+            com.eclipse.launcher.media.BottomScreen.current?.setTyping(false)
             runCatching { recognizer.value?.destroy() }
         }
     }

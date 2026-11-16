@@ -93,6 +93,18 @@
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
             android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|smallestScreenSize|density" />
 
+        <!-- Eclipse's bottom screen as an app screen in its own task on the bottom display: apps opened or moved there
+             sit on top of it, and it's underneath again when they go (media/BottomScreen.kt) -->
+        <activity
+            android:name=".media.BottomScreenActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:taskAffinity="com.eclipse.launcher.bottom"
+            android:resizeableActivity="true"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+            android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|smallestScreenSize|density" />
+
         <activity
             android:name=".media.MirrorPermissionActivity"
             android:exported="false"

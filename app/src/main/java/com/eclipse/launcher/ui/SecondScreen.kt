@@ -406,10 +406,10 @@ private fun DrawerOverlay(vm: EclipseVM, launch: (String) -> Unit, close: () -> 
     val searchFr = remember { androidx.compose.ui.focus.FocusRequester() }
     val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     var typing by remember { mutableStateOf(false) }
-    DisposableEffect(Unit) { onDispose { com.eclipse.launcher.media.SecondaryPresentation.current?.setTyping(false) } }
+    DisposableEffect(Unit) { onDispose { com.eclipse.launcher.media.BottomScreen.current?.setTyping(false) } }
     LaunchedEffect(typing) {
         if (typing) {
-            com.eclipse.launcher.media.SecondaryPresentation.current?.setTyping(true)
+            com.eclipse.launcher.media.BottomScreen.current?.setTyping(true)
             delay(80)
             runCatching { searchFr.requestFocus() }
             keyboard?.show()
@@ -887,10 +887,10 @@ private fun WalkSheet(vm: EclipseVM, g: Game, openViewer: (String) -> Unit, clos
     val fieldFr = remember { androidx.compose.ui.focus.FocusRequester() }
     val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     var typing by remember { mutableStateOf(false) }
-    DisposableEffect(Unit) { onDispose { com.eclipse.launcher.media.SecondaryPresentation.current?.setTyping(false) } }
+    DisposableEffect(Unit) { onDispose { com.eclipse.launcher.media.BottomScreen.current?.setTyping(false) } }
     LaunchedEffect(typing) {
         if (typing) {
-            com.eclipse.launcher.media.SecondaryPresentation.current?.setTyping(true)
+            com.eclipse.launcher.media.BottomScreen.current?.setTyping(true)
             delay(80)
             runCatching { fieldFr.requestFocus() }
             keyboard?.show()

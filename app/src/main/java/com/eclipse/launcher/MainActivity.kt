@@ -34,7 +34,8 @@ class MainActivity : ComponentActivity() {
 
     // Bottom screen. A Presentation window sits above normal apps on that display, so the device's own
     // second-screen launcher can't cover it (that's what happened with a regular activity on the AYN Thor).
-    private var presentation: SecondaryPresentation? = null
+    /** Eclipse's bottom screen: an app screen under any app there (default), or the old overlay (media/BottomScreen.kt). */
+    private var presentation: com.eclipse.launcher.media.BottomSurface? = null
     private var hiddenForApp = false
     /** The Companion's browser window is open on the bottom screen (the overlay is hidden until it closes). */
     private var guideOpen = false
@@ -176,7 +177,7 @@ class MainActivity : ComponentActivity() {
         if (placeMain()) return
         // show / hide the second screen when the "dual" setting changes
         lifecycleScope.launch {
-            snapshotFlow { vm.flag("dual") }.collect { syncSecondScreen() }
+            snapshotFlow { vm.flag("dual") to vm.flag("bottom_app", true) }.collect { syncSecondScreen() }
         }
         (getSystemService(DISPLAY_SERVICE) as DisplayManager).registerDisplayListener(displayListener, null)
         SecondScreenHost.owner = this
@@ -184,9 +185,12 @@ class MainActivity : ComponentActivity() {
         SecondScreenHost.appLeft = { handler.post { restoreAfterApp() } }
         SecondScreenHost.hideForGuide = {
             handler.post {
-                presentation?.let { if (it.isShowing) runCatching { it.hide() } }
-                hiddenForApp = true
-                guideOpen = true
+                // (as an app screen it's simply under the browser window: nothing to hide)
+                if (presentation?.stacksUnderApps != true) {
+                    presentation?.let { if (it.isShowing) runCatching { it.hide() } }
+                    hiddenForApp = true
+                    guideOpen = true
+                }
             }
         }
         SecondScreenHost.guideClosed = {
@@ -203,7 +207,7 @@ class MainActivity : ComponentActivity() {
                 if (!placeMain()) {
                     // which display may have changed: start the second screen again on the right one
                     val want = secondDisplay()?.displayId
-                    if (presentation != null && presentation?.display?.displayId != want) closeSecondScreen()
+                    if (presentation != null && presentation?.displayId != want) closeSecondScreen()
                     syncSecondScreen()
                     presentation?.applyFocusMode()
                 }
@@ -227,6 +231,7 @@ class MainActivity : ComponentActivity() {
         watchdog = null
         presentation?.dismiss()
         presentation = null
+        com.eclipse.launcher.media.BottomScreen.current = null
         hiddenForApp = false
         guideOpen = false
     }
@@ -332,7 +337,8 @@ class MainActivity : ComponentActivity() {
 
     /** The second screen's display turned off: stop drawing it. Back on: show it again (unless an app is using it). */
     private fun screenStateChanged(id: Int) {
-        val p = presentation ?: return
+        // (an app screen looks after itself when its display turns off)
+        val p = (presentation as? com.eclipse.launcher.media.PresentationSurface)?.p ?: return
         if (p.display.displayId != id) return
         val off = p.display.state == Display.STATE_OFF
         if (off && p.isShowing) { runCatching { p.hide() }; offHidden = true }
@@ -361,29 +367,37 @@ class MainActivity : ComponentActivity() {
         if (!want || d == null) {
             presentation?.dismiss()
             presentation = null
+            com.eclipse.launcher.media.BottomScreen.current = null
             hiddenForApp = false
             return
         }
+        val asApp = vm.flag("bottom_app", true)
         val p = presentation
-        if (p != null && p.display.displayId == d.displayId && (p.isShowing || hiddenForApp || offHidden)) return
+        if (p != null && p.displayId == d.displayId && p.stacksUnderApps == asApp) {
+            if (p.stacksUnderApps) { if (!p.isShowing) p.show() } // (closed by Android, or the close button: open it again)
+            if (p.isShowing || hiddenForApp || offHidden) return
+        }
         p?.dismiss()
         hiddenForApp = false
         offHidden = false
+        val focusable = { vm.flag("bottom_focus", Screens.bottomFocusDefault()) }
+        val onLeave = { handler.post { focusMain() }; Unit }
         presentation = try {
-            SecondaryPresentation(
-                this, d,
-                focusable = { vm.flag("bottom_focus", Screens.bottomFocusDefault()) },
-                onLeave = { handler.post { focusMain() } }
-            ) { SecondaryContent(vm, d.displayId) }.also { it.show() }
+            if (asApp) com.eclipse.launcher.media.ActivitySurface(applicationContext, d.displayId, focusable, onLeave) { SecondaryContent(vm, d.displayId) }.also { it.show() }
+            else com.eclipse.launcher.media.PresentationSurface(
+                SecondaryPresentation(this, d, focusable = focusable, onLeave = onLeave) { SecondaryContent(vm, d.displayId) }.also { it.show() }
+            )
         } catch (e: Exception) {
             vm.message = "Couldn't open the second screen: ${e.message}"
             null
         }
+        com.eclipse.launcher.media.BottomScreen.current = presentation
     }
 
     /** An app was opened from the bottom dock: step aside so it's visible, and come back when it closes. */
     private fun hideForApp(pkg: String, displayId: Int) {
         val p = presentation ?: return
+        if (p.stacksUnderApps) return // an app screen: the app is simply on top of it
         if (p.isShowing) p.hide()
         hiddenForApp = true
         // With Eclipse's accessibility helper on, we see the app close and return right away.
@@ -407,6 +421,7 @@ class MainActivity : ComponentActivity() {
         watchdog = null
         if (!hiddenForApp) return
         hiddenForApp = false
+        if (presentation?.stacksUnderApps == true) return // (never brought in front of an app)
         try { presentation?.show() } catch (e: Exception) { presentation = null }
     }
 
