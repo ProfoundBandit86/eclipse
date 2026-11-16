@@ -244,6 +244,9 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         if (showingCrash || isChangingConfigurations) return
+        // an app screen stays: it sits under any app on its display by itself. Closing it here meant starting it again
+        // when Eclipse came back, and a newly started screen goes on top, covering the app running down there
+        if (presentation?.stacksUnderApps == true) return
         val justLaunched = System.currentTimeMillis() - SecondScreenHost.lastLaunchMs < 5_000
         if (!justLaunched && !hiddenForApp && vm.session == null) closeSecondScreen()
     }
