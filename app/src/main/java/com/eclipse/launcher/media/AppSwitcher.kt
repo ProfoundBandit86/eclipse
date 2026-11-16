@@ -75,7 +75,8 @@ import kotlin.math.sign
  * Runs inside the Eclipse helper (the accessibility service): it catches the button while open, and the overlay
  * takes focus to read the D-pad (a joystick hat on the Thor). It keeps the list of recent apps from the apps it
  * sees come to the front (only their names). Android doesn't share other apps' recent-app pictures, so each card
- * shows the picture taken the last time that app was in front, or the app's icon.
+ * shows the picture taken the last time that app was in front, or the app's icon. Where Eclipse can ask Android which
+ * apps are really open (Shizuku, AYN's root service or root), apps closed since then lose their cards.
  */
 object AppSwitcher {
     private const val PREFS = "eclipse"
@@ -339,8 +340,12 @@ object AppSwitcher {
         // apps running on the bottom screen get a card too (right after the one on top), so Down can bring them up
         val bottomId = Screens.companion(svc)?.displayId
         val onBottom = if (bottomId != null) appsOnDisplay(svc, bottomId) else emptyList()
-        // (Eclipse itself never gets a card)
-        val pkgs = (mru.take(1) + onBottom + mru.drop(1)).distinct().filter { it != svc.packageName && pm.getLaunchIntentForPackage(it) != null }.take(MAX_APPS)
+        // (Eclipse itself never gets a card.) Apps known to be closed are left out (the last list of open apps, see
+        // [pruneClosed]; an app seen since then counts as open); the list is checked again just below
+        val known = lastRunning
+        fun open(p: String) = known == null || p == mru.firstOrNull() || p in onBottom || p in known || (seenAt[p] ?: 0L) > lastRunningAt
+        val pkgs = (mru.take(1) + onBottom + mru.drop(1)).distinct()
+            .filter { it != svc.packageName && pm.getLaunchIntentForPackage(it) != null && open(it) }.take(MAX_APPS)
         if (pkgs.isEmpty()) return
         val st = UiState()
         st.current = mru.firstOrNull()
@@ -371,6 +376,38 @@ object AppSwitcher {
         // and of the app on the bottom screen (the switcher doesn't cover it), for its card in the swap view
         if (bottomId != null) onBottom.firstOrNull()?.let { capture(svc, it, st, bottomId) }
         addOverlay(svc, st)
+        pruneClosed(svc, st)
+    }
+
+    // the apps with an open task, the last time Android was asked (null: never, or it can't be asked here)
+    private var lastRunning: Set<String>? = null
+    private var lastRunningAt = 0L
+
+    /**
+     * Asks Android which apps are really open (through Shizuku, AYN's root service or root, like moving apps; see
+     * [Privileged.runningApps]) and takes away the cards of apps that were closed since, forgetting them for good (and
+     * their pictures) until they're opened again. Without any of those, the list stays as Eclipse remembers it.
+     */
+    private fun pruneClosed(svc: AccessibilityService, st: UiState) {
+        val ctx = svc.applicationContext
+        val asked = System.currentTimeMillis()
+        Thread {
+            val running = Privileged.runningApps(ctx) ?: return@Thread
+            main.post {
+                lastRunning = running; lastRunningAt = asked
+                val gone = mru.filter { it !in running && it != st.current && it !in st.bottom && (seenAt[it] ?: 0L) <= asked }
+                gone.forEach { p -> memShots.remove(p); runCatching { shotFile(ctx, p).delete() } }
+                if (gone.isNotEmpty()) { mru.removeAll(gone.toSet()); ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(MRU, mru.joinToString("\n")).apply() }
+                // the open switcher: not in the middle of a move, close or swap
+                if (state !== st || st.closing || st.flying || st.sinking || st.preview) return@post
+                val chosen = st.apps.getOrNull(st.sel)?.pkg
+                if (st.apps.removeAll { it.pkg in gone }) {
+                    st.sel = st.apps.indexOfFirst { it.pkg == chosen }.takeIf { it >= 0 } ?: st.sel.coerceIn(0, (st.apps.size - 1).coerceAtLeast(0))
+                    st.expanded = false
+                    if (st.apps.isEmpty()) { toast(ctx, "No apps open"); finish(svc, switch = false) }
+                }
+            }
+        }.start()
     }
 
     private fun entry(svc: AccessibilityService, p: String): Entry {

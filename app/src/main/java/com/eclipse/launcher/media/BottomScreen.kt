@@ -72,22 +72,29 @@ class ActivitySurface(
     }
 
     private val live: BottomScreenActivity? get() = BottomScreenActivity.live?.takeIf { !it.isFinishing && !it.isDestroyed }
-    override val isShowing: Boolean get() = live != null
+    // when it was asked to open and hasn't yet (Android takes a moment): counts as showing, so a second check right
+    // after (Eclipse starting checks on create and again on resume) doesn't throw it away and start it over
+    private var startedAt = 0L
+    private val starting: Boolean get() = live == null && android.os.SystemClock.uptimeMillis() - startedAt < 3_000
+    override val isShowing: Boolean get() = live != null || starting
     override val stacksUnderApps = true
 
-    /** Starts the screen on its display, unless it's already there (it is never brought in front of an app). */
+    /** Starts the screen on its display, unless it's already there or on its way (never brought in front of an app). */
     override fun show() {
-        if (live != null) return
+        if (live != null || starting) return
+        startedAt = android.os.SystemClock.uptimeMillis()
         val i = Intent(ctx, BottomScreenActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
-        runCatching { ctx.startActivity(i, ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle()) }
+        runCatching { ctx.startActivity(i, ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle()) }.onFailure { startedAt = 0L }
     }
 
     /** Nothing to do: an app on this screen covers it by itself. */
     override fun hide() {}
 
     override fun dismiss() {
+        startedAt = 0L
         live?.let { runCatching { it.finishAndRemoveTask() } }
+        // (one still on its way finds no content and closes itself, unless a new surface has set it again)
         BottomScreenActivity.content = null
     }
 

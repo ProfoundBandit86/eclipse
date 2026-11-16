@@ -392,7 +392,10 @@ private fun BottomDock(vm: EclipseVM, launch: (String) -> Unit, openDrawer: () -
     }
 }
 
-/** App drawer for the second screen: a sheet with search, the dock's pinned apps, then every app by letter. Long-press pins / unpins. */
+/**
+ * App drawer for the second screen: a sheet with search, your favourite apps (the same ones as the top screen's app
+ * drawer), then every app by letter. Long-press pins / unpins on the dock.
+ */
 @Composable
 private fun DrawerOverlay(vm: EclipseVM, launch: (String) -> Unit, close: () -> Unit) {
     var query by remember { mutableStateOf("") }
@@ -471,23 +474,11 @@ private fun DrawerOverlay(vm: EclipseVM, launch: (String) -> Unit, close: () -> 
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                 val cols = ((maxWidth - 36.dp - 28.dp) / 76.dp).toInt().coerceIn(3, 8)
                 androidx.compose.foundation.lazy.LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 40.dp)) {
+                    // favourites first (not while searching), in the order you added them
+                    val favs = if (query.isBlank()) vm.favApps.mapNotNull { p -> all.firstOrNull { it.pkg == p } } else emptyList()
+                    if (favs.isNotEmpty()) item(key = "favs") { DrawerSection(vm, "\u2605  Favorites", favs, cols, launch, close) }
                     groups.forEach { (letter, apps) ->
-                        item(key = "l:$letter") {
-                            Column(Modifier.padding(horizontal = 18.dp)) {
-                                // the letter as a gold section label with a hairline, like the top screen's sections
-                                Box(Modifier.padding(top = 10.dp, bottom = 2.dp)) { DropSection(letter) }
-                                Row(Modifier.padding(vertical = 2.dp)) {
-                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                        apps.chunked(cols).forEach { line ->
-                                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                line.forEach { app -> Box(Modifier.weight(1f)) { BottomDrawerTile(vm, app, launch, close) } }
-                                                repeat(cols - line.size) { Spacer(Modifier.weight(1f)) }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        item(key = "l:$letter") { DrawerSection(vm, letter, apps, cols, launch, close) }
                     }
                     if (shown.isEmpty()) item { Text("No apps match \u201c$query\u201d.", color = C.sub, modifier = Modifier.padding(18.dp)) }
                     // last: close Eclipse on this screen (e.g. when you've switched to another launcher); it comes back with Eclipse
@@ -513,6 +504,22 @@ private fun DrawerOverlay(vm: EclipseVM, launch: (String) -> Unit, close: () -> 
     }
 }
 
+
+/** One section of the bottom drawer: a gold label with a hairline (like the top screen's sections), its apps in lines. */
+@Composable
+private fun DrawerSection(vm: EclipseVM, title: String, apps: List<AppEntry>, cols: Int, launch: (String) -> Unit, close: () -> Unit) {
+    Column(Modifier.padding(horizontal = 18.dp)) {
+        Box(Modifier.padding(top = 10.dp, bottom = 2.dp)) { DropSection(title) }
+        Column(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            apps.chunked(cols).forEach { line ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    line.forEach { app -> Box(Modifier.weight(1f)) { BottomDrawerTile(vm, app, launch, close) } }
+                    repeat(cols - line.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun BottomDrawerTile(vm: EclipseVM, app: AppEntry, launch: (String) -> Unit, close: () -> Unit) {

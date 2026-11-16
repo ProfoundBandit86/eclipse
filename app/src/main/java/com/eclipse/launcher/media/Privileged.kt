@@ -110,6 +110,16 @@ object Privileged {
         data class Failed(val why: String) : Moved()
     }
 
+    /**
+     * The packages with an open task right now (on any display), or null when nothing with the rights to ask is
+     * there (no Shizuku, AYN service or root) or the answer didn't come.
+     */
+    fun runningApps(ctx: Context): Set<String>? {
+        val out = runMover(ctx, "--list") ?: return null
+        if (!out.startsWith("OK")) return null
+        return out.removePrefix("OK").trim().split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+    }
+
     /** Moves [pkg]'s running task to display [to] (from display [from], when known), keeping its state. */
     fun moveTask(ctx: Context, pkg: String, to: Int, from: Int?): Moved {
         val out = runMover(ctx, *listOfNotNull(pkg, to.toString(), from?.toString()).toTypedArray()) ?: return Moved.NoRights

@@ -9,6 +9,9 @@ import android.os.IBinder
  * `CLASSPATH=<Eclipse's APK> app_process /system/bin com.eclipse.launcher.media.TaskMoveMain <package> <to> [from]`,
  * because the Android call that moves a task between displays (ActivityTaskManager's moveRootTaskToDisplay) is only
  * open to the system. It prints one line, "OK <task>" or "FAIL <why>", and exits.
+ *
+ * `… TaskMoveMain --list` instead prints "OK " and the packages that have a task right now (the apps really open, the
+ * same list Android's own Recents works from), comma-separated, for the app switcher.
  */
 object TaskMoveMain {
     @JvmStatic
@@ -24,23 +27,15 @@ object TaskMoveMain {
 
     private fun run(args: Array<String>): Int {
         val pkg = args.getOrNull(0) ?: return fail("no package")
+        if (pkg == "--list") {
+            val running = allTasks() ?: return fail("no task manager")
+            println("OK " + running.mapNotNull { (it.baseActivity ?: it.topActivity)?.packageName }.distinct().joinToString(","))
+            return 0
+        }
         val to = args.getOrNull(1)?.toIntOrNull() ?: return fail("no display")
         val from = args.getOrNull(2)?.toIntOrNull()
-        val sm = Class.forName("android.os.ServiceManager")
-        val binder = sm.getMethod("getService", String::class.java).invoke(null, "activity_task") as? IBinder ?: return fail("no activity_task")
-        val atm = Class.forName("android.app.IActivityTaskManager\$Stub").getMethod("asInterface", IBinder::class.java).invoke(null, binder)
-            ?: return fail("no task manager")
-        // getTasks' parameters differ between Android versions and makers: fill them by type
-        val getTasks = atm.javaClass.methods.firstOrNull { it.name == "getTasks" } ?: return fail("no getTasks")
-        var firstInt = true
-        val params = getTasks.parameterTypes.map { t ->
-            when (t) {
-                Int::class.javaPrimitiveType -> if (firstInt) { firstInt = false; 100 } else -1
-                Boolean::class.javaPrimitiveType -> false
-                else -> null
-            }
-        }.toTypedArray()
-        val tasks = (getTasks.invoke(atm, *params) as? List<*>).orEmpty().filterIsInstance<ActivityManager.RunningTaskInfo>()
+        val atm = taskManager() ?: return fail("no task manager")
+        val tasks = (allTasks() ?: return fail("no getTasks"))
             .filter { it.baseActivity?.packageName == pkg || it.topActivity?.packageName == pkg }
         if (tasks.isEmpty()) return fail("not running")
         val task = tasks.firstOrNull { from != null && displayOf(it) == from } ?: tasks.firstOrNull { displayOf(it) != to } ?: tasks.first()
@@ -51,6 +46,28 @@ object TaskMoveMain {
         move.invoke(atm, id, to)
         println("OK ${task.taskId}")
         return 0
+    }
+
+    private fun taskManager(): Any? {
+        val sm = Class.forName("android.os.ServiceManager")
+        val binder = sm.getMethod("getService", String::class.java).invoke(null, "activity_task") as? IBinder ?: return null
+        return Class.forName("android.app.IActivityTaskManager\$Stub").getMethod("asInterface", IBinder::class.java).invoke(null, binder)
+    }
+
+    /** Every task there is right now, on every display (null: the call isn't there). */
+    private fun allTasks(): List<ActivityManager.RunningTaskInfo>? {
+        val atm = taskManager() ?: return null
+        // getTasks' parameters differ between Android versions and makers: fill them by type
+        val getTasks = atm.javaClass.methods.firstOrNull { it.name == "getTasks" } ?: return null
+        var firstInt = true
+        val params = getTasks.parameterTypes.map { t ->
+            when (t) {
+                Int::class.javaPrimitiveType -> if (firstInt) { firstInt = false; 100 } else -1
+                Boolean::class.javaPrimitiveType -> false
+                else -> null
+            }
+        }.toTypedArray()
+        return (getTasks.invoke(atm, *params) as? List<*>).orEmpty().filterIsInstance<ActivityManager.RunningTaskInfo>()
     }
 
     private fun fail(why: String): Int { println("FAIL $why"); return 2 }
