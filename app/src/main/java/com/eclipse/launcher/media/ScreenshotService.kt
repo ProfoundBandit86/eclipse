@@ -38,7 +38,7 @@ class ScreenshotService : AccessibilityService() {
             val s = instance ?: return
             runCatching {
                 s.serviceInfo = s.serviceInfo.apply {
-                    flags = if (AppSwitcher.keyCode(s) != 0 || AppSwitcher.learning != null)
+                    flags = if (AppSwitcher.wantsKeys(s))
                         flags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
                     else flags and android.accessibilityservice.AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS.inv()
                 }
@@ -223,7 +223,7 @@ class ScreenshotService : AccessibilityService() {
         // catch key presses only once a switcher button is chosen (Settings → General → App switcher)
         runCatching {
             serviceInfo = serviceInfo.apply {
-                flags = if (AppSwitcher.keyCode(this@ScreenshotService) != 0 || AppSwitcher.learning != null)
+                flags = if (AppSwitcher.wantsKeys(this@ScreenshotService))
                     flags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
                 else flags and android.accessibilityservice.AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS.inv()
             }

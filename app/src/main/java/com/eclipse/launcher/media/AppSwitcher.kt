@@ -87,6 +87,13 @@ object AppSwitcher {
         val v = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, null) ?: return android.view.KeyEvent.KEYCODE_BACK
         return v.toIntOrNull() ?: 0 // ("" was how "off" used to be kept)
     }
+    /** Holding Home swaps the apps on the two screens (Settings → App switcher); on by default. */
+    fun homeSwap(ctx: Context): Boolean = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(HOME_SWAP, true)
+    fun setHomeSwap(ctx: Context, on: Boolean) { ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(HOME_SWAP, on).apply() }
+    private const val HOME_SWAP = "home_swap"
+    /** Whether the helper needs to see key presses at all (the switcher's button, choosing one, or Home held). */
+    fun wantsKeys(ctx: Context): Boolean = keyCode(ctx) != 0 || learning != null || homeSwap(ctx)
+
     fun setKeyCode(ctx: Context, code: Int) { ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, code.toString()).apply() }
     fun keyName(code: Int): String = if (code == 0) "Off" else KeyEvent.keyCodeToString(code).removePrefix("KEYCODE_").replace('_', ' ')
 
@@ -209,6 +216,22 @@ object AppSwitcher {
         // the let-go of the press that chose the button: not a "quick press" (that would go Back in Settings)
         if (e.keyCode == swallowUp) { if (e.action == KeyEvent.ACTION_UP) swallowUp = 0; return true }
         val code = keyCode(svc)
+        // Home (or the controller's Home button) held: the apps on the two screens swap places; a quick press is Home
+        if ((e.keyCode == KeyEvent.KEYCODE_HOME || e.keyCode == KeyEvent.KEYCODE_BUTTON_MODE) && e.keyCode != code && !isOpen &&
+            homeSwap(svc) && Screens.companion(svc) != null) {
+            when (e.action) {
+                KeyEvent.ACTION_DOWN -> if (e.repeatCount == 0) {
+                    homeLong = false; homeSvc = svc
+                    main.removeCallbacks(homeHold); main.postDelayed(homeHold, HOME_HOLD_MS)
+                }
+                KeyEvent.ACTION_UP -> {
+                    main.removeCallbacks(homeHold)
+                    if (!homeLong) main.post { runCatching { svc.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME) } }
+                    homeLong = false
+                }
+            }
+            return true
+        }
         if (code == 0) return false
         if (e.keyCode == code) {
             // holding it opens the switcher; pressing it again while open switches (B stays where you were);
@@ -369,6 +392,43 @@ object AppSwitcher {
         val c = android.graphics.Canvas(b)
         d.setBounds(0, 0, size, size); d.draw(c); b
     }.getOrNull()
+
+    // Home held
+    private const val HOME_HOLD_MS = 500L
+    private var homeLong = false
+    private var homeSvc: AccessibilityService? = null
+    private val homeHold = Runnable {
+        homeLong = true
+        homeSvc?.let { swapScreens(it) }
+    }
+
+    /**
+     * Home held: the app on the top screen goes to the bottom one and the app on the bottom screen comes up, both
+     * still running (see [Privileged]). With only one of them, just that one moves. Eclipse's own screens stay put.
+     */
+    private fun swapScreens(svc: AccessibilityService) {
+        val bottomId = Screens.companion(svc)?.displayId ?: return
+        val top = appsOnDisplay(svc, Screens.mainId).firstOrNull()
+        val bottom = appsOnDisplay(svc, bottomId).firstOrNull()
+        if (top == null && bottom == null) { toast(svc, "No app on either screen to swap"); return }
+        val ctx = svc.applicationContext
+        Thread {
+            val down = top?.let { Privileged.moveTask(ctx, it, bottomId, Screens.mainId) }
+            val up = bottom?.let { Privileged.moveTask(ctx, it, Screens.mainId, bottomId) }
+            main.post {
+                // Eclipse's bottom page steps aside for the app now down there, or comes back when it went up alone
+                if (down is Privileged.Moved.Ok && top != null) {
+                    runCatching { SecondScreenHost.hideForApp?.invoke(top, bottomId); ScreenshotService.markWatchedSeen() }
+                } else if (up is Privileged.Moved.Ok) runCatching { SecondScreenHost.appLeft?.invoke() }
+                val fail = listOfNotNull(down, up).firstOrNull { it !is Privileged.Moved.Ok }
+                when (fail) {
+                    is Privileged.Moved.NoRights -> toast(ctx, "Swapping screens needs Shizuku, AYN's root service (Settings \u2192 App switcher) or a rooted device")
+                    is Privileged.Moved.Failed -> toast(ctx, "Couldn't swap the screens: ${fail.why}")
+                    else -> {}
+                }
+            }
+        }.start()
+    }
 
     /** The apps with a window on display [id] (package names only), newest first. Android 11+. */
     private fun appsOnDisplay(svc: AccessibilityService, id: Int): List<String> {

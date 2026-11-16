@@ -436,6 +436,13 @@ private fun AppSwitcherRows(vm: EclipseVM) {
         else shizukuTick++
     }
     Note("With Shizuku running and allowed, Eclipse uses it to move apps between the screens (first, before AYN's service).")
+    // Home held: the apps on the two screens swap places
+    var homeSwap by remember { mutableStateOf(com.eclipse.launcher.media.AppSwitcher.homeSwap(ctx)) }
+    ToggleRow(
+        "Hold Home to swap screens",
+        "The app on the top screen goes to the bottom one and the bottom screen's app comes up, both still running. A quick press of Home is still Home.",
+        homeSwap
+    ) { homeSwap = it; com.eclipse.launcher.media.AppSwitcher.setHomeSwap(ctx, it); ScreenshotService.refreshKeyFilter() }
 }
 
 /** Settings → General → Permissions: one row with how many are on; A opens the list of them under it. */
