@@ -90,15 +90,8 @@ object AppSwitcher {
         val v = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, null) ?: return android.view.KeyEvent.KEYCODE_BACK
         return v.toIntOrNull() ?: 0 // ("" was how "off" used to be kept)
     }
-    /**
-     * Holding Home swaps the apps on the two screens (Settings → App switcher). Off by default: on the Thor the AYN
-     * button reaches Android as Home too, and catching it took away the Thor's own menu.
-     */
-    fun homeSwap(ctx: Context): Boolean = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(HOME_SWAP, false)
-    fun setHomeSwap(ctx: Context, on: Boolean) { ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(HOME_SWAP, on).apply() }
-    private const val HOME_SWAP = "home_swap"
-    /** Whether the helper needs to see key presses at all (the switcher's button, choosing one, or Home held). */
-    fun wantsKeys(ctx: Context): Boolean = keyCode(ctx) != 0 || learning != null || homeSwap(ctx)
+    /** Whether the helper needs to see key presses at all (the switcher's button, or choosing one). */
+    fun wantsKeys(ctx: Context): Boolean = keyCode(ctx) != 0 || learning != null
 
     fun setKeyCode(ctx: Context, code: Int) { ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, code.toString()).apply() }
     fun keyName(code: Int): String = if (code == 0) "Off" else KeyEvent.keyCodeToString(code).removePrefix("KEYCODE_").replace('_', ' ')
@@ -165,6 +158,10 @@ object AppSwitcher {
         val bottom = mutableStateListOf<String>()
         /** the bottom screen's display, when there is one */
         var bottomId: Int? = null
+        /** the bottom screen's app has its own card down there (an overlay on that screen) */
+        var bottomShown by mutableStateOf(false)
+        /** the controller works the bottom screen's card (no other apps open): Up lifts it, Up again brings it up */
+        var bottomFocus by mutableStateOf(false)
         val shots = mutableStateMapOf<String, ImageBitmap>()
     }
 
@@ -227,25 +224,6 @@ object AppSwitcher {
         // the let-go of the press that chose the button: not a "quick press" (that would go Back in Settings)
         if (e.keyCode == swallowUp) { if (e.action == KeyEvent.ACTION_UP) swallowUp = 0; return true }
         val code = keyCode(svc)
-        // Home held: the apps on the two screens swap places; a quick press is Home. Only Android's Home key: the
-        // controller's own button (BUTTON_MODE, the AYN button on the Thor) keeps its usual job
-        if (e.keyCode == KeyEvent.KEYCODE_HOME && e.keyCode != code && !isOpen &&
-            // (a Home from a controller, like the Thor's AYN button, is left alone)
-            !e.isFromSource(android.view.InputDevice.SOURCE_GAMEPAD) && !e.isFromSource(android.view.InputDevice.SOURCE_JOYSTICK) &&
-            homeSwap(svc) && Screens.companion(svc) != null) {
-            when (e.action) {
-                KeyEvent.ACTION_DOWN -> if (e.repeatCount == 0) {
-                    homeLong = false; homeSvc = svc
-                    main.removeCallbacks(homeHold); main.postDelayed(homeHold, HOME_HOLD_MS)
-                }
-                KeyEvent.ACTION_UP -> {
-                    main.removeCallbacks(homeHold)
-                    if (!homeLong) main.post { runCatching { svc.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME) } }
-                    homeLong = false
-                }
-            }
-            return true
-        }
         if (code == 0) return false
         if (e.keyCode == code) {
             // holding it opens the switcher; pressing it again while open switches (B stays where you were);
@@ -294,6 +272,9 @@ object AppSwitcher {
                 repeat == 0 -> finish(svc, switch = false, goHome = true)
             }
             KeyEvent.KEYCODE_DPAD_UP -> if (repeat == 0 && !s.flying) when {
+                // the bottom screen's card: Up lifts it part way, Up again brings the app up to the top screen
+                s.bottomFocus && s.preview -> swap(svc)
+                s.bottomFocus -> showBottomUp(svc)
                 s.preview -> s.preview = false
                 !s.expanded -> s.expanded = true
                 else -> dismiss(svc)
@@ -301,6 +282,7 @@ object AppSwitcher {
             // Down: a lifted card goes back into the row; a card in the row shows the swap (the bottom screen's app
             // above it); Down again swaps the two screens' apps
             KeyEvent.KEYCODE_DPAD_DOWN -> if (repeat == 0 && !s.flying) when {
+                s.bottomFocus -> s.preview = false
                 s.expanded -> s.expanded = false
                 s.preview -> swap(svc)
                 else -> showSwap(svc)
@@ -350,9 +332,10 @@ object AppSwitcher {
         // [pruneClosed]; an app seen since then counts as open); the list is checked again just below
         val known = lastRunning
         fun open(p: String) = known == null || p == mru.firstOrNull() || p in onBottom || p in known || (seenAt[p] ?: 0L) > lastRunningAt
-        val pkgs = (mru.take(1) + onBottom + mru.drop(1)).distinct()
-            .filter { it != svc.packageName && pm.getLaunchIntentForPackage(it) != null && open(it) }.take(MAX_APPS)
-        if (pkgs.isEmpty()) return
+        // the bottom screen's app isn't in the row: it gets its own card on the bottom screen (see addBottomOverlay)
+        val pkgs = mru.distinct()
+            .filter { it != svc.packageName && it !in onBottom && pm.getLaunchIntentForPackage(it) != null && open(it) }.take(MAX_APPS)
+        if (pkgs.isEmpty() && onBottom.isEmpty()) return
         val st = UiState()
         st.current = mru.firstOrNull()
         st.bottomId = bottomId
@@ -382,6 +365,9 @@ object AppSwitcher {
         // and of the app on the bottom screen (the switcher doesn't cover it), for its card in the swap view
         if (bottomId != null) onBottom.firstOrNull()?.let { capture(svc, it, st, bottomId) }
         addOverlay(svc, st)
+        addBottomOverlay(svc, st)
+        // only an app on the bottom screen: the controller works its card (Up lifts it, Up again brings it up)
+        if (st.apps.isEmpty()) st.bottomFocus = true
         pruneClosed(svc, st)
     }
 
@@ -410,7 +396,8 @@ object AppSwitcher {
                 if (st.apps.removeAll { it.pkg in gone }) {
                     st.sel = st.apps.indexOfFirst { it.pkg == chosen }.takeIf { it >= 0 } ?: st.sel.coerceIn(0, (st.apps.size - 1).coerceAtLeast(0))
                     st.expanded = false
-                    if (st.apps.isEmpty()) { toast(ctx, "No apps open"); finish(svc, switch = false) }
+                    if (st.apps.isEmpty() && st.bottom.isEmpty()) { toast(ctx, "No apps open"); finish(svc, switch = false) }
+                    else if (st.apps.isEmpty()) st.bottomFocus = true
                 }
             }
         }.start()
@@ -462,27 +449,6 @@ object AppSwitcher {
         d.setBounds(0, 0, size, size); d.draw(c); b
     }.getOrNull()
 
-    // Home held
-    private const val HOME_HOLD_MS = 500L
-    private var homeLong = false
-    private var homeSvc: AccessibilityService? = null
-    private val homeHold = Runnable {
-        homeLong = true
-        homeSvc?.let { swapScreens(it) }
-    }
-
-    /**
-     * Home held: the app on the top screen goes to the bottom one and the app on the bottom screen comes up, both
-     * still running (see [Privileged]). With only one of them, just that one moves. Eclipse's own screens stay put.
-     */
-    private fun swapScreens(svc: AccessibilityService) {
-        val bottomId = Screens.companion(svc)?.displayId ?: return
-        val top = appsOnDisplay(svc, Screens.mainId).firstOrNull()
-        val bottom = appsOnDisplay(svc, bottomId).firstOrNull()
-        if (top == null && bottom == null) { toast(svc, "No app on either screen to swap"); return }
-        moveApps(svc, top, bottom, bottomId)
-    }
-
     /** [top] goes down to the bottom screen and [bottom] comes up to the top one, both still running. */
     private fun moveApps(svc: AccessibilityService, top: String?, bottom: String?, bottomId: Int) {
         val ctx = svc.applicationContext
@@ -529,7 +495,17 @@ object AppSwitcher {
         } else {
             s.down = e
             s.up = s.bottom.firstOrNull { it != e.pkg }?.let { p -> s.apps.firstOrNull { it.pkg == p } ?: entry(svc, p) }
+            // (the top screen's card is the one sinking: its app goes down)
         }
+        s.preview = true
+    }
+
+    /** Up on the bottom screen's card: it lifts part way (Up again brings it up to the top screen). */
+    private fun showBottomUp(svc: AccessibilityService) {
+        val s = state ?: return
+        val p = s.bottom.firstOrNull() ?: return
+        s.up = entry(svc, p)
+        s.down = null
         s.preview = true
     }
 
@@ -627,6 +603,108 @@ object AppSwitcher {
         runCatching { ctx.startActivity(intent, opts) }
     }
 
+    // ---- the bottom screen's own overlay: its app's picture zooms out into a card, like the top screen's
+    private var bottomView: ComposeView? = null
+    private var bottomOwner: OverlayOwner? = null
+
+    /**
+     * On the bottom screen, the app running there zooms out of full screen into a card (its picture, taken as the
+     * switcher opened), the same way the top screen's app does. In the swap view it lifts part way up, and goes up
+     * off the screen as it moves to the top one. Touch only: the controller stays with the switcher on the top screen.
+     * Android 11+; if the overlay can't be added, the top screen shows that app's card instead.
+     */
+    private fun addBottomOverlay(svc: AccessibilityService, st: UiState) {
+        if (Build.VERSION.SDK_INT < 31) return
+        val id = st.bottomId ?: return
+        val pkg = st.bottom.firstOrNull() ?: return
+        val d = (svc.getSystemService(Context.DISPLAY_SERVICE) as android.hardware.display.DisplayManager).getDisplay(id) ?: return
+        val e = entry(svc, pkg)
+        runCatching {
+            val wctx = svc.createWindowContext(d, WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, null)
+            val wm = wctx.getSystemService(WindowManager::class.java)
+            val o = OverlayOwner()
+            val v = ComposeView(wctx).apply {
+                setViewTreeLifecycleOwner(o)
+                setViewTreeViewModelStoreOwner(o)
+                setViewTreeSavedStateRegistryOwner(o)
+                setContent { BottomUi(st, e) }
+            }
+            val lp = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                PixelFormat.TRANSLUCENT
+            )
+            wm.addView(v, lp)
+            o.resume()
+            bottomView = v; bottomOwner = o
+            st.bottomShown = true
+        }
+    }
+
+    private fun removeBottomOverlay() {
+        val v = bottomView ?: return
+        bottomView = null
+        runCatching { if (v.isAttachedToWindow) (v.context.getSystemService(WindowManager::class.java)).removeView(v) }
+        bottomOwner?.destroy(); bottomOwner = null
+    }
+
+    @Composable
+    private fun BottomUi(st: UiState, e: Entry) {
+        val gold = ThemeColors.accent.value
+        val ring = ThemeColors.focus.value
+        val appear = remember { Animatable(0f) }
+        LaunchedEffect(Unit) { appear.animateTo(1f, tween(320)) }
+        // 0 resting, 1 lifted part way (swap view / Up), 2 gone up off the screen (moving to the top one)
+        val up = st.up?.pkg == e.pkg
+        val lift by animateFloatAsState(
+            when { up && st.sinking -> 2f; up && st.preview -> 1f; else -> 0f },
+            if (up && st.sinking) tween(260) else spring(dampingRatio = 0.82f, stiffness = 360f), label = "bottomLift"
+        )
+        val p2 = (lift - 1f).coerceIn(0f, 1f)
+        BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f * appear.value))) {
+            val h = maxHeight
+            Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(0x400A0A0C), Color(0xE00A0A0C)))).graphicsLayer { alpha = appear.value })
+            // the card: from full screen down to 0.8 (a little more zoomed out than the top screen's, so its edges show)
+            val rest = 0.80f
+            val scale = 1f + (rest - 1f) * appear.value - 0.05f * lift.coerceAtMost(1f)
+            val y = -(h * 0.42f) * lift.coerceAtMost(1f) - h * 0.75f * p2
+            val shape = RoundedCornerShape(16.dp)
+            Box(
+                Modifier.align(Alignment.Center).offset(y = y).fillMaxSize()
+                    .graphicsLayer { scaleX = scale; scaleY = scale; alpha = 1f - p2 * 0.6f }
+                    .then(if (st.bottomFocus || st.preview) Modifier.shadow(30.dp, shape, ambientColor = ring, spotColor = ring) else Modifier)
+                    .clip(shape)
+                    .background(Brush.linearGradient(listOf(Color(0xFF1C1C22), Color(0xFF0B0B0D))))
+                    .border(3.dp, if (st.bottomFocus || up) ring else gold.copy(alpha = 0.55f), shape),
+                contentAlignment = Alignment.Center
+            ) {
+                val shot = st.shots[e.pkg]
+                if (shot != null) Image(shot, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                else e.icon?.let { Image(it, null, Modifier.size(72.dp).clip(RoundedCornerShape(18.dp))) }
+            }
+            // its name, and what Up does
+            Column(
+                Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp).graphicsLayer { alpha = appear.value * (1f - p2) },
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    e.icon?.let { Image(it, null, Modifier.size(20.dp).clip(RoundedCornerShape(10.dp))) }
+                    Text(e.label, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 7.dp))
+                }
+                Text(
+                    when {
+                        st.sinking && up -> "TO THE TOP SCREEN\u2026"
+                        up -> "\u25B2  " + (if (st.bottomFocus) "UP AGAIN: TO THE TOP SCREEN" else "GOES TO THE TOP SCREEN")
+                        st.bottomFocus -> "ON THE BOTTOM SCREEN  ·  UP: TO THE TOP SCREEN"
+                        else -> "ON THE BOTTOM SCREEN"
+                    },
+                    color = if (up) gold else Color(0xFFC8CAD2), fontSize = 8.5.sp, letterSpacing = 1.6.sp, modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+        }
+    }
+
     // ---- the overlay window
     private fun addOverlay(svc: AccessibilityService, st: UiState) {
         val wm = svc.getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -660,6 +738,7 @@ object AppSwitcher {
     }
 
     private fun removeOverlay(ctx: Context) {
+        removeBottomOverlay()
         val v = view ?: return
         view = null
         state = null
@@ -779,7 +858,7 @@ object AppSwitcher {
                     SwapCard(st, e, cardW, cardH, y, scale, (if (fromRow) 1f else p1) * (1f - p2), chosen = false, dim = 0.4f * p1,
                         tag = "\u25BC  TO THE BOTTOM SCREEN")
                 }
-                st.up?.let { e ->
+                st.up?.takeIf { !st.bottomShown }?.let { e ->
                     val fromRow = e.pkg == chosenPkg
                     val start = if (fromRow) 1f else 1f / 0.60f
                     val rest = 0.85f
@@ -791,7 +870,7 @@ object AppSwitcher {
             }
             // the chosen app's name, and when it was last in front (in the swap view: the app coming up, and what
             // Down again does), lifted above the sunk card
-            (if (p1 > 0f) st.up ?: st.down else st.apps.getOrNull(st.sel))?.let { e ->
+            (if (p1 > 0f) st.up ?: st.down else st.apps.getOrNull(st.sel))?.takeIf { !st.bottomFocus }?.let { e ->
                 Column(
                     Modifier.align(Alignment.BottomCenter).padding(bottom = 30.dp).offset(y = -(56.dp * p1)).graphicsLayer { alpha = appear.value * (1f - p2) },
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -816,6 +895,15 @@ object AppSwitcher {
                         color = Color(0xFFC8CAD2), fontSize = 8.5.sp, letterSpacing = 1.6.sp, modifier = Modifier.padding(top = 4.dp)
                     )
                 }
+            }
+            // no other app open: the one on the bottom screen is worked from there
+            if (st.apps.isEmpty() && st.bottomShown) Column(
+                Modifier.align(Alignment.Center).graphicsLayer { alpha = appear.value * (1f - p2) },
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("\u25BC", color = gold, fontSize = 22.sp)
+                Text("ONLY THE BOTTOM SCREEN'S APP IS OPEN", color = Color.White, fontSize = 11.sp, letterSpacing = 1.8.sp, modifier = Modifier.padding(top = 6.dp))
+                Text(if (st.preview) "UP AGAIN: TO THE TOP SCREEN  ·  DOWN: BACK" else "UP: BRING IT UP HERE  ·  B: CLOSE", color = Color(0xFFC8CAD2), fontSize = 8.5.sp, letterSpacing = 1.6.sp, modifier = Modifier.padding(top = 4.dp))
             }
             // where you are in the row
             Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp).graphicsLayer { alpha = 1f - p1 }, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
