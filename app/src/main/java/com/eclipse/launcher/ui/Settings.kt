@@ -440,7 +440,7 @@ private fun AppSwitcherRows(vm: EclipseVM) {
     var homeSwap by remember { mutableStateOf(com.eclipse.launcher.media.AppSwitcher.homeSwap(ctx)) }
     ToggleRow(
         "Hold Home to swap screens",
-        "The app on the top screen goes to the bottom one and the bottom screen's app comes up, both still running. A quick press of Home is still Home.",
+        "The app on the top screen goes to the bottom one and the bottom screen's app comes up, both still running. A quick press of Home is still Home. On the Thor this can take over the AYN button (its menu won't open): leave it off if so.",
         homeSwap
     ) { homeSwap = it; com.eclipse.launcher.media.AppSwitcher.setHomeSwap(ctx, it); ScreenshotService.refreshKeyFilter() }
 }

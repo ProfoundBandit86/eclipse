@@ -90,8 +90,11 @@ object AppSwitcher {
         val v = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, null) ?: return android.view.KeyEvent.KEYCODE_BACK
         return v.toIntOrNull() ?: 0 // ("" was how "off" used to be kept)
     }
-    /** Holding Home swaps the apps on the two screens (Settings → App switcher); on by default. */
-    fun homeSwap(ctx: Context): Boolean = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(HOME_SWAP, true)
+    /**
+     * Holding Home swaps the apps on the two screens (Settings → App switcher). Off by default: on the Thor the AYN
+     * button reaches Android as Home too, and catching it took away the Thor's own menu.
+     */
+    fun homeSwap(ctx: Context): Boolean = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(HOME_SWAP, false)
     fun setHomeSwap(ctx: Context, on: Boolean) { ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(HOME_SWAP, on).apply() }
     private const val HOME_SWAP = "home_swap"
     /** Whether the helper needs to see key presses at all (the switcher's button, choosing one, or Home held). */
@@ -227,6 +230,8 @@ object AppSwitcher {
         // Home held: the apps on the two screens swap places; a quick press is Home. Only Android's Home key: the
         // controller's own button (BUTTON_MODE, the AYN button on the Thor) keeps its usual job
         if (e.keyCode == KeyEvent.KEYCODE_HOME && e.keyCode != code && !isOpen &&
+            // (a Home from a controller, like the Thor's AYN button, is left alone)
+            !e.isFromSource(android.view.InputDevice.SOURCE_GAMEPAD) && !e.isFromSource(android.view.InputDevice.SOURCE_JOYSTICK) &&
             homeSwap(svc) && Screens.companion(svc) != null) {
             when (e.action) {
                 KeyEvent.ACTION_DOWN -> if (e.repeatCount == 0) {
