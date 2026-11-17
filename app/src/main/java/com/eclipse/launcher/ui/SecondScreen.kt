@@ -307,8 +307,12 @@ private fun BottomDock(vm: EclipseVM, launch: (String) -> Unit, openDrawer: () -
         contentAlignment = Alignment.BottomCenter
     ) {
         val scale = when (vm.dock2Size) { "small" -> 0.82f; "large" -> 1.18f; else -> 1f }
-        val slot = (((if (bar) maxWidth else maxWidth - 64.dp) / 5) * (if (bar) 1f else scale)).coerceIn(56.dp, 124.dp)
-        val icon = ((if (bar) maxWidth / 5 else slot) * 0.7f).coerceAtMost(58.dp * scale)
+        // five equal slots that always fit: the panel (its 10 dp padding each side) stays at least 12 dp inside each
+        // edge whatever the size setting; a bigger size makes the icons bigger, never the row wider than the screen
+        // (it used to: the last slot was squeezed and the outer icons cut off)
+        val fit = (maxWidth - 24.dp - 20.dp) / 5
+        val slot = if (bar) maxWidth / 5 else (((maxWidth - 64.dp) / 5) * scale).coerceIn(56.dp, 124.dp).coerceAtMost(fit)
+        val icon = (slot * 0.7f).coerceAtMost(58.dp * scale)
         // each slot's width, read here: inside the Row below, the screen's width can't be reached
         val cellW = if (bar) maxWidth / 5 else slot
         val corner = RoundedCornerShape(icon * 0.28f)
