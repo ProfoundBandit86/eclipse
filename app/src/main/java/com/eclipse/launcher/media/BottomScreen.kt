@@ -8,7 +8,10 @@ import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.sp
 
 /**
  * Eclipse's bottom screen, whichever window it lives in:
@@ -67,8 +70,8 @@ class ActivitySurface(
         BottomScreenActivity.content = content
         BottomScreenActivity.focusable = focusable
         BottomScreenActivity.onLeave = onLeave
-        // the screen is still open from before (Eclipse's main screen was recreated): show the new content in it
-        BottomScreenActivity.live?.let { a -> a.runOnUiThread { runCatching { a.setContent { content() } } } }
+        // (a screen still open from before, or one Android opened by itself as the bottom screen's home, shows the new
+        // content straight away: it draws whatever this holds)
     }
 
     private val live: BottomScreenActivity? get() = BottomScreenActivity.live?.takeIf { !it.isFinishing && !it.isDestroyed }
@@ -79,13 +82,21 @@ class ActivitySurface(
     override val isShowing: Boolean get() = live != null || starting
     override val stacksUnderApps = true
 
-    /** Starts the screen on its display, unless it's already there or on its way (never brought in front of an app). */
+    /**
+     * Starts the screen on its display, unless it's already there or on its way (never brought in front of an app).
+     * It's started as that display's home (the bottom screen's Home intent, Eclipse's own package), so Android keeps it
+     * as the bottom screen's home: Home pressed there comes back to it, as Mjolnir and other dual-screen homes do.
+     */
     override fun show() {
         if (live != null || starting) return
         startedAt = android.os.SystemClock.uptimeMillis()
-        val i = Intent(ctx, BottomScreenActivity::class.java)
+        val opts = ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle()
+        val home = Intent(Intent.ACTION_MAIN).addCategory("android.intent.category.SECONDARY_HOME").setPackage(ctx.packageName)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
-        runCatching { ctx.startActivity(i, ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle()) }.onFailure { startedAt = 0L }
+        val plain = Intent(ctx, BottomScreenActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
+        runCatching { ctx.startActivity(home, opts) }
+            .recoverCatching { ctx.startActivity(plain, opts) }
+            .onFailure { startedAt = 0L }
     }
 
     /** Nothing to do: an app on this screen covers it by itself. */
@@ -117,7 +128,11 @@ class ActivitySurface(
 class BottomScreenActivity : ComponentActivity() {
     companion object {
         @Volatile var live: BottomScreenActivity? = null
-        @Volatile var content: (@Composable () -> Unit)? = null
+        /** What the screen shows (set by Eclipse's main screen; until then a quiet placeholder). */
+        private val contentState = androidx.compose.runtime.mutableStateOf<(@Composable () -> Unit)?>(null)
+        var content: (@Composable () -> Unit)?
+            get() = contentState.value
+            set(v) { contentState.value = v }
         @Volatile var focusable: () -> Boolean = { false }
         @Volatile var onLeave: () -> Unit = {}
     }
@@ -143,14 +158,23 @@ class BottomScreenActivity : ComponentActivity() {
         // touch only from the very first frame, so opening it never takes the controller from the top screen
         applyFocusMode()
         super.onCreate(savedInstanceState)
-        val c = content
-        if (c == null) { finishAndRemoveTask(); return } // Eclipse isn't running its main screen: nothing to show
+        // (no content yet: Android opened this by itself as the bottom screen's home, before Eclipse's main screen
+        // has started, or the second screen is off in Settings; it shows a placeholder until there is some)
         live = this
         window.addFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED)
         // laid out inside the bottom screen's bars, over black, like the overlay
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
         window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.BLACK))
-        setContent { c() }
+        setContent {
+            val c = contentState.value
+            if (c != null) c()
+            else androidx.compose.foundation.layout.Box(
+                androidx.compose.ui.Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black),
+                contentAlignment = androidx.compose.ui.Alignment.Center
+            ) {
+                androidx.compose.material3.Text("ECLIPSE", color = androidx.compose.ui.graphics.Color(0x33FFFFFF), fontSize = 12.sp, letterSpacing = 4.sp)
+            }
+        }
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(window.decorView) { v, insets ->
             val bars = insets.getInsets(
                 androidx.core.view.WindowInsetsCompat.Type.systemBars() or androidx.core.view.WindowInsetsCompat.Type.displayCutout()

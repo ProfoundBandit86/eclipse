@@ -95,15 +95,24 @@
 
         <!-- Eclipse's bottom screen as an app screen in its own task on the bottom display: apps opened or moved there
              sit on top of it, and it's underneath again when they go (media/BottomScreen.kt) -->
+        <!-- It's also the bottom screen's home (SECONDARY_HOME, like Mjolnir's): Home pressed on the bottom screen comes back
+             to it instead of the device's own secondary launcher replacing it. Android only takes a secondary home from
+             the default home app's package, and not singleTask / singleInstance. -->
         <activity
             android:name=".media.BottomScreenActivity"
-            android:exported="false"
+            android:exported="true"
             android:excludeFromRecents="true"
-            android:launchMode="singleInstance"
+            android:launchMode="singleTop"
             android:taskAffinity="com.eclipse.launcher.bottom"
             android:resizeableActivity="true"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
-            android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|smallestScreenSize|density" />
+            android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|smallestScreenSize|density">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.SECONDARY_HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
 
         <activity
             android:name=".media.MirrorPermissionActivity"
